@@ -1,0 +1,72 @@
+# General
+.DS_Store
+Thumbs.db
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Node / TypeScript
+node_modules/
+dist/
+build/
+lib/
+out/
+.tmp/
+tmp/
+.cache/
+.eslintcache
+coverage/
+.nyc_output/
+*.tsbuildinfo
+
+# Bundlers and frameworks
+.parcel-cache/
+.next/
+.nuxt/
+.svelte-kit/
+.turbo/
+storybook-static/
+.vercel/
+.netlify/
+.docusaurus/
+
+# Yarn (Berry / v2+)
+# Keep essential subfolders if present; ignore everything else
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+# If not using Zero-Installs, ensure cache stays untracked
+.yarn/cache/
+
+# Note: Yarn Plug'n'Play files (.pnp.cjs/.pnp.loader.mjs) are intended to be committed
+
+# Env files
+.env
+.env.*
+.env.local
+.env.*.local
+!.env.example
+
+# Editors/IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Local tools and temp data
+.gemini-clipboard/

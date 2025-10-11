@@ -1,0 +1,29 @@
+{
+  "name": "taskagent",
+  "version": "1.0.0",
+  "description": "",
+  "main": "ui.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "tsx ui.tsx"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@ai-sdk/openai": "^2.0.48",
+    "ai": "^5.0.68",
+    "dotenv": "^17.2.3",
+    "ink": "^6.3.1",
+    "ink-text-input": "^6.0.0",
+    "react": "^19.2.0",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/node": "^24.7.1",
+    "@types/react": "^19.2.2",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}
