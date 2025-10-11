@@ -22,8 +22,9 @@ if (process.env.OPENROUTER_API_KEY) {
 }
 
 // --- AI Configuration ---
+const OPENROUTER_BASE_URL = process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1';
 const openrouter = createOpenAI({
-    baseURL: 'https://openrouter.ai/api/v1',
+    baseURL: OPENROUTER_BASE_URL,
 });
 
 // --- Model Configuration ---
