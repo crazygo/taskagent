@@ -70,3 +70,6 @@ storybook-static/
 
 # Local tools and temp data
 .gemini-clipboard/
+
+# Temporary directories
+opencodetmp/

@@ -4,7 +4,7 @@ dotenv.config({ path: '.env.local' });
 
 import fs from 'fs';
 import React, {useState, useCallback, useEffect} from 'react';
-import {render, Text, Box, Newline, Static} from 'ink';
+import {render, Text, Box, Newline, Static, useInput} from 'ink';
 import TextInput from 'ink-text-input';
 import { createOpenAI } from '@ai-sdk/openai';
 import { streamText } from 'ai';
@@ -40,7 +40,58 @@ interface Message {
     isBoxed?: boolean;
 }
 
+enum Kernel {
+  CLAUDE_CODE = 'Claude Code',
+  GEMINI = 'Gemini',
+  CODEX = 'Codex',
+}
+
+enum Driver {
+  MANUAL = '手动挡',
+  PLAN_REVIEW_DO = 'Plan-Review-DO',
+  AUTO_COMMIT = 'L2+',
+}
+
+
 // --- Components ---
+
+interface OptionGroupProps<T extends string> {
+  title: string;
+  options: T[];
+  selectedValue: T;
+  onSelect: (value: T) => void;
+  isFocused: boolean;
+}
+
+const OptionGroup = <T extends string>({ title, options, selectedValue, onSelect, isFocused }: OptionGroupProps<T>) => {
+  useInput(
+    (input, key) => {
+      if (key.leftArrow) {
+        const currentIndex = options.indexOf(selectedValue);
+        const newIndex = currentIndex > 0 ? currentIndex - 1 : options.length - 1;
+        onSelect(options[newIndex]);
+      } else if (key.rightArrow) {
+        const currentIndex = options.indexOf(selectedValue);
+        const newIndex = currentIndex < options.length - 1 ? currentIndex + 1 : 0;
+        onSelect(options[newIndex]);
+      }
+    },
+    { isActive: isFocused }
+  );
+
+  return (
+    <Box>
+      <Box width={10}><Text color={isFocused ? 'blue' : 'white'}>{title}:</Text></Box>
+      {options.map(option => (
+        <Box key={option} marginRight={2}>
+          <Text color={isFocused ? 'blue' : 'white'}>
+            {selectedValue === option ? '(◉)' : '(○)'} {option}
+          </Text>
+        </Box>
+      ))}
+    </Box>
+  );
+};
 
 const WelcomeScreen = React.memo(() => (
     <Box borderStyle="round" paddingX={2} flexDirection="column">
@@ -126,15 +177,29 @@ const ActiveHistory: React.FC<HistoryProps> = React.memo(({ messages }) => (
 ));
 
 const App = () => {
+    // --- STATE ---
     const [frozenMessages, setFrozenMessages] = useState<Message[]>([]);
     const [activeMessages, setActiveMessages] = useState<Message[]>([]);
     const [query, setQuery] = useState('');
+    const [selectedKernel, setSelectedKernel] = useState<Kernel>(Kernel.CLAUDE_CODE);
+    const [selectedDriver, setSelectedDriver] = useState<Driver>(Driver.MANUAL);
+    const [focusedControl, setFocusedControl] = useState<'input' | 'kernel' | 'driver'>('input');
 
+    // --- EFFECTS & HOOKS ---
     useEffect(() => {
         fs.writeFileSync(LOG_FILE, '');
         addLog('--- Application Started ---');
     }, []);
 
+    useInput((input, key) => {
+        if (key.tab) {
+            if (focusedControl === 'input') setFocusedControl('kernel');
+            else if (focusedControl === 'kernel') setFocusedControl('driver');
+            else if (focusedControl === 'driver') setFocusedControl('input');
+        }
+    });
+
+    // --- HANDLERS (Existing handleSubmit logic remains unchanged) ---
     const handleSubmit = async (userInput: string) => {
         addLog('--- New Submission ---');
         if (!userInput) return;
@@ -202,6 +267,7 @@ const App = () => {
         }
     };
 
+    // --- RENDER ---
     const staticItems = [
         <Box key="welcome-screen-wrapper" flexDirection="column"><WelcomeScreen /><Newline /></Box>,
         ...frozenMessages
@@ -219,14 +285,33 @@ const App = () => {
             </Static>
             <ActiveHistory messages={activeMessages} />
 			<Newline />
-            <Box borderStyle="single" borderColor="blue">
+
+            <Box borderStyle="single" borderColor={focusedControl === 'input' ? 'blue' : 'grey'}>
                 <TextInput
                     value={query}
                     onChange={setQuery}
                     onSubmit={handleSubmit}
                     placeholder="Type your message..."
+                    focus={focusedControl === 'input'}
                 />
             </Box>
+
+            <OptionGroup
+              title="Kernel"
+              options={Object.values(Kernel)}
+              selectedValue={selectedKernel}
+              onSelect={setSelectedKernel}
+              isFocused={focusedControl === 'kernel'}
+            />
+            <OptionGroup
+              title="Driver"
+              options={Object.values(Driver)}
+              selectedValue={selectedDriver}
+              onSelect={setSelectedDriver}
+              isFocused={focusedControl === 'driver'}
+            />
+
+            <Text color="gray">(Press [Tab] to switch between controls)</Text>
 		</Box>
 	);
 };
