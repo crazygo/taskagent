@@ -50,6 +50,7 @@ enum Driver {
   MANUAL = '手动挡',
   PLAN_REVIEW_DO = 'Plan-Review-DO',
   AUTO_COMMIT = 'L2+',
+  CUSTOM = 'Custom',
 }
 
 
