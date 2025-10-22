@@ -1,38 +1,17 @@
 
-import dotenv from 'dotenv';
-dotenv.config({ path: '.env.local' });
+import { addLog } from './src/logger.ts';
+import { loadCliConfig } from './src/cli/config.ts';
 
-import fs from 'fs';
+
 import React, {useState, useEffect, useRef} from 'react';
 import {render, Text, Box, Newline, Static, useInput} from 'ink';
 import TextInput from 'ink-text-input';
-import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { streamText } from 'ai';
 import { TaskManager, type Task } from './task-manager.ts';
-import minimist from 'minimist';
-
-// --- Logging Setup ---
-const LOG_FILE = 'debug.log';
-const addLog = (message: string) => {
-    const timestamp = new Date().toLocaleTimeString();
-    fs.appendFileSync(LOG_FILE, `[${timestamp}] ${message}\n`);
-};
-
-// --- Environment Variable Workaround ---
-if (process.env.OPENROUTER_API_KEY) {
-  process.env.OPENAI_API_KEY = process.env.OPENROUTER_API_KEY;
-}
+import { getOpenRouterClient, modelName } from './src/config/openrouter.ts';
 
 // --- AI Configuration ---
-const OPENROUTER_BASE_URL = process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1';
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-const openrouter = createOpenRouter({
-    ...(OPENROUTER_API_KEY ? { apiKey: OPENROUTER_API_KEY } : {}),
-    baseURL: OPENROUTER_BASE_URL,
-});
-
-// --- Model Configuration ---
-const modelName = process.env.OPENROUTER_MODEL_NAME || 'google/gemini-flash';
+const openrouter = getOpenRouterClient();
 
 // --- Task Manager ---
 const taskManager = new TaskManager();
@@ -427,9 +406,10 @@ const TaskList: React.FC<TaskListProps> = ({ tasks, isFocused }) => {
   );
 };
 
-// --- Argument Parsing for Non-Interactive Mode ---
-const argv = minimist(process.argv.slice(2));
-const nonInteractiveInput = String(argv.p || argv.prompt); // Ensure it's a string
+
+
+const cliConfig = loadCliConfig();
+const nonInteractiveInput = cliConfig.prompt;
 
 const App = () => {
     // --- STATE ---
@@ -475,22 +455,9 @@ const App = () => {
 
     // --- EFFECTS & HOOKS ---
     useEffect(() => {
-        const requiredEnvVars = [
-            'OPENROUTER_API_KEY',
-            'ANTHROPIC_API_KEY',
-            'ANTHROPIC_BASE_URL',
-            'ANTHROPIC_MODEL',
-        ];
-        const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
 
-        if (missingEnvVars.length > 0) {
-            console.error(`Error: Missing required environment variables: ${missingEnvVars.join(', ')}`);
-            console.error('Please ensure these are set in your .env file or environment.');
-            process.exit(1);
-        }
 
-        fs.writeFileSync(LOG_FILE, '');
-        addLog('--- Application Started ---');
+
 
         const interval = setInterval(() => {
             setTasks(taskManager.getAllTasks());
