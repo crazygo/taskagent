@@ -13,12 +13,13 @@
   "license": "ISC",
   "dependencies": {
     "@ai-sdk/openai": "^2.0.48",
+    "@anthropic-ai/claude-agent-sdk": "^0.1.25",
     "ai": "^5.0.68",
     "dotenv": "^17.2.3",
     "ink": "^6.3.1",
     "ink-text-input": "^6.0.0",
     "react": "^19.2.0",
-    "zod": "^4.1.12"
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/node": "^24.7.1",

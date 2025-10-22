@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "ask": [
+      "Read(!/Users/admin/Codespaces/aminer/taskagent/**)",
+      "Edit(!/Users/admin/Codespaces/aminer/taskagent/**)"
+    ],
+    "allow": [
+      "Read(/Users/admin/Codespaces/aminer/taskagent/**)",
+      "Edit(/Users/admin/Codespaces/aminer/taskagent/**)"
+    ]
+  },
+  "memoryImport": {},
+  "monitoring": {}
+}

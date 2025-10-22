@@ -8,6 +8,7 @@ import {render, Text, Box, Newline, Static, useInput} from 'ink';
 import TextInput from 'ink-text-input';
 import { createOpenAI } from '@ai-sdk/openai';
 import { streamText } from 'ai';
+import { TaskManager, Task } from './task-manager';
 
 // --- Logging Setup ---
 const LOG_FILE = 'debug.log';
@@ -29,6 +30,9 @@ const openrouter = createOpenAI({
 
 // --- Model Configuration ---
 const modelName = process.env.OPENROUTER_MODEL_NAME || 'google/gemini-flash';
+
+// --- Task Manager ---
+const taskManager = new TaskManager();
 
 // --- Types ---
 type MessageType = 'user' | 'assistant' | 'system';
@@ -177,6 +181,22 @@ const ActiveHistory: React.FC<HistoryProps> = React.memo(({ messages }) => (
 	</Box>
 ));
 
+const TaskList: React.FC<{ tasks: Task[] }> = ({ tasks }) => {
+  return (
+    <Box flexDirection="column" borderStyle="round" padding={1}>
+      <Text>Background Tasks</Text>
+      {tasks.map(task => (
+        <Box key={task.id} flexDirection="column">
+          <Text>Task ID: {task.id}</Text>
+          <Text>Status: {task.status}</Text>
+          <Text>Prompt: {task.prompt}</Text>
+          <Text>Output: {task.output}</Text>
+        </Box>
+      ))}
+    </Box>
+  );
+};
+
 const App = () => {
     // --- STATE ---
     const [frozenMessages, setFrozenMessages] = useState<Message[]>([]);
@@ -185,11 +205,18 @@ const App = () => {
     const [selectedKernel, setSelectedKernel] = useState<Kernel>(Kernel.CLAUDE_CODE);
     const [selectedDriver, setSelectedDriver] = useState<Driver>(Driver.MANUAL);
     const [focusedControl, setFocusedControl] = useState<'input' | 'kernel' | 'driver'>('input');
+    const [tasks, setTasks] = useState<Task[]>([]);
 
     // --- EFFECTS & HOOKS ---
     useEffect(() => {
         fs.writeFileSync(LOG_FILE, '');
         addLog('--- Application Started ---');
+
+        const interval = setInterval(() => {
+            setTasks(taskManager.getAllTasks());
+        }, 1000);
+
+        return () => clearInterval(interval);
     }, []);
 
     useInput((input, key) => {
@@ -204,6 +231,13 @@ const App = () => {
     const handleSubmit = async (userInput: string) => {
         addLog('--- New Submission ---');
         if (!userInput) return;
+
+        if (userInput.startsWith('/task ')) {
+            const prompt = userInput.substring(6);
+            taskManager.createTask(prompt);
+            setQuery('');
+            return;
+        }
 
         if (activeMessages.length > 0) {
             setFrozenMessages(prev => [...prev, ...activeMessages]);
@@ -282,20 +316,23 @@ const App = () => {
                         return item;
                     }
                     return <MessageComponent key={item.id} message={item} />;
-                }}
+                }}\
             </Static>
             <ActiveHistory messages={activeMessages} />
 			<Newline />
+
+            <TaskList tasks={tasks} />
+            <Newline />
 
             <Box borderStyle="single" borderColor={focusedControl === 'input' ? 'blue' : 'grey'}>
                 <TextInput
                     value={query}
                     onChange={setQuery}
                     onSubmit={handleSubmit}
-                    placeholder="Type your message..."
+                    placeholder="Type your message... or use /task <prompt>"
                     focus={focusedControl === 'input'}
                 />
-            </Box>
+
 
             <OptionGroup
               title="Kernel"
