@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "tsx ui.tsx"
+    "start": "tsx ui.tsx",
+    "start:test": "concurrently --raw --kill-others \"yarn start\" \"sleep 5\""
   },
   "keywords": [],
   "author": "",
@@ -24,6 +25,7 @@
   "devDependencies": {
     "@types/node": "^24.7.1",
     "@types/react": "^19.2.2",
+    "concurrently": "^9.2.1",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3"
   }

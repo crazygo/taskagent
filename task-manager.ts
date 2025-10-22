@@ -1,10 +1,5 @@
 
-import { query, createAnthropic } from '@anthropic-ai/claude-agent-sdk';
-
-const anthropic = createAnthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-  baseURL: process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com',
-});
+import { query, Options, SDKMessage, SDKAssistantMessage } from '@anthropic-ai/claude-agent-sdk';
 
 export interface Task {
   id: string;
@@ -41,19 +36,29 @@ export class TaskManager {
     this.tasks.set(task.id, { ...task, status: 'in_progress' });
 
     try {
-      // Use the Claude SDK's query function
-      const result = anthropic.query(task.prompt, {
-        // Configure the model and other options as needed
-        // For example, to specify a model:
-        // model: 'claude-3-opus-20240229',
-        // You might need to pass a CancellationToken or AbortController if you want to cancel tasks
+      const options: Options = {
+        apiKey: process.env.ANTHROPIC_API_KEY,
+        baseURL: process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com',
+        model: process.env.ANTHROPIC_MODEL,
+      };
+
+
+
+      const result = await query({
+        prompt: task.prompt,
+        options: options,
       });
 
       let fullOutput = '';
       for await (const message of result) {
         if (message.type === 'assistant') {
-          fullOutput += message.content;
-          this.tasks.set(task.id, { ...task, status: 'in_progress', output: fullOutput });
+          const assistantMessage = message as SDKAssistantMessage;
+          for (const block of assistantMessage.message.content) {
+            if (block.type === 'text') {
+              fullOutput += block.text;
+              this.tasks.set(task.id, { ...task, status: 'in_progress', output: fullOutput });
+            }
+          }
         }
       }
 

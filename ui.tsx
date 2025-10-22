@@ -8,7 +8,7 @@ import {render, Text, Box, Newline, Static, useInput} from 'ink';
 import TextInput from 'ink-text-input';
 import { createOpenAI } from '@ai-sdk/openai';
 import { streamText } from 'ai';
-import { TaskManager, Task } from './task-manager';
+import { TaskManager, type Task } from './task-manager.ts';
 
 // --- Logging Setup ---
 const LOG_FILE = 'debug.log';
@@ -209,6 +209,19 @@ const App = () => {
 
     // --- EFFECTS & HOOKS ---
     useEffect(() => {
+        const requiredEnvVars = [
+            'ANTHROPIC_API_KEY',
+            'ANTHROPIC_BASE_URL',
+            'ANTHROPIC_MODEL',
+        ];
+        const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
+
+        if (missingEnvVars.length > 0) {
+            console.error(`Error: Missing required environment variables: ${missingEnvVars.join(', ')}`);
+            console.error('Please ensure these are set in your .env file or environment.');
+            process.exit(1);
+        }
+
         fs.writeFileSync(LOG_FILE, '');
         addLog('--- Application Started ---');
 
@@ -305,18 +318,13 @@ const App = () => {
     // --- RENDER ---
     const staticItems = [
         <Box key="welcome-screen-wrapper" flexDirection="column"><WelcomeScreen /><Newline /></Box>,
-        ...frozenMessages
+        ...frozenMessages.map(msg => <MessageComponent key={msg.id} message={msg} />)
     ];
 
 	return (
 		<Box flexDirection="column">
             <Static items={staticItems}>
-                {item => {
-                    if (React.isValidElement(item)) {
-                        return item;
-                    }
-                    return <MessageComponent key={item.id} message={item} />;
-                }}\
+                {item => item}
             </Static>
             <ActiveHistory messages={activeMessages} />
 			<Newline />
@@ -332,6 +340,7 @@ const App = () => {
                     placeholder="Type your message... or use /task <prompt>"
                     focus={focusedControl === 'input'}
                 />
+            </Box>
 
 
             <OptionGroup

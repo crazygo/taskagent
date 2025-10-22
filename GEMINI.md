@@ -20,3 +20,4 @@ Your primary role is to act as an interactive CLI agent for software engineering
 - **Test Thoroughly**: Add or update tests to verify your changes.
 - **Communicate Clearly**: Keep the user informed of your plans and progress. Use ASCII art and user stories where appropriate to clarify complex features.
 - **Memory**: Remember key facts and instructions provided by the user, especially regarding workflow (e.g., how to run and test the application).
+- **Testing Workflow**: Utilize the `yarn start:test` command for quick, automated checks of application initialization and UI rendering, as detailed in `AGENTS.md`.
