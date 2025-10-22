@@ -31,6 +31,7 @@ const RAW_RUNTIME_STATE =
           ["@ai-sdk/openai", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:2.0.48"],\
           ["@anthropic-ai/claude-agent-sdk", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:0.1.25"],\
           ["@openrouter/ai-sdk-provider", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:1.2.0"],\
+          ["@types/minimist", "npm:1.2.5"],\
           ["@types/node", "npm:24.7.1"],\
           ["@types/react", "npm:19.2.2"],\
           ["ai", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:5.0.68"],\
@@ -38,6 +39,7 @@ const RAW_RUNTIME_STATE =
           ["dotenv", "npm:17.2.3"],\
           ["ink", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:6.3.1"],\
           ["ink-text-input", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:6.0.0"],\
+          ["minimist", "npm:1.2.8"],\
           ["react", "npm:19.2.0"],\
           ["taskagent", "workspace:."],\
           ["tsx", "npm:4.20.6"],\
@@ -615,6 +617,15 @@ const RAW_RUNTIME_STATE =
         "packageLocation": "../../../.yarn/berry/cache/@standard-schema-spec-npm-1.0.0-e86c6647f1-10c0.zip/node_modules/@standard-schema/spec/",\
         "packageDependencies": [\
           ["@standard-schema/spec", "npm:1.0.0"]\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
+    ["@types/minimist", [\
+      ["npm:1.2.5", {\
+        "packageLocation": "../../../.yarn/berry/cache/@types-minimist-npm-1.2.5-c85664a9d8-10c0.zip/node_modules/@types/minimist/",\
+        "packageDependencies": [\
+          ["@types/minimist", "npm:1.2.5"]\
         ],\
         "linkType": "HARD"\
       }]\
@@ -1484,6 +1495,15 @@ const RAW_RUNTIME_STATE =
         "linkType": "HARD"\
       }]\
     ]],\
+    ["minimist", [\
+      ["npm:1.2.8", {\
+        "packageLocation": "../../../.yarn/berry/cache/minimist-npm-1.2.8-d7af7b1dce-10c0.zip/node_modules/minimist/",\
+        "packageDependencies": [\
+          ["minimist", "npm:1.2.8"]\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
     ["minipass", [\
       ["npm:3.3.6", {\
         "packageLocation": "../../../.yarn/berry/cache/minipass-npm-3.3.6-b8d93a945b-10c0.zip/node_modules/minipass/",\
@@ -2009,6 +2029,7 @@ const RAW_RUNTIME_STATE =
           ["@ai-sdk/openai", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:2.0.48"],\
           ["@anthropic-ai/claude-agent-sdk", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:0.1.25"],\
           ["@openrouter/ai-sdk-provider", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:1.2.0"],\
+          ["@types/minimist", "npm:1.2.5"],\
           ["@types/node", "npm:24.7.1"],\
           ["@types/react", "npm:19.2.2"],\
           ["ai", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:5.0.68"],\
@@ -2016,6 +2037,7 @@ const RAW_RUNTIME_STATE =
           ["dotenv", "npm:17.2.3"],\
           ["ink", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:6.3.1"],\
           ["ink-text-input", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:6.0.0"],\
+          ["minimist", "npm:1.2.8"],\
           ["react", "npm:19.2.0"],\
           ["taskagent", "workspace:."],\
           ["tsx", "npm:4.20.6"],\
