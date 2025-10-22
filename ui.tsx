@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
 
 import fs from 'fs';
-import React, {useState, useCallback, useEffect, useRef} from 'react';
+import React, {useState, useEffect, useRef} from 'react';
 import {render, Text, Box, Newline, Static, useInput} from 'ink';
 import TextInput from 'ink-text-input';
 import { createOpenAI } from '@ai-sdk/openai';
@@ -42,7 +42,13 @@ interface Message {
     role: MessageType;
     content: string;
     isBoxed?: boolean;
+    isPending?: boolean;
 }
+
+type LogMessage = {
+    role: 'user' | 'assistant' | 'system';
+    content: string;
+};
 
 enum Kernel {
   CLAUDE_CODE = 'Claude Code',
@@ -140,9 +146,10 @@ const MessageComponent: React.FC<MessageProps> = ({ message }) => {
         }
     }
 
+    const pendingSuffix = message.isPending ? ' (queued)' : '';
     const content = (
         <Text color={textColor}>
-            {prefix}{message.content}
+            {prefix}{message.content}{pendingSuffix}
         </Text>
     );
 
@@ -188,6 +195,8 @@ const formatPrompt = (prompt: string | undefined, wordLimit = 20) => {
   }
   return `${words.slice(0, wordLimit).join(' ')} …`;
 };
+
+const STREAM_TOKEN_TIMEOUT_MS = 10_000;
 
 const TaskList: React.FC<TaskListProps> = ({ tasks, isFocused }) => {
   const [selectedTaskIndex, setSelectedTaskIndex] = useState(0);
@@ -413,6 +422,38 @@ const App = () => {
     const [selectedDriver, setSelectedDriver] = useState<Driver>(Driver.MANUAL);
     const [focusedControl, setFocusedControl] = useState<'input' | 'kernel' | 'driver' | 'tasks'>('input');
     const [tasks, setTasks] = useState<Task[]>([]);
+    const [isStreaming, setIsStreaming] = useState(false);
+    const conversationLogRef = useRef<LogMessage[]>([]);
+    const pendingUserInputsRef = useRef<Message[]>([]);
+    const isProcessingQueueRef = useRef(false);
+    const streamAbortControllerRef = useRef<AbortController | null>(null);
+    const streamTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const lastTokenAtRef = useRef<number>(0);
+    const messageIdRef = useRef(0);
+
+    const nextMessageId = () => {
+        messageIdRef.current += 1;
+        return messageIdRef.current;
+    };
+
+    const clearStreamWatchdog = () => {
+        if (streamTimeoutRef.current) {
+            clearInterval(streamTimeoutRef.current);
+            streamTimeoutRef.current = null;
+        }
+    };
+
+    const pushSystemMessage = (content: string) => {
+        const systemMessage: Message = {
+            id: Date.now(),
+            role: 'system',
+            content,
+            isBoxed: true,
+        };
+        setActiveMessages(prev => [...prev, systemMessage]);
+        setFrozenMessages(prev => [...prev, systemMessage]);
+        conversationLogRef.current.push({ role: 'system', content });
+    };
 
     // --- EFFECTS & HOOKS ---
     useEffect(() => {
@@ -448,7 +489,143 @@ const App = () => {
         }
     });
 
-    // --- HANDLERS (Existing handleSubmit logic remains unchanged) ---
+    const runStreamForUserMessage = async (userMessage: Message): Promise<void> => {
+        const normalizedUserMessage: Message = { ...userMessage, isPending: false };
+        addLog(`[Stream] Starting turn with user content: ${normalizedUserMessage.content.replace(/\s+/g, ' ').slice(0, 120)}`);
+        setIsStreaming(true);
+
+        // Render: keep only pending placeholders then append current user message
+        setActiveMessages(prev => {
+            const pendingOnly = prev.filter(msg => msg.isPending);
+            return [...pendingOnly, normalizedUserMessage];
+        });
+
+        conversationLogRef.current.push({ role: 'user', content: normalizedUserMessage.content });
+
+        const assistantMessageId = nextMessageId();
+        const assistantPlaceholder: Message = {
+            id: assistantMessageId,
+            role: 'assistant',
+            content: '',
+        };
+
+        setActiveMessages(prev => [...prev, assistantPlaceholder]);
+
+        const assistantLogIndex = conversationLogRef.current.push({ role: 'assistant', content: '' }) - 1;
+
+        const abortController = new AbortController();
+        streamAbortControllerRef.current = abortController;
+        lastTokenAtRef.current = Date.now();
+
+        clearStreamWatchdog();
+        let timedOut = false;
+        streamTimeoutRef.current = setInterval(() => {
+            if (Date.now() - lastTokenAtRef.current > STREAM_TOKEN_TIMEOUT_MS) {
+                addLog('Stream timeout reached (10s without new tokens). Aborting request.');
+                timedOut = true;
+                abortController.abort();
+            }
+        }, 1000);
+
+        let assistantContent = '';
+        let assistantSucceeded = false;
+
+        try {
+            addLog(`Calling AI API with model: ${modelName}`);
+            const messagesPayload = conversationLogRef.current
+                .slice(0, assistantLogIndex)
+                .map(({ role, content }) => ({ role, content }));
+
+            const result = await streamText({
+                model: openrouter.chat(modelName),
+                messages: messagesPayload,
+                abortSignal: abortController.signal,
+            });
+
+            addLog('AI stream started.');
+
+            for await (const delta of result.textStream) {
+                assistantContent += delta;
+                lastTokenAtRef.current = Date.now();
+                setActiveMessages(prev =>
+                    prev.map(msg =>
+                        msg.id === assistantMessageId ? { ...msg, content: assistantContent } : msg
+                    )
+                );
+                conversationLogRef.current[assistantLogIndex] = { role: 'assistant', content: assistantContent };
+            }
+
+            assistantSucceeded = true;
+            addLog('[Stream] Completed assistant response.');
+        } catch (error) {
+            const rawMessage = error instanceof Error ? error.message : String(error);
+            const displayMessage = timedOut ? 'Stream timeout (10s without response).' : rawMessage;
+            addLog(`[Stream] Error: ${displayMessage}`);
+            conversationLogRef.current.splice(assistantLogIndex, 1);
+            setActiveMessages(prev => prev.filter(msg => msg.id !== assistantMessageId));
+            pushSystemMessage(`Error: ${displayMessage}`);
+        } finally {
+            clearStreamWatchdog();
+            streamAbortControllerRef.current = null;
+            setIsStreaming(false);
+        }
+
+        const completedMessages: Message[] = [{ ...normalizedUserMessage, isPending: false }];
+        if (assistantSucceeded) {
+            conversationLogRef.current[assistantLogIndex] = { role: 'assistant', content: assistantContent };
+            completedMessages.push({
+                id: assistantMessageId,
+                role: 'assistant',
+                content: assistantContent,
+            });
+        }
+        setFrozenMessages(prev => [...prev, ...completedMessages]);
+
+        setActiveMessages(prev => prev.filter(msg => msg.isPending));
+
+        if (!isProcessingQueueRef.current) {
+            await flushPendingQueue();
+        }
+    };
+
+    const flushPendingQueue = async () => {
+        if (pendingUserInputsRef.current.length === 0) {
+            return;
+        }
+
+        isProcessingQueueRef.current = true;
+
+        try {
+            while (pendingUserInputsRef.current.length > 0) {
+                const batch = pendingUserInputsRef.current.splice(0, pendingUserInputsRef.current.length);
+                const batchSummary = batch.map(msg => msg.content.replace(/\s+/g, ' ').trim()).join(' | ');
+                addLog(`[Queue] Flushing ${batch.length} queued input(s): ${batchSummary}`);
+
+                const idsToRemove = new Set(batch.map(msg => msg.id));
+                setActiveMessages(prev => prev.filter(msg => !(msg.isPending && idsToRemove.has(msg.id))));
+
+                const mergedContent = batch.map(msg => msg.content).join('\n');
+                const trimmed = mergedContent.trim();
+
+                if (trimmed.length === 0) {
+                    addLog('[Queue] Merged content was empty after trimming; skipping send.');
+                    continue;
+                }
+
+                const mergedMessage: Message = {
+                    id: nextMessageId(),
+                    role: 'user',
+                    content: mergedContent,
+                };
+
+                await runStreamForUserMessage(mergedMessage);
+            }
+        } finally {
+            isProcessingQueueRef.current = false;
+        }
+    };
+
+    // --- HANDLERS ---
     const handleSubmit = async (userInput: string) => {
         addLog('--- New Submission ---');
         if (!userInput) return;
@@ -460,66 +637,27 @@ const App = () => {
             return;
         }
 
-        if (activeMessages.length > 0) {
-            setFrozenMessages(prev => [...prev, ...activeMessages]);
-        }
-
-        addLog('User submitted input.');
         const newUserMessage: Message = {
-            id: Date.now(),
+            id: nextMessageId(),
             role: 'user',
             content: userInput,
         };
 
-        setActiveMessages([newUserMessage]);
         setQuery('');
 
+        if (isStreaming || isProcessingQueueRef.current) {
+            addLog(`Stream in progress. Queuing user input: ${userInput}`);
+            pendingUserInputsRef.current.push({ ...newUserMessage });
+            setActiveMessages(prev => [...prev, { ...newUserMessage, isPending: true }]);
+            return;
+        }
+
         try {
-            addLog(`Calling AI API with model: ${modelName}`);
-            const result = await streamText({
-                model: openrouter.chat(modelName),
-                messages: [...frozenMessages, newUserMessage].map(({id, isBoxed, ...rest}) => rest),
-            });
-            addLog('AI stream started.');
-    
-            const assistantMessageId = Date.now() + 1;
-            const assistantPlaceholder: Message = { id: assistantMessageId, role: 'assistant', content: '' };
-            setActiveMessages(prev => [...prev, assistantPlaceholder]);
-
-            let contentBuffer = '';
-            let lastRenderTime = 0;
-            const renderInterval = 100; // ms
-
-            const updateAssistantMessage = (newContent: string) => {
-                setActiveMessages(prevMessages =>
-                    prevMessages.map(msg =>
-                        msg.id === assistantMessageId ? { ...msg, content: newContent } : msg
-                    )
-                );
-            };
-
-            for await (const delta of result.textStream) {
-                contentBuffer += delta;
-                const now = Date.now();
-                if (now - lastRenderTime > renderInterval) {
-                    updateAssistantMessage(contentBuffer);
-                    lastRenderTime = now;
-                }
-            }
-
-            updateAssistantMessage(contentBuffer);
-
-            addLog('AI stream finished.');
+            await runStreamForUserMessage(newUserMessage);
         } catch (error) {
-            const errorContent = `Error: ${error instanceof Error ? error.message : String(error)}`;
-            addLog(errorContent);
-            const errorMessage: Message = {
-                id: Date.now() + 1,
-                role: 'system',
-                content: errorContent,
-                isBoxed: true,
-            };
-            setActiveMessages(prev => [...prev, errorMessage]);
+            const message = error instanceof Error ? error.message : String(error);
+            addLog(`Submission error: ${message}`);
+            pushSystemMessage(`Error: ${message}`);
         }
     };
 
