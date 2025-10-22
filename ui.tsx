@@ -391,7 +391,7 @@ const TaskList: React.FC<TaskListProps> = ({ tasks, isFocused }) => {
           )}
           {(totalLines > visibleCount || isFocused) && (
             <Text color="gray">
-              显示第 {sliceStart + 1}-{sliceEnd} 行 / 共 {totalLines} 行{isFocused ? ' （使用 ← → 切换任务，b/f 翻页，↑/↓ 单行滚动）' : ''}
+              Showing lines {sliceStart + 1}-{sliceEnd} of {totalLines}{isFocused ? ' (Use ← → to switch tasks, b/f to page, ↑/↓ to scroll)' : ''}
             </Text>
           )}
         </Box>
