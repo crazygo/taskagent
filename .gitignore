@@ -73,3 +73,11 @@ storybook-static/
 
 # Temporary directories
 opencodetmp/
+
+# Other ignored paths
+.fileHistory/
+.kiro/
+.worktree/
+
+# Qoder configuration
+.qoder/

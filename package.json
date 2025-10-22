@@ -6,23 +6,26 @@
   "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "tsx ui.tsx"
+    "start": "tsx ui.tsx",
+    "start:test": "concurrently --raw --kill-others \"yarn start\" \"sleep 5\""
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "@ai-sdk/openai": "^2.0.48",
+    "@anthropic-ai/claude-agent-sdk": "^0.1.25",
     "ai": "^5.0.68",
     "dotenv": "^17.2.3",
     "ink": "^6.3.1",
     "ink-text-input": "^6.0.0",
     "react": "^19.2.0",
-    "zod": "^4.1.12"
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/node": "^24.7.1",
     "@types/react": "^19.2.2",
+    "concurrently": "^9.2.1",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3"
   }

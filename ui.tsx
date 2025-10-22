@@ -3,11 +3,12 @@ import dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
 
 import fs from 'fs';
-import React, {useState, useCallback, useEffect} from 'react';
+import React, {useState, useCallback, useEffect, useRef} from 'react';
 import {render, Text, Box, Newline, Static, useInput} from 'ink';
 import TextInput from 'ink-text-input';
 import { createOpenAI } from '@ai-sdk/openai';
 import { streamText } from 'ai';
+import { TaskManager, type Task } from './task-manager.ts';
 
 // --- Logging Setup ---
 const LOG_FILE = 'debug.log';
@@ -30,6 +31,9 @@ const openrouter = createOpenAI({
 // --- Model Configuration ---
 const modelName = process.env.OPENROUTER_MODEL_NAME || 'google/gemini-flash';
 
+// --- Task Manager ---
+const taskManager = new TaskManager();
+
 // --- Types ---
 type MessageType = 'user' | 'assistant' | 'system';
 
@@ -47,9 +51,10 @@ enum Kernel {
 }
 
 enum Driver {
-  MANUAL = '手动挡',
+  MANUAL = 'Manual',
   PLAN_REVIEW_DO = 'Plan-Review-DO',
   AUTO_COMMIT = 'L2+',
+  CUSTOM = 'Custom',
 }
 
 
@@ -81,7 +86,7 @@ const OptionGroup = <T extends string>({ title, options, selectedValue, onSelect
 
   return (
     <Box>
-      <Box width={10}><Text color={isFocused ? 'blue' : 'white'}>{title}:</Text></Box>
+      <Box><Text color={isFocused ? 'blue' : 'white'}>{title}:</Text></Box>
       {options.map(option => (
         <Box key={option} marginRight={2}>
           <Text color={isFocused ? 'blue' : 'white'}>
@@ -97,29 +102,13 @@ const WelcomeScreen = React.memo(() => (
     <Box borderStyle="round" paddingX={2} flexDirection="column">
         <Box>
             <Box flexGrow={1} flexDirection="column">
-                <Text>Claude Code v2.0.13</Text>
-                <Box height={8} justifyContent="center" alignItems="center">
-                    <Text>Welcome back Shengliang!</Text>
-                </Box>
-                <Box height={5} justifyContent="center" alignItems="center">
-                    <Text>[Robot]</Text>
-                </Box>
-                <Text>glm-4.5 - API Usage Billing</Text>
-                <Text>/Users/admin/Codespaces/askman-dev/askgear</Text>
+                <Text>TaskAgent v0.0.1</Text>
+
+                <Text>Agent Model: {process.env.OPENROUTER_MODEL_NAME || 'Not Set'}</Text>
+                <Text>Coder Model: {process.env.ANTHROPIC_MODEL || 'Not Set'}</Text>
+                <Text>Working Directory: {process.cwd()}</Text>
             </Box>
-            <Box borderStyle="single" flexDirection="column" paddingX={1} flexGrow={2}>
-                <Text color="yellow">Recent activity</Text>
-                <Text>22h ago 你好</Text>
-                <Text>1w ago  24 Point Game: Comprehensive User Stories & Design</Text>
-                <Text>1w ago  Boosting Programming Efficiency: Tips and Strategies</Text>
-                <Text>/resume for more</Text>
-                <Newline />
-                <Text color="yellow">What's new</Text>
-                <Text>Fix @-mentioning MCP servers to toggle them on/off</Text>
-                <Text>Improve permission checks for bash with inline env vars</Text>
-                <Text>Fix ultrathink + thinking toggle</Text>
-                <Text>/release-notes for more</Text>
-            </Box>
+
         </Box>
     </Box>
 ));
@@ -176,6 +165,245 @@ const ActiveHistory: React.FC<HistoryProps> = React.memo(({ messages }) => (
 	</Box>
 ));
 
+interface TaskListProps {
+  tasks: Task[];
+  isFocused: boolean; // New prop for active state
+}
+
+const TASK_PAGE_SIZE = 5;
+const splitOutputIntoLines = (output: string) => {
+  if (!output) {
+    return [];
+  }
+  return output.split(/\r?\n/);
+};
+
+const formatPrompt = (prompt: string | undefined, wordLimit = 20) => {
+  if (!prompt) {
+    return '';
+  }
+  const words = prompt.trim().split(/\s+/);
+  if (words.length <= wordLimit) {
+    return words.join(' ');
+  }
+  return `${words.slice(0, wordLimit).join(' ')} …`;
+};
+
+const TaskList: React.FC<TaskListProps> = ({ tasks, isFocused }) => {
+  const [selectedTaskIndex, setSelectedTaskIndex] = useState(0);
+  const userSelectedRef = useRef(false); // Track if user has manually selected
+  const [taskScrollOffsets, setTaskScrollOffsets] = useState<Record<string, number>>({});
+
+  // Update selectedTaskIndex when tasks change
+  useEffect(() => {
+    if (tasks.length === 0) {
+      setSelectedTaskIndex(0);
+      userSelectedRef.current = false; // Reset user selection flag
+      setTaskScrollOffsets({});
+    } else {
+      if (selectedTaskIndex >= tasks.length) {
+        setSelectedTaskIndex(tasks.length - 1);
+        userSelectedRef.current = false;
+      } else if (!userSelectedRef.current && tasks.length > 0) {
+        setSelectedTaskIndex(tasks.length - 1);
+      }
+    }
+  }, [tasks, selectedTaskIndex]);
+
+  // Clamp scroll offsets when outputs change
+  useEffect(() => {
+    setTaskScrollOffsets(prev => {
+      const next: Record<string, number> = {};
+      tasks.forEach(task => {
+        const lines = splitOutputIntoLines(task.output);
+        const maxOffset = Math.max(0, lines.length - Math.min(lines.length, TASK_PAGE_SIZE));
+        const previous = prev[task.id] ?? 0;
+        next[task.id] = Math.min(previous, maxOffset);
+      });
+      return next;
+    });
+  }, [tasks]);
+
+  // Input handling for left/right arrows to switch tabs
+  useInput(
+    (input, key) => {
+      if (!isFocused || tasks.length === 0) {
+        return;
+      }
+
+      if (key.leftArrow) {
+        userSelectedRef.current = true;
+        const nextIndex = selectedTaskIndex > 0 ? selectedTaskIndex - 1 : tasks.length - 1;
+        setSelectedTaskIndex(nextIndex);
+        const nextTask = tasks[nextIndex];
+        if (nextTask) {
+          setTaskScrollOffsets(prev => {
+            if ((prev[nextTask.id] ?? 0) === 0) {
+              return prev;
+            }
+            return { ...prev, [nextTask.id]: 0 };
+          });
+        }
+      } else if (key.rightArrow) {
+        userSelectedRef.current = true;
+        const nextIndex = selectedTaskIndex < tasks.length - 1 ? selectedTaskIndex + 1 : 0;
+        setSelectedTaskIndex(nextIndex);
+        const nextTask = tasks[nextIndex];
+        if (nextTask) {
+          setTaskScrollOffsets(prev => {
+            if ((prev[nextTask.id] ?? 0) === 0) {
+              return prev;
+            }
+            return { ...prev, [nextTask.id]: 0 };
+          });
+        }
+      } else if (input.toLowerCase() === 'b') {
+        const task = tasks[selectedTaskIndex];
+        if (!task) return;
+        setTaskScrollOffsets(prev => {
+          const lines = splitOutputIntoLines(task.output);
+          const maxOffset = Math.max(0, lines.length - Math.min(lines.length, TASK_PAGE_SIZE));
+          const current = prev[task.id] ?? 0;
+          const next = Math.min(maxOffset, current + TASK_PAGE_SIZE);
+          if (next === current) return prev;
+          return { ...prev, [task.id]: next };
+        });
+      } else if (input.toLowerCase() === 'f') {
+        const task = tasks[selectedTaskIndex];
+        if (!task) return;
+        setTaskScrollOffsets(prev => {
+          const current = prev[task.id] ?? 0;
+          if (current === 0) {
+            return prev;
+          }
+          return { ...prev, [task.id]: Math.max(0, current - TASK_PAGE_SIZE) };
+        });
+      } else if (key.upArrow) {
+        const task = tasks[selectedTaskIndex];
+        if (!task) return;
+        setTaskScrollOffsets(prev => {
+          const lines = splitOutputIntoLines(task.output);
+          const maxOffset = Math.max(0, lines.length - Math.min(lines.length, TASK_PAGE_SIZE));
+          const current = prev[task.id] ?? 0;
+          const next = Math.min(maxOffset, current + 1);
+          if (next === current) return prev;
+          return { ...prev, [task.id]: next };
+        });
+      } else if (key.downArrow) {
+        const task = tasks[selectedTaskIndex];
+        if (!task) return;
+        setTaskScrollOffsets(prev => {
+          const current = prev[task.id] ?? 0;
+          if (current === 0) {
+            return prev;
+          }
+          return { ...prev, [task.id]: current - 1 };
+        });
+      }
+    },
+    { isActive: isFocused } // Only active when TaskList is focused
+  );
+
+  const selectedTask = tasks[selectedTaskIndex];
+  const selectedOffset = selectedTask ? taskScrollOffsets[selectedTask.id] ?? 0 : 0;
+  const selectedLines = selectedTask ? splitOutputIntoLines(selectedTask.output) : [];
+  const totalLines = selectedLines.length;
+  const sliceEnd = Math.max(0, totalLines - selectedOffset);
+  const sliceStart = Math.max(0, sliceEnd - TASK_PAGE_SIZE);
+  const visibleLines =
+    totalLines === 0 ? [] : selectedLines.slice(sliceStart, sliceEnd);
+  const visibleCount = visibleLines.length;
+
+  // Determine border style based on focus
+  const borderStyle = isFocused ? 'double' : 'round'; // Use 'double' for active, 'round' for inactive
+  const borderColor = isFocused ? 'blue' : 'gray';
+
+  return (
+    <Box
+      flexDirection="column"
+      borderStyle={borderStyle}
+      borderColor={borderColor}
+      paddingX={1}
+      paddingY={0}
+    >
+      <Box flexDirection="row" alignItems="center">
+        <Text bold>Background Tasks</Text>
+        <Box flexGrow={1} />
+        <Box
+          flexDirection="row"
+          alignItems="center"
+          flexWrap="nowrap"
+        >
+          {tasks.slice(0, 4).map((task, index) => {
+            const isSelected = index === selectedTaskIndex;
+            return (
+              <Box key={task.id} flexDirection="row" marginLeft={index === 0 ? 0 : 1}>
+                {isSelected && (
+                  <Text color="cyan" bold>
+                    {'> '}
+                  </Text>
+                )}
+                <Text color={isSelected ? 'cyan' : 'gray'} bold={isSelected}>
+                  [T{index + 1}]
+                </Text>
+              </Box>
+            );
+          })}
+          {tasks.length > 4 && (
+            <Box marginLeft={1}>
+              <Text color="gray">...</Text>
+            </Box>
+          )}
+        </Box>
+      </Box>
+
+      <Box
+        borderStyle="single"
+        borderTop={false}
+        borderBottom={false}
+        borderLeft={false}
+        borderRight={false}
+      >
+        <Text>
+          ───────────────────────────────────────────────────────────────────────────
+        </Text>
+      </Box>
+
+      {selectedTask ? (
+        <Box flexDirection="column">
+          <Text>
+            Task ID: {selectedTask.id} | Status: {selectedTask.status} | Prompt: {formatPrompt(selectedTask.prompt)}
+          </Text>
+          {visibleLines.length > 0 ? (
+            <Box flexDirection="column">
+              <Box flexDirection="row">
+                <Text>Output: </Text>
+                <Text>{visibleLines[0] || ' '}</Text>
+              </Box>
+              {visibleLines.slice(1).map((line, index) => (
+                <Text key={`${selectedTask.id}-${sliceStart + index + 1}`}>
+                  {line || ' '}
+                </Text>
+              ))}
+            </Box>
+          ) : (
+            <Text color="gray">Output: No output yet</Text>
+          )}
+          {(totalLines > visibleCount || isFocused) && (
+            <Text color="gray">
+              Showing lines {sliceStart + 1}-{sliceEnd} of {totalLines}{isFocused ? ' (Use ← → to switch tasks, b/f to page, ↑/↓ to scroll)' : ''}
+            </Text>
+          )}
+        </Box>
+      ) : (
+        <Text color="gray" marginTop={1}>
+          No background tasks running.
+        </Text>
+      )}
+    </Box>
+  );
+};
+
 const App = () => {
     // --- STATE ---
     const [frozenMessages, setFrozenMessages] = useState<Message[]>([]);
@@ -183,19 +411,40 @@ const App = () => {
     const [query, setQuery] = useState('');
     const [selectedKernel, setSelectedKernel] = useState<Kernel>(Kernel.CLAUDE_CODE);
     const [selectedDriver, setSelectedDriver] = useState<Driver>(Driver.MANUAL);
-    const [focusedControl, setFocusedControl] = useState<'input' | 'kernel' | 'driver'>('input');
+    const [focusedControl, setFocusedControl] = useState<'input' | 'kernel' | 'driver' | 'tasks'>('input');
+    const [tasks, setTasks] = useState<Task[]>([]);
 
     // --- EFFECTS & HOOKS ---
     useEffect(() => {
+        const requiredEnvVars = [
+            'ANTHROPIC_API_KEY',
+            'ANTHROPIC_BASE_URL',
+            'ANTHROPIC_MODEL',
+        ];
+        const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
+
+        if (missingEnvVars.length > 0) {
+            console.error(`Error: Missing required environment variables: ${missingEnvVars.join(', ')}`);
+            console.error('Please ensure these are set in your .env file or environment.');
+            process.exit(1);
+        }
+
         fs.writeFileSync(LOG_FILE, '');
         addLog('--- Application Started ---');
+
+        const interval = setInterval(() => {
+            setTasks(taskManager.getAllTasks());
+        }, 1000);
+
+        return () => clearInterval(interval);
     }, []);
 
     useInput((input, key) => {
         if (key.tab) {
             if (focusedControl === 'input') setFocusedControl('kernel');
             else if (focusedControl === 'kernel') setFocusedControl('driver');
-            else if (focusedControl === 'driver') setFocusedControl('input');
+            else if (focusedControl === 'driver') setFocusedControl('tasks');
+            else if (focusedControl === 'tasks') setFocusedControl('input');
         }
     });
 
@@ -203,6 +452,13 @@ const App = () => {
     const handleSubmit = async (userInput: string) => {
         addLog('--- New Submission ---');
         if (!userInput) return;
+
+        if (userInput.startsWith('/task ')) {
+            const prompt = userInput.substring(6);
+            taskManager.createTask(prompt);
+            setQuery('');
+            return;
+        }
 
         if (activeMessages.length > 0) {
             setFrozenMessages(prev => [...prev, ...activeMessages]);
@@ -270,48 +526,47 @@ const App = () => {
     // --- RENDER ---
     const staticItems = [
         <Box key="welcome-screen-wrapper" flexDirection="column"><WelcomeScreen /><Newline /></Box>,
-        ...frozenMessages
+        ...frozenMessages.map(msg => <MessageComponent key={msg.id} message={msg} />)
     ];
 
 	return (
 		<Box flexDirection="column">
             <Static items={staticItems}>
-                {item => {
-                    if (React.isValidElement(item)) {
-                        return item;
-                    }
-                    return <MessageComponent key={item.id} message={item} />;
-                }}
+                {item => item}
             </Static>
             <ActiveHistory messages={activeMessages} />
-			<Newline />
 
-            <Box borderStyle="single" borderColor={focusedControl === 'input' ? 'blue' : 'grey'}>
+            <TaskList tasks={tasks} isFocused={focusedControl === 'tasks'} />
+
+            <Box borderStyle="single" borderColor={focusedControl === 'input' ? 'blue' : 'gray'} paddingX={1}>
                 <TextInput
                     value={query}
                     onChange={setQuery}
                     onSubmit={handleSubmit}
-                    placeholder="Type your message..."
+                    placeholder="Type your message... or use /task <prompt>"
                     focus={focusedControl === 'input'}
                 />
             </Box>
 
-            <OptionGroup
-              title="Kernel"
-              options={Object.values(Kernel)}
-              selectedValue={selectedKernel}
-              onSelect={setSelectedKernel}
-              isFocused={focusedControl === 'kernel'}
-            />
-            <OptionGroup
-              title="Driver"
-              options={Object.values(Driver)}
-              selectedValue={selectedDriver}
-              onSelect={setSelectedDriver}
-              isFocused={focusedControl === 'driver'}
-            />
 
-            <Text color="gray">(Press [Tab] to switch between controls)</Text>
+            <Box paddingX={1} flexDirection="column">
+                <OptionGroup
+                  title="Kernel"
+                  options={Object.values(Kernel)}
+                  selectedValue={selectedKernel}
+                  onSelect={setSelectedKernel}
+                  isFocused={focusedControl === 'kernel'}
+                />
+                <OptionGroup
+                  title="Driver"
+                  options={Object.values(Driver)}
+                  selectedValue={selectedDriver}
+                  onSelect={setSelectedDriver}
+                  isFocused={focusedControl === 'driver'}
+                />
+
+                <Text color="gray">(Press [Tab] to switch between controls)</Text>
+            </Box>
 		</Box>
 	);
 };
