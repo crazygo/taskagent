@@ -10,6 +10,7 @@ if (process.env.OPENROUTER_API_KEY) {
 export const loadEnv = () => {
     const requiredEnvVars = [
         'OPENROUTER_API_KEY',
+        'OPENROUTER_MODEL_NAME',
         'ANTHROPIC_API_KEY',
         'ANTHROPIC_BASE_URL',
         'ANTHROPIC_MODEL',
@@ -17,8 +18,6 @@ export const loadEnv = () => {
     const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
 
     if (missingEnvVars.length > 0) {
-        console.error(`Error: Missing required environment variables: ${missingEnvVars.join(', ')}`);
-        console.error('Please ensure these are set in your .env file or environment.');
-        process.exit(1);
+        throw new Error(`Missing required environment variables: ${missingEnvVars.join(', ')}`);
     }
 };

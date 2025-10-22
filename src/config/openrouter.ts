@@ -5,9 +5,7 @@ export const getOpenRouterClient = () => {
   const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
   if (!OPENROUTER_API_KEY) {
-    // This should ideally be caught by loadEnv, but as a safeguard
-    console.error('OPENROUTER_API_KEY is not set. OpenRouter client cannot be initialized.');
-    process.exit(1);
+    throw new Error('OPENROUTER_API_KEY is not set. OpenRouter client cannot be initialized.');
   }
 
   return createOpenRouter({
@@ -16,4 +14,12 @@ export const getOpenRouterClient = () => {
   });
 };
 
-export const modelName = process.env.OPENROUTER_MODEL_NAME || 'google/gemini-flash';
+export const getModelName = () => {
+  const name = process.env.OPENROUTER_MODEL_NAME;
+  if (!name) {
+    throw new Error('OPENROUTER_MODEL_NAME is not set.');
+  }
+  return name;
+};
+
+export type OpenRouterClient = ReturnType<typeof createOpenRouter>;
