@@ -6,7 +6,7 @@ import fs from 'fs';
 import React, {useState, useEffect, useRef} from 'react';
 import {render, Text, Box, Newline, Static, useInput} from 'ink';
 import TextInput from 'ink-text-input';
-import { createOpenAI } from '@ai-sdk/openai';
+import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { streamText } from 'ai';
 import { TaskManager, type Task } from './task-manager.ts';
 
@@ -24,7 +24,9 @@ if (process.env.OPENROUTER_API_KEY) {
 
 // --- AI Configuration ---
 const OPENROUTER_BASE_URL = process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1';
-const openrouter = createOpenAI({
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+const openrouter = createOpenRouter({
+    ...(OPENROUTER_API_KEY ? { apiKey: OPENROUTER_API_KEY } : {}),
     baseURL: OPENROUTER_BASE_URL,
 });
 
@@ -43,6 +45,7 @@ interface Message {
     content: string;
     isBoxed?: boolean;
     isPending?: boolean;
+    reasoning?: string;
 }
 
 type LogMessage = {
@@ -126,14 +129,14 @@ interface MessageProps {
 const MessageComponent: React.FC<MessageProps> = ({ message }) => {
     let prefix = '';
     let textColor: "white" | "gray" | "yellow" = 'white';
-    let boxProps = {};
+    let boxProps = {} as Record<string, unknown>;
 
     if (message.role === 'user') {
         prefix = '> ';
         textColor = 'white';
     } else if (message.role === 'assistant') {
-        prefix = '✦ ';
-        textColor = 'gray';
+        prefix = '✦ '; // Reverted to '✦ '
+        textColor = 'white';
     } else if (message.role === 'system') {
         prefix = 'ℹ️ ';
         textColor = 'yellow';
@@ -147,15 +150,25 @@ const MessageComponent: React.FC<MessageProps> = ({ message }) => {
     }
 
     const pendingSuffix = message.isPending ? ' (queued)' : '';
-    const content = (
-        <Text color={textColor}>
-            {prefix}{message.content}{pendingSuffix}
-        </Text>
-    );
+    const allReasoningLines = (message.reasoning ?? '').split(/\r?\n/).filter(line => line.length > 0);
+    const reasoningLines = allReasoningLines.slice(Math.max(0, allReasoningLines.length - 3)); // Get last 3 lines
+    const contentLines = (message.content ?? '').split(/\r?\n/);
 
     return (
-        <Box {...boxProps}>
-            {content}
+        <Box {...boxProps} flexDirection="column">
+            {reasoningLines.length > 0 && (
+                <Text color="gray" italic>{'| Thought:'}</Text>
+            )}
+            {reasoningLines.map((line, index) => (
+                <Text key={`${message.id}-reasoning-${index}`} color="gray" italic>
+                    {'|   '}{line || ' '}
+                </Text>
+            ))}
+            {contentLines.map((line, index) => (
+                <Text key={`${message.id}-content-${index}`} color={textColor}>
+                    {index === 0 ? prefix : '  '}{line || ' '}{index === 0 ? pendingSuffix : ''}
+                </Text>
+            ))}
         </Box>
     );
 };
@@ -458,6 +471,7 @@ const App = () => {
     // --- EFFECTS & HOOKS ---
     useEffect(() => {
         const requiredEnvVars = [
+            'OPENROUTER_API_KEY',
             'ANTHROPIC_API_KEY',
             'ANTHROPIC_BASE_URL',
             'ANTHROPIC_MODEL',
@@ -507,9 +521,10 @@ const App = () => {
             id: assistantMessageId,
             role: 'assistant',
             content: '',
+            reasoning: '',
         };
 
-        setActiveMessages(prev => [...prev, assistantPlaceholder]);
+        setActiveMessages(prev => [...prev, { ...assistantPlaceholder, reasoning: '' }]);
 
         const assistantLogIndex = conversationLogRef.current.push({ role: 'assistant', content: '' }) - 1;
 
@@ -519,6 +534,8 @@ const App = () => {
 
         clearStreamWatchdog();
         let timedOut = false;
+        let assistantContent = '';
+        let assistantReasoning = '';
         streamTimeoutRef.current = setInterval(() => {
             if (Date.now() - lastTokenAtRef.current > STREAM_TOKEN_TIMEOUT_MS) {
                 addLog('Stream timeout reached (10s without new tokens). Aborting request.');
@@ -526,8 +543,6 @@ const App = () => {
                 abortController.abort();
             }
         }, 1000);
-
-        let assistantContent = '';
         let assistantSucceeded = false;
 
         try {
@@ -536,23 +551,185 @@ const App = () => {
                 .slice(0, assistantLogIndex)
                 .map(({ role, content }) => ({ role, content }));
 
-            const result = await streamText({
+            const result: any = await streamText({
                 model: openrouter.chat(modelName),
                 messages: messagesPayload,
                 abortSignal: abortController.signal,
-            });
+                providerOptions: { openrouter: { reasoning: { effort: 'medium' } } },
+            } as any);
 
             addLog('AI stream started.');
 
-            for await (const delta of result.textStream) {
-                assistantContent += delta;
-                lastTokenAtRef.current = Date.now();
+            const processAssistantUpdate = () => {
                 setActiveMessages(prev =>
                     prev.map(msg =>
-                        msg.id === assistantMessageId ? { ...msg, content: assistantContent } : msg
+                        msg.id === assistantMessageId
+                            ? { ...msg, content: assistantContent, reasoning: assistantReasoning }
+                            : msg
                     )
                 );
-                conversationLogRef.current[assistantLogIndex] = { role: 'assistant', content: assistantContent };
+            };
+
+            const extractReasoningFromContent = (content: any): string => {
+                if (!content) return '';
+                if (Array.isArray(content)) {
+                    return content
+                        .map(item => {
+                            const itemType = String(item?.type ?? '').toLowerCase();
+                            const itemText = typeof item?.text === 'string' ? item.text : '';
+                            if (!itemText) return '';
+                            if (itemType.includes('reasoning')) {
+                                return itemText;
+                            }
+                            if (itemType === 'message' && Array.isArray(item?.content)) {
+                                return extractReasoningFromContent(item.content);
+                            }
+                            return '';
+                        })
+                        .join('');
+                }
+                if (typeof content === 'object') {
+                    return [
+                        extractReasoningFromContent((content as any).content),
+                        typeof (content as any).text === 'string' && String((content as any).type).toLowerCase().includes('reasoning')
+                            ? (content as any).text
+                            : '',
+                    ].join('');
+                }
+                return '';
+            };
+
+            const extractTextFromContent = (content: any): string => {
+                if (!content) return '';
+                if (Array.isArray(content)) {
+                    return content
+                        .map(item => {
+                            const itemType = String(item?.type ?? '').toLowerCase();
+                            const itemText = typeof item?.text === 'string' ? item.text : '';
+                            if (!itemText) return '';
+                            if (
+                                itemType.includes('output') ||
+                                itemType.includes('text') ||
+                                itemType === 'message'
+                            ) {
+                                if (itemType === 'message' && Array.isArray(item?.content)) {
+                                    return extractTextFromContent(item.content);
+                                }
+                                return itemText;
+                            }
+                            return '';
+                        })
+                        .join('');
+                }
+                if (typeof content === 'object') {
+                    return [
+                        extractTextFromContent((content as any).content),
+                        typeof (content as any).text === 'string' &&
+                        (String((content as any).type).toLowerCase().includes('text') ||
+                            String((content as any).type).toLowerCase().includes('output'))
+                            ? (content as any).text
+                            : '',
+                    ].join('');
+                }
+                return '';
+            };
+
+            if (result && 'fullStream' in result && result.fullStream) {
+                for await (const part of result.fullStream as AsyncIterable<any>) {
+                    addLog(`[Stream] Raw part: ${JSON.stringify(part)}`);
+                    const type = String(part?.type ?? '');
+                    const normalizedType = type.toLowerCase();
+
+                    const reasoningPieces: string[] = [];
+                    if (normalizedType.includes('reasoning')) {
+                        const typedReasoning = part?.text ?? part?.textDelta ?? part?.delta?.text;
+                        if (typeof typedReasoning === 'string') {
+                            reasoningPieces.push(typedReasoning);
+                        }
+                    }
+                    const explicitReasoningFields = [
+                        part?.delta?.reasoning,
+                        part?.delta?.reasoning_text,
+                        part?.delta?.reasoning_delta,
+                        part?.reasoning,
+                        part?.reasoning_delta,
+                    ];
+                    explicitReasoningFields.forEach(value => {
+                        if (typeof value === 'string' && value.length > 0) {
+                            reasoningPieces.push(value);
+                        }
+                    });
+                    if (Array.isArray(part?.reasoning_details)) {
+                        const joined = part.reasoning_details
+                            .map((d: any) => (typeof d?.text === 'string' ? d.text : ''))
+                            .join('');
+                        if (joined.length > 0) {
+                            reasoningPieces.push(joined);
+                        }
+                    }
+                    reasoningPieces.push(extractReasoningFromContent(part?.delta?.content));
+                    reasoningPieces.push(extractReasoningFromContent(part?.content));
+                    const combinedReasoningDelta = reasoningPieces.join('');
+
+                    const textPieces: string[] = [];
+                    const pushTextPiece = (value: unknown) => {
+                        if (typeof value === 'string' && value.length > 0) {
+                            textPieces.push(value);
+                        }
+                    };
+                    if (normalizedType.includes('text') || normalizedType.includes('output')) {
+                        pushTextPiece(part?.textDelta);
+                        pushTextPiece(part?.delta?.text_delta);
+                        pushTextPiece(part?.delta?.output_text_delta);
+                        pushTextPiece(part?.delta?.output_text);
+                        pushTextPiece(part?.delta?.text);
+                        pushTextPiece(part?.text);
+                    } else {
+                        pushTextPiece(part?.delta?.output_text);
+                        pushTextPiece(part?.delta?.text);
+                        if (!normalizedType.includes('reasoning')) {
+                            pushTextPiece(part?.textDelta);
+                            pushTextPiece(part?.text);
+                        }
+                    }
+                    textPieces.push(extractTextFromContent(part?.delta?.content));
+                    textPieces.push(extractTextFromContent(part?.content));
+                    const textDelta = textPieces.join('');
+
+                    let handled = false;
+                    if (combinedReasoningDelta.length > 0) {
+                        assistantReasoning += combinedReasoningDelta;
+                        lastTokenAtRef.current = Date.now();
+                        addLog(
+                            `[Stream] Reasoning delta (${type || 'unknown'}): ${combinedReasoningDelta.replace(/\s+/g, ' ').slice(0, 120)}`
+                        );
+                        handled = true;
+                    }
+
+                    if (textDelta.length > 0) {
+                        assistantContent += textDelta;
+                        lastTokenAtRef.current = Date.now();
+                        addLog(
+                            `[Stream] Text delta (${type || 'unknown'}): ${textDelta.replace(/\s+/g, ' ').slice(0, 120)}`
+                        );
+                        conversationLogRef.current[assistantLogIndex] = { role: 'assistant', content: assistantContent };
+                        handled = true;
+                    }
+
+                    if (handled) {
+                        processAssistantUpdate();
+                    } else {
+                        addLog(`[Stream] Ignored part type=${type || 'unknown'} (no recognized deltas)`);
+                    }
+                }
+            } else if (result && 'textStream' in result && result.textStream) {
+                for await (const delta of result.textStream as AsyncIterable<string>) {
+                    if (!delta) continue;
+                    assistantContent += delta;
+                    lastTokenAtRef.current = Date.now();
+                    processAssistantUpdate();
+                    conversationLogRef.current[assistantLogIndex] = { role: 'assistant', content: assistantContent };
+                }
             }
 
             assistantSucceeded = true;
@@ -577,6 +754,7 @@ const App = () => {
                 id: assistantMessageId,
                 role: 'assistant',
                 content: assistantContent,
+                reasoning: assistantReasoning,
             });
         }
         setFrozenMessages(prev => [...prev, ...completedMessages]);

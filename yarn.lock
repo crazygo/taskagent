@@ -420,6 +420,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@openrouter/ai-sdk-provider@npm:^1.2.0":
+  version: 1.2.0
+  resolution: "@openrouter/ai-sdk-provider@npm:1.2.0"
+  peerDependencies:
+    ai: ^5.0.0
+    zod: ^3.24.1 || ^v4
+  checksum: 10c0/4ca7c471ec46bdd48eea9c56d94778a06ca4b74b6ef2ab892ab7eadbd409e3530ac0c5791cd80e88cafc44a49a76585e59707104792e3e3124237fed767104ef
+  languageName: node
+  linkType: hard
+
 "@opentelemetry/api@npm:1.9.0":
   version: 1.9.0
   resolution: "@opentelemetry/api@npm:1.9.0"
@@ -1695,6 +1705,7 @@ __metadata:
   dependencies:
     "@ai-sdk/openai": "npm:^2.0.48"
     "@anthropic-ai/claude-agent-sdk": "npm:^0.1.25"
+    "@openrouter/ai-sdk-provider": "npm:^1.2.0"
     "@types/node": "npm:^24.7.1"
     "@types/react": "npm:^19.2.2"
     ai: "npm:^5.0.68"
