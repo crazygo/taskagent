@@ -135,7 +135,7 @@ const MessageComponent: React.FC<MessageProps> = ({ message }) => {
         prefix = '> ';
         textColor = 'white';
     } else if (message.role === 'assistant') {
-        prefix = '✦ ';
+        prefix = '✦ '; // Reverted to '✦ '
         textColor = 'white';
     } else if (message.role === 'system') {
         prefix = 'ℹ️ ';
@@ -150,18 +150,18 @@ const MessageComponent: React.FC<MessageProps> = ({ message }) => {
     }
 
     const pendingSuffix = message.isPending ? ' (queued)' : '';
-    const reasoningLines = (message.reasoning ?? '').split(/\r?\n/).filter((line, idx, arr) => {
-        // keep empty line if it's the only line
-        if (arr.length === 1) return true;
-        return line.length > 0;
-    });
+    const allReasoningLines = (message.reasoning ?? '').split(/\r?\n/).filter(line => line.length > 0);
+    const reasoningLines = allReasoningLines.slice(Math.max(0, allReasoningLines.length - 3)); // Get last 3 lines
     const contentLines = (message.content ?? '').split(/\r?\n/);
 
     return (
         <Box {...boxProps} flexDirection="column">
+            {reasoningLines.length > 0 && (
+                <Text color="gray" italic>{'| Thought:'}</Text>
+            )}
             {reasoningLines.map((line, index) => (
                 <Text key={`${message.id}-reasoning-${index}`} color="gray" italic>
-                    {prefix ? '  ' : ''}{line || ' '}
+                    {'|   '}{line || ' '}
                 </Text>
             ))}
             {contentLines.map((line, index) => (
