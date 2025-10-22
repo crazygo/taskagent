@@ -78,3 +78,6 @@ opencodetmp/
 .fileHistory/
 .kiro/
 .worktree/
+
+# Qoder configuration
+.qoder/

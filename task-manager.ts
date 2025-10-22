@@ -1,4 +1,5 @@
 
+import crypto from 'crypto';
 import { query, Options, SDKAssistantMessage } from '@anthropic-ai/claude-agent-sdk';
 
 export interface Task {
@@ -12,7 +13,7 @@ export class TaskManager {
   private tasks: Map<string, Task> = new Map();
 
   createTask(prompt: string): Task {
-    const id = Date.now().toString();
+    const id = crypto.randomUUID();
     const task: Task = {
       id,
       prompt,
