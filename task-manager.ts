@@ -1,5 +1,5 @@
 
-import { query, Options, SDKMessage, SDKAssistantMessage } from '@anthropic-ai/claude-agent-sdk';
+import { query, Options, SDKAssistantMessage } from '@anthropic-ai/claude-agent-sdk';
 
 export interface Task {
   id: string;
@@ -37,8 +37,6 @@ export class TaskManager {
 
     try {
       const options: Options = {
-        apiKey: process.env.ANTHROPIC_API_KEY,
-        baseURL: process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com',
         model: process.env.ANTHROPIC_MODEL,
       };
 

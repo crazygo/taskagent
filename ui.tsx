@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
 
 import fs from 'fs';
-import React, {useState, useCallback, useEffect} from 'react';
+import React, {useState, useCallback, useEffect, useRef} from 'react';
 import {render, Text, Box, Newline, Static, useInput} from 'ink';
 import TextInput from 'ink-text-input';
 import { createOpenAI } from '@ai-sdk/openai';
@@ -86,7 +86,7 @@ const OptionGroup = <T extends string>({ title, options, selectedValue, onSelect
 
   return (
     <Box>
-      <Box width={10}><Text color={isFocused ? 'blue' : 'white'}>{title}:</Text></Box>
+      <Box><Text color={isFocused ? 'blue' : 'white'}>{title}:</Text></Box>
       {options.map(option => (
         <Box key={option} marginRight={2}>
           <Text color={isFocused ? 'blue' : 'white'}>
@@ -181,18 +181,128 @@ const ActiveHistory: React.FC<HistoryProps> = React.memo(({ messages }) => (
 	</Box>
 ));
 
-const TaskList: React.FC<{ tasks: Task[] }> = ({ tasks }) => {
+interface TaskListProps {
+  tasks: Task[];
+  isFocused: boolean; // New prop for active state
+}
+
+const TaskList: React.FC<TaskListProps> = ({ tasks, isFocused }) => {
+  const [selectedTaskIndex, setSelectedTaskIndex] = useState(0);
+  const userSelectedRef = useRef(false); // Track if user has manually selected
+
+  // Update selectedTaskIndex when tasks change
+  useEffect(() => {
+    if (tasks.length === 0) {
+      setSelectedTaskIndex(0);
+      userSelectedRef.current = false; // Reset user selection flag
+    } else if (selectedTaskIndex >= tasks.length) {
+      // If selected index is out of bounds (e.g., task was removed), select the new last one
+      setSelectedTaskIndex(tasks.length - 1);
+      userSelectedRef.current = false; // Selection was forced, not user-driven
+    } else if (!userSelectedRef.current && tasks.length > 0) {
+      // If no user selection yet, and tasks are present, default to the last one
+      setSelectedTaskIndex(tasks.length - 1);
+    }
+  }, [tasks]); // Only depend on tasks
+
+  // Input handling for left/right arrows to switch tabs
+  useInput(
+    (input, key) => {
+      if (!isFocused || tasks.length === 0) {
+        return;
+      }
+
+      if (key.leftArrow) {
+        setSelectedTaskIndex(prevIndex => {
+          userSelectedRef.current = true; // User made a selection
+          return prevIndex > 0 ? prevIndex - 1 : tasks.length - 1;
+        });
+      } else if (key.rightArrow) {
+        setSelectedTaskIndex(prevIndex => {
+          userSelectedRef.current = true; // User made a selection
+          return prevIndex < tasks.length - 1 ? prevIndex + 1 : 0;
+        });
+      }
+    },
+    { isActive: isFocused } // Only active when TaskList is focused
+  );
+
+  const selectedTask = tasks[selectedTaskIndex];
+
+  // Determine border style based on focus
+  const borderStyle = isFocused ? 'double' : 'round'; // Use 'double' for active, 'round' for inactive
+  const borderColor = isFocused ? 'blue' : 'gray';
+
   return (
-    <Box flexDirection="column" borderStyle="round" padding={1}>
-      <Text>Background Tasks</Text>
-      {tasks.map(task => (
-        <Box key={task.id} flexDirection="column">
-          <Text>Task ID: {task.id}</Text>
-          <Text>Status: {task.status}</Text>
-          <Text>Prompt: {task.prompt}</Text>
-          <Text>Output: {task.output}</Text>
+    <Box
+      flexDirection="column"
+      borderStyle={borderStyle}
+      borderColor={borderColor}
+      paddingX={1}
+      paddingY={0}
+    >
+      <Box flexDirection="row" alignItems="center">
+        <Text bold>Background Tasks</Text>
+        <Box flexGrow={1} />
+        <Box
+          flexDirection="row"
+          alignItems="center"
+          flexWrap="nowrap"
+        >
+          {tasks.slice(0, 4).map((task, index) => {
+            const isSelected = index === selectedTaskIndex;
+            return (
+              <Box key={task.id} flexDirection="row" marginLeft={index === 0 ? 0 : 1}>
+                {isSelected && (
+                  <Text color="cyan" bold>
+                    {'> '}
+                  </Text>
+                )}
+                <Text color={isSelected ? 'cyan' : 'gray'} bold={isSelected}>
+                  [T{index + 1}]
+                </Text>
+              </Box>
+            );
+          })}
+          {tasks.length > 4 && (
+            <Box marginLeft={1}>
+              <Text color="gray">...</Text>
+            </Box>
+          )}
         </Box>
-      ))}
+      </Box>
+
+      <Box
+        borderStyle="single"
+        borderTop={false}
+        borderBottom={false}
+        borderLeft={false}
+        borderRight={false}
+      >
+        <Text>
+          ───────────────────────────────────────────────────────────────────────────
+        </Text>
+      </Box>
+
+      {selectedTask ? (
+        <Box flexDirection="column" marginTop={1}>
+          <Text>
+            Task ID: {selectedTask.id} | Status: {selectedTask.status}
+          </Text>
+          <Text>Prompt: {selectedTask.prompt}</Text>
+          <Text>Output: {selectedTask.output}</Text>
+        </Box>
+      ) : (
+        <Text color="gray" marginTop={1}>
+          No background tasks running.
+        </Text>
+      )}
+
+      {tasks.length > 1 && isFocused && (
+        <Text color="gray" marginTop={1}>
+          (使用 ← → 切换任务)
+        </Text>
+      )}
     </Box>
   );
 };
@@ -204,7 +314,7 @@ const App = () => {
     const [query, setQuery] = useState('');
     const [selectedKernel, setSelectedKernel] = useState<Kernel>(Kernel.CLAUDE_CODE);
     const [selectedDriver, setSelectedDriver] = useState<Driver>(Driver.MANUAL);
-    const [focusedControl, setFocusedControl] = useState<'input' | 'kernel' | 'driver'>('input');
+    const [focusedControl, setFocusedControl] = useState<'input' | 'kernel' | 'driver' | 'tasks'>('input');
     const [tasks, setTasks] = useState<Task[]>([]);
 
     // --- EFFECTS & HOOKS ---
@@ -236,7 +346,8 @@ const App = () => {
         if (key.tab) {
             if (focusedControl === 'input') setFocusedControl('kernel');
             else if (focusedControl === 'kernel') setFocusedControl('driver');
-            else if (focusedControl === 'driver') setFocusedControl('input');
+            else if (focusedControl === 'driver') setFocusedControl('tasks');
+            else if (focusedControl === 'tasks') setFocusedControl('input');
         }
     });
 
@@ -327,10 +438,8 @@ const App = () => {
                 {item => item}
             </Static>
             <ActiveHistory messages={activeMessages} />
-			<Newline />
 
-            <TaskList tasks={tasks} />
-            <Newline />
+            <TaskList tasks={tasks} isFocused={focusedControl === 'tasks'} />
 
             <Box borderStyle="single" borderColor={focusedControl === 'input' ? 'blue' : 'grey'}>
                 <TextInput
