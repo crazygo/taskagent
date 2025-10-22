@@ -51,7 +51,7 @@ enum Kernel {
 }
 
 enum Driver {
-  MANUAL = '手动挡',
+  MANUAL = 'Manual',
   PLAN_REVIEW_DO = 'Plan-Review-DO',
   AUTO_COMMIT = 'L2+',
   CUSTOM = 'Custom',
@@ -102,29 +102,13 @@ const WelcomeScreen = React.memo(() => (
     <Box borderStyle="round" paddingX={2} flexDirection="column">
         <Box>
             <Box flexGrow={1} flexDirection="column">
-                <Text>Claude Code v2.0.13</Text>
-                <Box height={8} justifyContent="center" alignItems="center">
-                    <Text>Welcome back Shengliang!</Text>
-                </Box>
-                <Box height={5} justifyContent="center" alignItems="center">
-                    <Text>[Robot]</Text>
-                </Box>
-                <Text>glm-4.5 - API Usage Billing</Text>
-                <Text>/Users/admin/Codespaces/askman-dev/askgear</Text>
+                <Text>TaskAgent v0.0.1</Text>
+
+                <Text>Agent Model: {process.env.OPENROUTER_MODEL_NAME || 'Not Set'}</Text>
+                <Text>Coder Model: {process.env.ANTHROPIC_MODEL || 'Not Set'}</Text>
+                <Text>Working Directory: {process.cwd()}</Text>
             </Box>
-            <Box borderStyle="single" flexDirection="column" paddingX={1} flexGrow={2}>
-                <Text color="yellow">Recent activity</Text>
-                <Text>22h ago 你好</Text>
-                <Text>1w ago  24 Point Game: Comprehensive User Stories & Design</Text>
-                <Text>1w ago  Boosting Programming Efficiency: Tips and Strategies</Text>
-                <Text>/resume for more</Text>
-                <Newline />
-                <Text color="yellow">What's new</Text>
-                <Text>Fix @-mentioning MCP servers to toggle them on/off</Text>
-                <Text>Improve permission checks for bash with inline env vars</Text>
-                <Text>Fix ultrathink + thinking toggle</Text>
-                <Text>/release-notes for more</Text>
-            </Box>
+
         </Box>
     </Box>
 ));
@@ -186,24 +170,59 @@ interface TaskListProps {
   isFocused: boolean; // New prop for active state
 }
 
+const TASK_PAGE_SIZE = 5;
+const splitOutputIntoLines = (output: string) => {
+  if (!output) {
+    return [];
+  }
+  return output.split(/\r?\n/);
+};
+
+const formatPrompt = (prompt: string | undefined, wordLimit = 20) => {
+  if (!prompt) {
+    return '';
+  }
+  const words = prompt.trim().split(/\s+/);
+  if (words.length <= wordLimit) {
+    return words.join(' ');
+  }
+  return `${words.slice(0, wordLimit).join(' ')} …`;
+};
+
 const TaskList: React.FC<TaskListProps> = ({ tasks, isFocused }) => {
   const [selectedTaskIndex, setSelectedTaskIndex] = useState(0);
   const userSelectedRef = useRef(false); // Track if user has manually selected
+  const [taskScrollOffsets, setTaskScrollOffsets] = useState<Record<string, number>>({});
 
   // Update selectedTaskIndex when tasks change
   useEffect(() => {
     if (tasks.length === 0) {
       setSelectedTaskIndex(0);
       userSelectedRef.current = false; // Reset user selection flag
-    } else if (selectedTaskIndex >= tasks.length) {
-      // If selected index is out of bounds (e.g., task was removed), select the new last one
-      setSelectedTaskIndex(tasks.length - 1);
-      userSelectedRef.current = false; // Selection was forced, not user-driven
-    } else if (!userSelectedRef.current && tasks.length > 0) {
-      // If no user selection yet, and tasks are present, default to the last one
-      setSelectedTaskIndex(tasks.length - 1);
+      setTaskScrollOffsets({});
+    } else {
+      if (selectedTaskIndex >= tasks.length) {
+        setSelectedTaskIndex(tasks.length - 1);
+        userSelectedRef.current = false;
+      } else if (!userSelectedRef.current && tasks.length > 0) {
+        setSelectedTaskIndex(tasks.length - 1);
+      }
     }
-  }, [tasks]); // Only depend on tasks
+  }, [tasks, selectedTaskIndex]);
+
+  // Clamp scroll offsets when outputs change
+  useEffect(() => {
+    setTaskScrollOffsets(prev => {
+      const next: Record<string, number> = {};
+      tasks.forEach(task => {
+        const lines = splitOutputIntoLines(task.output);
+        const maxOffset = Math.max(0, lines.length - Math.min(lines.length, TASK_PAGE_SIZE));
+        const previous = prev[task.id] ?? 0;
+        next[task.id] = Math.min(previous, maxOffset);
+      });
+      return next;
+    });
+  }, [tasks]);
 
   // Input handling for left/right arrows to switch tabs
   useInput(
@@ -213,14 +232,72 @@ const TaskList: React.FC<TaskListProps> = ({ tasks, isFocused }) => {
       }
 
       if (key.leftArrow) {
-        setSelectedTaskIndex(prevIndex => {
-          userSelectedRef.current = true; // User made a selection
-          return prevIndex > 0 ? prevIndex - 1 : tasks.length - 1;
-        });
+        userSelectedRef.current = true;
+        const nextIndex = selectedTaskIndex > 0 ? selectedTaskIndex - 1 : tasks.length - 1;
+        setSelectedTaskIndex(nextIndex);
+        const nextTask = tasks[nextIndex];
+        if (nextTask) {
+          setTaskScrollOffsets(prev => {
+            if ((prev[nextTask.id] ?? 0) === 0) {
+              return prev;
+            }
+            return { ...prev, [nextTask.id]: 0 };
+          });
+        }
       } else if (key.rightArrow) {
-        setSelectedTaskIndex(prevIndex => {
-          userSelectedRef.current = true; // User made a selection
-          return prevIndex < tasks.length - 1 ? prevIndex + 1 : 0;
+        userSelectedRef.current = true;
+        const nextIndex = selectedTaskIndex < tasks.length - 1 ? selectedTaskIndex + 1 : 0;
+        setSelectedTaskIndex(nextIndex);
+        const nextTask = tasks[nextIndex];
+        if (nextTask) {
+          setTaskScrollOffsets(prev => {
+            if ((prev[nextTask.id] ?? 0) === 0) {
+              return prev;
+            }
+            return { ...prev, [nextTask.id]: 0 };
+          });
+        }
+      } else if (input.toLowerCase() === 'b') {
+        const task = tasks[selectedTaskIndex];
+        if (!task) return;
+        setTaskScrollOffsets(prev => {
+          const lines = splitOutputIntoLines(task.output);
+          const maxOffset = Math.max(0, lines.length - Math.min(lines.length, TASK_PAGE_SIZE));
+          const current = prev[task.id] ?? 0;
+          const next = Math.min(maxOffset, current + TASK_PAGE_SIZE);
+          if (next === current) return prev;
+          return { ...prev, [task.id]: next };
+        });
+      } else if (input.toLowerCase() === 'f') {
+        const task = tasks[selectedTaskIndex];
+        if (!task) return;
+        setTaskScrollOffsets(prev => {
+          const current = prev[task.id] ?? 0;
+          if (current === 0) {
+            return prev;
+          }
+          return { ...prev, [task.id]: Math.max(0, current - TASK_PAGE_SIZE) };
+        });
+      } else if (key.upArrow) {
+        const task = tasks[selectedTaskIndex];
+        if (!task) return;
+        setTaskScrollOffsets(prev => {
+          const lines = splitOutputIntoLines(task.output);
+          const maxOffset = Math.max(0, lines.length - Math.min(lines.length, TASK_PAGE_SIZE));
+          const current = prev[task.id] ?? 0;
+          const next = Math.min(maxOffset, current + 1);
+          if (next === current) return prev;
+          return { ...prev, [task.id]: next };
+        });
+      } else if (key.downArrow) {
+        const task = tasks[selectedTaskIndex];
+        if (!task) return;
+        setTaskScrollOffsets(prev => {
+          const current = prev[task.id] ?? 0;
+          if (current === 0) {
+            return prev;
+          }
+          return { ...prev, [task.id]: current - 1 };
         });
       }
     },
@@ -228,6 +305,14 @@ const TaskList: React.FC<TaskListProps> = ({ tasks, isFocused }) => {
   );
 
   const selectedTask = tasks[selectedTaskIndex];
+  const selectedOffset = selectedTask ? taskScrollOffsets[selectedTask.id] ?? 0 : 0;
+  const selectedLines = selectedTask ? splitOutputIntoLines(selectedTask.output) : [];
+  const totalLines = selectedLines.length;
+  const sliceEnd = Math.max(0, totalLines - selectedOffset);
+  const sliceStart = Math.max(0, sliceEnd - TASK_PAGE_SIZE);
+  const visibleLines =
+    totalLines === 0 ? [] : selectedLines.slice(sliceStart, sliceEnd);
+  const visibleCount = visibleLines.length;
 
   // Determine border style based on focus
   const borderStyle = isFocused ? 'double' : 'round'; // Use 'double' for active, 'round' for inactive
@@ -285,22 +370,34 @@ const TaskList: React.FC<TaskListProps> = ({ tasks, isFocused }) => {
       </Box>
 
       {selectedTask ? (
-        <Box flexDirection="column" marginTop={1}>
+        <Box flexDirection="column">
           <Text>
-            Task ID: {selectedTask.id} | Status: {selectedTask.status}
+            Task ID: {selectedTask.id} | Status: {selectedTask.status} | Prompt: {formatPrompt(selectedTask.prompt)}
           </Text>
-          <Text>Prompt: {selectedTask.prompt}</Text>
-          <Text>Output: {selectedTask.output}</Text>
+          {visibleLines.length > 0 ? (
+            <Box flexDirection="column">
+              <Box flexDirection="row">
+                <Text>Output: </Text>
+                <Text>{visibleLines[0] || ' '}</Text>
+              </Box>
+              {visibleLines.slice(1).map((line, index) => (
+                <Text key={`${selectedTask.id}-${sliceStart + index + 1}`}>
+                  {line || ' '}
+                </Text>
+              ))}
+            </Box>
+          ) : (
+            <Text color="gray">Output: （暂无输出）</Text>
+          )}
+          {(totalLines > visibleCount || isFocused) && (
+            <Text color="gray">
+              显示第 {sliceStart + 1}-{sliceEnd} 行 / 共 {totalLines} 行{isFocused ? ' （使用 ← → 切换任务，b/f 翻页，↑/↓ 单行滚动）' : ''}
+            </Text>
+          )}
         </Box>
       ) : (
         <Text color="gray" marginTop={1}>
           No background tasks running.
-        </Text>
-      )}
-
-      {tasks.length > 1 && isFocused && (
-        <Text color="gray" marginTop={1}>
-          (使用 ← → 切换任务)
         </Text>
       )}
     </Box>
@@ -452,22 +549,24 @@ const App = () => {
             </Box>
 
 
-            <OptionGroup
-              title="Kernel"
-              options={Object.values(Kernel)}
-              selectedValue={selectedKernel}
-              onSelect={setSelectedKernel}
-              isFocused={focusedControl === 'kernel'}
-            />
-            <OptionGroup
-              title="Driver"
-              options={Object.values(Driver)}
-              selectedValue={selectedDriver}
-              onSelect={setSelectedDriver}
-              isFocused={focusedControl === 'driver'}
-            />
+            <Box paddingX={1} flexDirection="column">
+                <OptionGroup
+                  title="Kernel"
+                  options={Object.values(Kernel)}
+                  selectedValue={selectedKernel}
+                  onSelect={setSelectedKernel}
+                  isFocused={focusedControl === 'kernel'}
+                />
+                <OptionGroup
+                  title="Driver"
+                  options={Object.values(Driver)}
+                  selectedValue={selectedDriver}
+                  onSelect={setSelectedDriver}
+                  isFocused={focusedControl === 'driver'}
+                />
 
-            <Text color="gray">(Press [Tab] to switch between controls)</Text>
+                <Text color="gray">(Press [Tab] to switch between controls)</Text>
+            </Box>
 		</Box>
 	);
 };
