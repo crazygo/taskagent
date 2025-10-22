@@ -15,6 +15,7 @@
   "dependencies": {
     "@ai-sdk/openai": "^2.0.48",
     "@anthropic-ai/claude-agent-sdk": "^0.1.25",
+    "@openrouter/ai-sdk-provider": "^1.2.0",
     "ai": "^5.0.68",
     "dotenv": "^17.2.3",
     "ink": "^6.3.1",
