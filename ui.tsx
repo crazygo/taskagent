@@ -9,6 +9,7 @@ import TextInput from 'ink-text-input';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { streamText } from 'ai';
 import { TaskManager, type Task } from './task-manager.ts';
+import minimist from 'minimist';
 
 // --- Logging Setup ---
 const LOG_FILE = 'debug.log';
@@ -426,6 +427,10 @@ const TaskList: React.FC<TaskListProps> = ({ tasks, isFocused }) => {
   );
 };
 
+// --- Argument Parsing for Non-Interactive Mode ---
+const argv = minimist(process.argv.slice(2));
+const nonInteractiveInput = String(argv.p || argv.prompt); // Ensure it's a string
+
 const App = () => {
     // --- STATE ---
     const [frozenMessages, setFrozenMessages] = useState<Message[]>([]);
@@ -491,8 +496,19 @@ const App = () => {
             setTasks(taskManager.getAllTasks());
         }, 1000);
 
+        if (nonInteractiveInput) {
+            addLog(`Non-interactive mode: Processing input "${nonInteractiveInput}"`);
+            handleSubmit(nonInteractiveInput).finally(() => {
+                // Ensure the Ink app has rendered the final output before exiting
+                // This might involve a small delay or a more robust mechanism
+                setTimeout(() => {
+                    process.exit(0);
+                }, 100); // Small delay to allow Ink to render final state
+            });
+        }
+
         return () => clearInterval(interval);
-    }, []);
+    }, [nonInteractiveInput]); // Add nonInteractiveInput to dependency array
 
     useInput((input, key) => {
         if (key.tab) {
@@ -854,35 +870,39 @@ const App = () => {
 
             <TaskList tasks={tasks} isFocused={focusedControl === 'tasks'} />
 
-            <Box borderStyle="single" borderColor={focusedControl === 'input' ? 'blue' : 'gray'} paddingX={1}>
-                <TextInput
-                    value={query}
-                    onChange={setQuery}
-                    onSubmit={handleSubmit}
-                    placeholder="Type your message... or use /task <prompt>"
-                    focus={focusedControl === 'input'}
-                />
-            </Box>
+            {!nonInteractiveInput && (
+                <>
+                    <Box borderStyle="single" borderColor={focusedControl === 'input' ? 'blue' : 'gray'} paddingX={1}>
+                        <TextInput
+                            value={query}
+                            onChange={setQuery}
+                            onSubmit={handleSubmit}
+                            placeholder="Type your message... or use /task <prompt>"
+                            focus={focusedControl === 'input'}
+                        />
+                    </Box>
 
 
-            <Box paddingX={1} flexDirection="column">
-                <OptionGroup
-                  title="Kernel"
-                  options={Object.values(Kernel)}
-                  selectedValue={selectedKernel}
-                  onSelect={setSelectedKernel}
-                  isFocused={focusedControl === 'kernel'}
-                />
-                <OptionGroup
-                  title="Driver"
-                  options={Object.values(Driver)}
-                  selectedValue={selectedDriver}
-                  onSelect={setSelectedDriver}
-                  isFocused={focusedControl === 'driver'}
-                />
+                    <Box paddingX={1} flexDirection="column">
+                        <OptionGroup
+                          title="Kernel"
+                          options={Object.values(Kernel)}
+                          selectedValue={selectedKernel}
+                          onSelect={setSelectedKernel}
+                          isFocused={focusedControl === 'kernel'}
+                        />
+                        <OptionGroup
+                          title="Driver"
+                          options={Object.values(Driver)}
+                          selectedValue={selectedDriver}
+                          onSelect={setSelectedDriver}
+                          isFocused={focusedControl === 'driver'}
+                        />
 
-                <Text color="gray">(Press [Tab] to switch between controls)</Text>
-            </Box>
+                        <Text color="gray">(Press [Tab] to switch between controls)</Text>
+                    </Box>
+                </>
+            )}
 		</Box>
 	);
 };
