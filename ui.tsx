@@ -538,7 +538,7 @@ const App = () => {
 
             <TaskList tasks={tasks} isFocused={focusedControl === 'tasks'} />
 
-            <Box borderStyle="single" borderColor={focusedControl === 'input' ? 'blue' : 'grey'} paddingX={1}>
+            <Box borderStyle="single" borderColor={focusedControl === 'input' ? 'blue' : 'gray'} paddingX={1}>
                 <TextInput
                     value={query}
                     onChange={setQuery}
