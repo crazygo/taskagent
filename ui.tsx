@@ -387,7 +387,7 @@ const TaskList: React.FC<TaskListProps> = ({ tasks, isFocused }) => {
               ))}
             </Box>
           ) : (
-            <Text color="gray">Output: （暂无输出）</Text>
+            <Text color="gray">Output: No output yet</Text>
           )}
           {(totalLines > visibleCount || isFocused) && (
             <Text color="gray">
