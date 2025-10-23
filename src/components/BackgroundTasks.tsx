@@ -120,33 +120,28 @@ export const BackgroundTasks: React.FC<BackgroundTasksProps> = ({ tasks, isFocus
     <Box
       borderStyle="round"
       borderColor={isFocused ? 'blue' : 'gray'}
-      padding={1}
+      paddingX={1}
       flexDirection="column"
-      marginTop={1}
     >
-      <Text color="white">Background Tasks</Text>
+      <Box flexDirection="row">
+        <Text color="white">Background Tasks </Text>
+        {tasks.map((task, index) => {
+          const isSelected = index === selectedTaskIndex;
+          return (
+            <Text key={task.id} color={isSelected ? 'green' : 'white'}>
+              {isSelected ? `[${index}]` : ` ${index} `}
+            </Text>
+          );
+        })}
+      </Box>
       <Text color="gray">───────────────────────────────────────────────────────────</Text>
 
       {tasks.length > 0 ? (
-        <Box flexDirection="column" marginTop={1}>
-          <Box flexDirection="row">
-            <Text color="gray">Tasks: </Text>
-            <Text>
-              {tasks.map((task, index) => {
-                const isSelected = index === selectedTaskIndex;
-                return (
-                  <Text key={task.id} color={isSelected ? 'green' : 'white'}>
-                    {isSelected ? `[${task.id}]` : task.id}{' '}
-                  </Text>
-                );
-              })}
-            </Text>
-          </Box>
-
+        <Box flexDirection="column">
           {selectedTask ? (
             <Box flexDirection="column">
               <Text>
-                Task ID: {selectedTask.id} | Status: {selectedTask.status} | Prompt: {formatPrompt(selectedTask.prompt)}
+                Task {selectedTaskIndex}: {selectedTask.id} | Status: {selectedTask.status} | Prompt: {formatPrompt(selectedTask.prompt)}
               </Text>
               {visibleLines.length > 0 ? (
                 <Box flexDirection="column">
@@ -175,7 +170,7 @@ export const BackgroundTasks: React.FC<BackgroundTasksProps> = ({ tasks, isFocus
           )}
         </Box>
       ) : (
-        <Text color="gray" marginTop={1}>
+        <Text color="gray">
           No background tasks running.
         </Text>
       )}
