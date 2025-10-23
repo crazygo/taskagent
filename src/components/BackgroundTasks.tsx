@@ -49,7 +49,7 @@ export const BackgroundTasks: React.FC<BackgroundTasksProps> = ({ tasks, isFocus
 
   useEffect(() => {
     setTaskScrollOffsets(prev => {
-      const next: Record<string, number> = { ...prev };
+      const next: Record<string, number> = {};
       tasks.forEach(task => {
         const lines = splitOutputIntoLines(task.output || '');
         const previous = prev[task.id] ?? 0;
