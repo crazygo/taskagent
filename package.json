@@ -14,7 +14,7 @@
   },
   "description": "",
   "devDependencies": {
-    "@types/minimist": "^1",
+    "@types/minimist": "^1.2.0",
     "@types/node": "^24.7.1",
     "@types/react": "^19.2.2",
     "concurrently": "^9.2.1",
