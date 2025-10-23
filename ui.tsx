@@ -5,7 +5,7 @@ import {render, Box, Text, useInput} from 'ink';
 import { addLog } from './src/logger.ts';
 import { loadCliConfig } from './src/cli/config.ts';
 import type { Task } from './task-manager.ts';
-import { getOpenRouterClient, type OpenRouterClient } from './src/config/openrouter.ts';
+import { ensureAiProvider, type AiChatProvider } from './src/config/ai-provider.ts';
 import * as Types from './src/types.ts';
 import { ChatPanel } from './src/components/ChatPanel.tsx';
 import { BackgroundTasks } from './src/components/BackgroundTasks.tsx';
@@ -31,20 +31,22 @@ enum Driver {
 // --- Components ---
 
 const App = () => {
-    const [{ config: bootstrapConfig, openrouterClient, error: bootstrapError }] = useState<{
+    const [{ config: bootstrapConfig, provider, modelName, reasoningEnabled, error: bootstrapError }] = useState<{
         config: ReturnType<typeof loadCliConfig> | null;
-        openrouterClient: OpenRouterClient | null;
+        provider: AiChatProvider | null;
+        modelName: string | null;
+        reasoningEnabled: boolean | null;
         error: string | null;
     }>(() => {
         try {
             const config = loadCliConfig();
-            const client = getOpenRouterClient();
+            const { provider, modelName, reasoningEnabled } = ensureAiProvider();
             addLog('Bootstrap succeeded.');
-            return { config, openrouterClient: client, error: null };
+            return { config, provider, modelName, reasoningEnabled, error: null };
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
             addLog(`Bootstrap error: ${message}`);
-            return { config: null, openrouterClient: null, error: message };
+            return { config: null, provider: null, modelName: null, reasoningEnabled: null, error: message };
         }
     });
 
@@ -58,7 +60,7 @@ const App = () => {
         return () => clearTimeout(timer);
     }, [bootstrapError]);
 
-    if (bootstrapError || !bootstrapConfig || !openrouterClient) {
+    if (bootstrapError || !bootstrapConfig || !provider || !modelName) {
         const message = bootstrapError ?? 'Initialization failed.';
         return (
             <Box borderStyle="round" borderColor="red" padding={1} flexDirection="column">
@@ -89,7 +91,9 @@ const App = () => {
         flushPendingQueue,
         nextMessageId,
     } = useConversationStore({
-        openrouter: openrouterClient,
+        aiProvider: provider,
+        modelName,
+        reasoningEnabled: reasoningEnabled || false,
         onActiveMessagesChange: setActiveMessages,
         onFrozenMessagesChange: setFrozenMessages,
     });
@@ -182,7 +186,7 @@ const App = () => {
     // --- RENDER ---
     return (
         <Box flexDirection="column">
-            <ChatPanel frozenMessages={frozenMessages} activeMessages={activeMessages} />
+            <ChatPanel frozenMessages={frozenMessages} activeMessages={activeMessages} modelName={modelName} />
 
             <BackgroundTasks tasks={tasks} isFocused={focusedControl === 'tasks'} />
 

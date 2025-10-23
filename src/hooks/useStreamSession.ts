@@ -1,13 +1,15 @@
 import { useState, useRef } from 'react';
 import { streamText } from 'ai';
 import { addLog } from '../logger.ts';
-import { getModelName, type OpenRouterClient } from '../config/openrouter.ts';
+import type { AiChatProvider } from '../config/ai-provider.ts';
 import { Message, LogMessage } from '../types.ts';
 
-const STREAM_TOKEN_TIMEOUT_MS = 10_000;
+const STREAM_TOKEN_TIMEOUT_MS = 30_000;
 
 interface UseStreamSessionProps {
-  openrouter: OpenRouterClient;
+  aiProvider: AiChatProvider;
+  modelName: string;
+  reasoningEnabled: boolean;
   setActiveMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   setFrozenMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   pushSystemMessage: (content: string) => void;
@@ -16,7 +18,9 @@ interface UseStreamSessionProps {
 }
 
 export const useStreamSession = ({
-  openrouter,
+  aiProvider,
+  modelName,
+  reasoningEnabled,
   setActiveMessages,
   setFrozenMessages,
   pushSystemMessage,
@@ -143,18 +147,24 @@ export const useStreamSession = ({
     let assistantSucceeded = false;
 
     try {
-      const modelName = getModelName();
       addLog(`Calling AI API with model: ${modelName}`);
       const messagesPayload = conversationLogRef.current
         .slice(0, assistantLogIndex)
         .map(({ role, content }) => ({ role, content }));
 
-      const result: any = await streamText({
-        model: openrouter.chat(modelName),
+      const streamOptions: Record<string, any> = {
+        model: aiProvider.chat(modelName),
         messages: messagesPayload,
         abortSignal: abortController.signal,
-        providerOptions: { openrouter: { reasoning: { effort: 'medium' } } },
-      } as any);
+      };
+
+      if (reasoningEnabled) {
+        streamOptions.providerOptions = {
+          openrouter: { reasoning: { effort: 'medium' } },
+        };
+      }
+
+      const result: any = await streamText(streamOptions);
 
       addLog('AI stream started.');
 
@@ -185,6 +195,7 @@ export const useStreamSession = ({
             part?.delta?.reasoning,
             part?.delta?.reasoning_text,
             part?.delta?.reasoning_delta,
+            part?.delta?.reasoning_content, // Specific to https://open.bigmodel.cn/api/coding/paas/v4
             part?.reasoning,
             part?.reasoning_delta,
           ];

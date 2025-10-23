@@ -2,17 +2,21 @@ import { useCallback, useRef } from 'react';
 import { useMessageQueue } from '../hooks/useMessageQueue.ts';
 import { useStreamSession } from '../hooks/useStreamSession.ts';
 import type { Message, LogMessage } from '../types.ts';
-import type { OpenRouterClient } from '../config/openrouter.ts';
+import type { AiChatProvider } from '../config/ai-provider.ts';
 
 interface UseConversationStoreOptions {
-  openrouter: OpenRouterClient;
+  aiProvider: AiChatProvider;
+  modelName: string;
+  reasoningEnabled: boolean;
   onSystemMessage?: (message: Message) => void;
   onActiveMessagesChange: React.Dispatch<React.SetStateAction<Message[]>>;
   onFrozenMessagesChange: React.Dispatch<React.SetStateAction<Message[]>>;
 }
 
 export const useConversationStore = ({
-  openrouter,
+  aiProvider,
+  modelName,
+  reasoningEnabled,
   onSystemMessage,
   onActiveMessagesChange,
   onFrozenMessagesChange,
@@ -40,7 +44,9 @@ export const useConversationStore = ({
   }, [nextMessageId, onActiveMessagesChange, onFrozenMessagesChange, systemMessageCallback]);
 
   const { isStreaming, runStreamForUserMessage } = useStreamSession({
-    openrouter,
+    aiProvider,
+    modelName,
+    reasoningEnabled,
     setActiveMessages: onActiveMessagesChange,
     setFrozenMessages: onFrozenMessagesChange,
     pushSystemMessage,

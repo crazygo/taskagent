@@ -70,13 +70,17 @@ const ActiveHistory: React.FC<HistoryProps> = ({ messages }) => (
   </Box>
 );
 
-const WelcomeScreen = React.memo(() => (
+interface WelcomeScreenProps {
+  modelName: string;
+}
+
+const WelcomeScreen = React.memo<WelcomeScreenProps>(({ modelName }) => (
   <Box borderStyle="round" paddingX={2} flexDirection="column">
     <Box>
       <Box flexGrow={1} flexDirection="column">
         <Text>TaskAgent v0.0.1</Text>
-        <Text>Agent Model: {process.env.OPENROUTER_MODEL_NAME || 'Not Set'}</Text>
-        <Text>Coder Model: {process.env.ANTHROPIC_MODEL || 'Not Set'}</Text>
+        <Text>Agent Model: {modelName || 'Not Set'}</Text>
+        <Text>Coder Model: {modelName || 'Not Set'}</Text>
         <Text>Working Directory: {process.cwd()}</Text>
       </Box>
     </Box>
@@ -86,12 +90,13 @@ const WelcomeScreen = React.memo(() => (
 interface ChatPanelProps {
   frozenMessages: Types.Message[];
   activeMessages: Types.Message[];
+  modelName: string;
 }
 
-export const ChatPanel: React.FC<ChatPanelProps> = ({ frozenMessages, activeMessages }) => {
+export const ChatPanel: React.FC<ChatPanelProps> = ({ frozenMessages, activeMessages, modelName }) => {
   const staticItems = [
     <Box key="welcome-screen-wrapper" flexDirection="column">
-      <WelcomeScreen />
+      <WelcomeScreen modelName={modelName} />
       <Newline />
     </Box>,
     ...frozenMessages.map(msg => <MessageComponent key={msg.id} message={msg} />),
