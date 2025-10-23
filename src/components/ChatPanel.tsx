@@ -46,7 +46,7 @@ const MessageComponent: React.FC<MessageProps> = ({ message }) => {
       )}
       {reasoningLines.map((line, index) => (
         <Text key={`${message.id}-reasoning-${index}`} color="gray" italic>
-          {index === 0 ? '  └ ' : '    '}{line || ' '}
+          {'│ '}{line || ' '}
         </Text>
       ))}
       {contentLines.map((line, index) => (
