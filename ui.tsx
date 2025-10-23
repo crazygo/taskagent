@@ -161,7 +161,6 @@ const App = () => {
         pendingUserInputsRef,
         runStreamForUserMessage,
         setActiveMessages,
-        setQuery,
     ]);
 
     useEffect(() => {
