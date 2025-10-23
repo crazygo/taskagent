@@ -279,7 +279,7 @@ export const useStreamSession = ({
       addLog('[Stream] Completed assistant response.');
     } catch (error) {
       const rawMessage = error instanceof Error ? error.message : String(error);
-      const displayMessage = timedOut ? 'Stream timeout (10s without response).' : rawMessage;
+      const displayMessage = timedOut ? 'Stream timeout (30s without response).' : rawMessage;
       addLog(`[Stream] Error: ${displayMessage}`);
       conversationLogRef.current.splice(assistantLogIndex, 1);
       setActiveMessages(prev => prev.filter(msg => msg.id !== assistantMessageId));
