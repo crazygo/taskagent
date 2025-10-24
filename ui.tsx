@@ -13,18 +13,13 @@ import { StatusControls } from './src/components/StatusControls.tsx';
 import { InputBar } from './src/components/InputBar.tsx';
 import { useTaskStore } from './src/domain/taskStore.ts';
 import { useConversationStore } from './src/domain/conversationStore.ts';
+import { Driver, getDriverEnum } from './src/drivers/types.ts';
+import { handlePlanReviewDo } from './src/drivers/plan-review-do/index.ts';
 
 enum Kernel {
   CLAUDE_CODE = 'Claude Code',
   GEMINI = 'Gemini',
   CODEX = 'Codex',
-}
-
-enum Driver {
-  MANUAL = 'Manual',
-  PLAN_REVIEW_DO = 'Plan-Review-DO',
-  AUTO_COMMIT = 'L2+',
-  CUSTOM = 'Custom',
 }
 
 
@@ -81,6 +76,15 @@ const App = () => {
     const [focusedControl, setFocusedControl] = useState<'input' | 'kernel' | 'driver' | 'tasks'>('input');
     const { tasks, createTask } = useTaskStore();
 
+    // 从 CLI 参数初始化 Driver（在 bootstrapConfig 确定后）
+    useEffect(() => {
+        if (bootstrapConfig?.driver) {
+            const driverEnum = getDriverEnum(bootstrapConfig.driver);
+            addLog(`[Driver Init] Setting driver from CLI: ${driverEnum}`);
+            setSelectedDriver(driverEnum);
+        }
+    }, [bootstrapConfig?.driver]);
+
     // --- REFS ---
     const hasProcessedNonInteractiveRef = useRef(false);
     const {
@@ -111,6 +115,7 @@ const App = () => {
         addLog('--- New Submission ---');
         if (!userInput) return false;
 
+        // /task 命令：创建后台任务（所有 Driver 共享）
         if (userInput.startsWith('/task ')) {
             const prompt = userInput.substring(6);
             createTask(prompt);
@@ -125,6 +130,19 @@ const App = () => {
         };
 
         setQuery('');
+
+        // Driver 路由
+        if (selectedDriver === Driver.PLAN_REVIEW_DO) {
+            addLog('[Driver] Routing to Plan-Review-DO');
+            return await handlePlanReviewDo(newUserMessage, {
+                nextMessageId,
+                setActiveMessages,
+                setFrozenMessages,
+            });
+        }
+
+        // Manual Driver（原有逻辑）
+        addLog('[Driver] Using Manual mode');
 
         if (isStreaming || isProcessingQueueRef.current) {
             addLog(`Stream in progress. Queuing user input: ${userInput}`);
@@ -154,6 +172,8 @@ const App = () => {
         }
         return succeeded && !flushFailed;
     }, [
+        selectedDriver,
+        createTask,
         flushPendingQueue,
         isProcessingQueueRef,
         isStreaming,
@@ -161,12 +181,20 @@ const App = () => {
         pendingUserInputsRef,
         runStreamForUserMessage,
         setActiveMessages,
+        setFrozenMessages,
     ]);
 
     useEffect(() => {
         if (!nonInteractiveInput || hasProcessedNonInteractiveRef.current) {
             return;
         }
+
+        // 如果 CLI 指定了 driver，则等待 selectedDriver 与之匹配后再提交
+        const desired = bootstrapConfig?.driver ? getDriverEnum(bootstrapConfig.driver) : null;
+        if (desired && selectedDriver !== desired) {
+            return; // 等待 driver 初始化完成
+        }
+
         hasProcessedNonInteractiveRef.current = true;
         addLog(`Non-interactive mode: Processing input "${nonInteractiveInput}"`);
         handleSubmit(nonInteractiveInput)
@@ -180,7 +208,7 @@ const App = () => {
                     process.exit(1);
                 }, 100);
             });
-    }, [handleSubmit, nonInteractiveInput]);
+    }, [handleSubmit, nonInteractiveInput, selectedDriver, bootstrapConfig?.driver]);
 
     // --- RENDER ---
     return (

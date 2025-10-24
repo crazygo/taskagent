@@ -26,7 +26,7 @@
   "main": "ui.js",
   "name": "taskagent",
   "scripts": {
-    "start": "tsx ui.tsx",
+    "start": "tsx ui.tsx --",
     "start:test": "concurrently --raw --kill-others --success first \"yarn start\" \"sleep 5\"",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
