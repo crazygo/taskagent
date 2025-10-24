@@ -65,7 +65,7 @@ interface HistoryProps {
 const ActiveHistory: React.FC<HistoryProps> = ({ messages }) => (
   <Box flexDirection="column">
     {messages.map(msg => (
-      <MessageComponent key={msg.id} message={msg} />
+      <MessageComponent key={`active-${msg.id}`} message={msg} />
     ))}
   </Box>
 );
@@ -99,7 +99,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ frozenMessages, activeMess
       <WelcomeScreen modelName={modelName} />
       <Newline />
     </Box>,
-    ...frozenMessages.map(msg => <MessageComponent key={msg.id} message={msg} />),
+    ...frozenMessages.map(msg => (
+      <MessageComponent key={`frozen-${msg.id}`} message={msg} />
+    )),
   ];
 
   return (

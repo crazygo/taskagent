@@ -5,16 +5,16 @@ __metadata:
   version: 8
   cacheKey: 10c0
 
-"@ai-sdk/gateway@npm:2.0.0":
-  version: 2.0.0
-  resolution: "@ai-sdk/gateway@npm:2.0.0"
+"@ai-sdk/gateway@npm:2.0.1":
+  version: 2.0.1
+  resolution: "@ai-sdk/gateway@npm:2.0.1"
   dependencies:
     "@ai-sdk/provider": "npm:2.0.0"
     "@ai-sdk/provider-utils": "npm:3.0.12"
     "@vercel/oidc": "npm:3.0.3"
   peerDependencies:
     zod: ^3.25.76 || ^4.1.8
-  checksum: 10c0/720cfb827bc64f3eb6bb86d17e7e7947c54bdc7d74db7f6e9e162be0973a45368c05829e4b257704182ca9c4886e7f3c74f6b64841e88359930f48f288aa958a
+  checksum: 10c0/624d8bb01bd8c0a2db93247ece51b90521b276b0a40457e4b02df10a473c8e4200a36fd71e73155bfc6899420e84b241c13571ce0aa9bfc0eab44d004c6b78d9
   languageName: node
   linkType: hard
 
@@ -451,7 +451,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/minimist@npm:^1":
+"@types/minimist@npm:^1.2.0":
   version: 1.2.5
   resolution: "@types/minimist@npm:1.2.5"
   checksum: 10c0/3f791258d8e99a1d7d0ca2bda1ca6ea5a94e5e7b8fc6cde84dd79b0552da6fb68ade750f0e17718f6587783c24254bbca0357648dd59dc3812c150305cabdc46
@@ -497,17 +497,17 @@ __metadata:
   languageName: node
   linkType: hard
 
-"ai@npm:^5.0.68":
-  version: 5.0.76
-  resolution: "ai@npm:5.0.76"
+"ai@npm:^5.0.78":
+  version: 5.0.78
+  resolution: "ai@npm:5.0.78"
   dependencies:
-    "@ai-sdk/gateway": "npm:2.0.0"
+    "@ai-sdk/gateway": "npm:2.0.1"
     "@ai-sdk/provider": "npm:2.0.0"
     "@ai-sdk/provider-utils": "npm:3.0.12"
     "@opentelemetry/api": "npm:1.9.0"
   peerDependencies:
     zod: ^3.25.76 || ^4.1.8
-  checksum: 10c0/167a191354b72106b1af6cfc8b53975637ca43919b8f48db81c0cf542ef0172f55958ed9331adcd08d017a608a98cb0b4a253c62732038322c78091e32595771
+  checksum: 10c0/9080ea4fe6bc3f75a557bde4c5312db081ca69671996e907cd5ba3820e212569d4101a7d92b92198c0d648f459a48019c0602a83b5ca4c0a0a463400c3fcd146
   languageName: node
   linkType: hard
 
@@ -1720,10 +1720,10 @@ __metadata:
     "@ai-sdk/openai": "npm:^2.0.48"
     "@anthropic-ai/claude-agent-sdk": "npm:^0.1.25"
     "@openrouter/ai-sdk-provider": "https://github.com/crazygo/ai-sdk-provider/releases/download/1.2.1/openrouter-ai-sdk-provider-1.2.1.tgz"
-    "@types/minimist": "npm:^1"
+    "@types/minimist": "npm:^1.2.0"
     "@types/node": "npm:^24.7.1"
     "@types/react": "npm:^19.2.2"
-    ai: "npm:^5.0.68"
+    ai: "npm:^5.0.78"
     concurrently: "npm:^9.2.1"
     dotenv: "npm:^17.2.3"
     ink: "npm:^6.3.1"

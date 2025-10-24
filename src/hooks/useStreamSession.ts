@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import { streamText } from 'ai';
 import { addLog } from '../logger.ts';
 import type { AiChatProvider } from '../config/ai-provider.ts';
-import { Message, LogMessage } from '../types.ts';
+import type { Message, LogMessage } from '../types.ts';
 
 const STREAM_TOKEN_TIMEOUT_MS = 30_000;
 

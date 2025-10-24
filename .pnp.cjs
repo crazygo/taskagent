@@ -34,7 +34,7 @@ const RAW_RUNTIME_STATE =
           ["@types/minimist", "npm:1.2.5"],\
           ["@types/node", "npm:24.9.1"],\
           ["@types/react", "npm:19.2.2"],\
-          ["ai", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:5.0.76"],\
+          ["ai", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:5.0.78"],\
           ["concurrently", "npm:9.2.1"],\
           ["dotenv", "npm:17.2.3"],\
           ["ink", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:6.3.1"],\
@@ -50,17 +50,17 @@ const RAW_RUNTIME_STATE =
       }]\
     ]],\
     ["@ai-sdk/gateway", [\
-      ["npm:2.0.0", {\
-        "packageLocation": "../../../.yarn/berry/cache/@ai-sdk-gateway-npm-2.0.0-854e11593a-10c0.zip/node_modules/@ai-sdk/gateway/",\
+      ["npm:2.0.1", {\
+        "packageLocation": "../../../.yarn/berry/cache/@ai-sdk-gateway-npm-2.0.1-20a80f4a45-10c0.zip/node_modules/@ai-sdk/gateway/",\
         "packageDependencies": [\
-          ["@ai-sdk/gateway", "npm:2.0.0"]\
+          ["@ai-sdk/gateway", "npm:2.0.1"]\
         ],\
         "linkType": "SOFT"\
       }],\
-      ["virtual:25d302d9a058b10b5da6ad9454a2fb9a952d58ba64572ceb47a6db6a66a2291a06adf3cf27f9e2f5e6a06a6dd624b21f0163f97d92d6dc2cba84ae303717df1a#npm:2.0.0", {\
-        "packageLocation": "./.yarn/__virtual__/@ai-sdk-gateway-virtual-f813fe472c/4/.yarn/berry/cache/@ai-sdk-gateway-npm-2.0.0-854e11593a-10c0.zip/node_modules/@ai-sdk/gateway/",\
+      ["virtual:5b21f0110f57b4845f465ccb4ce6ac78f80c3093880cf3d26ba08ac9f3605275b2d39a41b0be879493e321354263179f8800797e67cc6a8dd9b397de9f265dd5#npm:2.0.1", {\
+        "packageLocation": "./.yarn/__virtual__/@ai-sdk-gateway-virtual-d202b7ef27/4/.yarn/berry/cache/@ai-sdk-gateway-npm-2.0.1-20a80f4a45-10c0.zip/node_modules/@ai-sdk/gateway/",\
         "packageDependencies": [\
-          ["@ai-sdk/gateway", "virtual:25d302d9a058b10b5da6ad9454a2fb9a952d58ba64572ceb47a6db6a66a2291a06adf3cf27f9e2f5e6a06a6dd624b21f0163f97d92d6dc2cba84ae303717df1a#npm:2.0.0"],\
+          ["@ai-sdk/gateway", "virtual:5b21f0110f57b4845f465ccb4ce6ac78f80c3093880cf3d26ba08ac9f3605275b2d39a41b0be879493e321354263179f8800797e67cc6a8dd9b397de9f265dd5#npm:2.0.1"],\
           ["@ai-sdk/provider", "npm:2.0.0"],\
           ["@ai-sdk/provider-utils", "virtual:c1da33eefb9846ef13cb432ab9e4a1a20a2d2afacee9d808cb054103f14ad84fd9696206986608b46ef2f493fef3d811128c6cf885a3eb09148c0683413953f7#npm:3.0.12"],\
           ["@types/zod", null],\
@@ -582,7 +582,7 @@ const RAW_RUNTIME_STATE =
           ["@openrouter/ai-sdk-provider", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#https://github.com/crazygo/ai-sdk-provider/releases/download/1.2.1/openrouter-ai-sdk-provider-1.2.1.tgz"],\
           ["@types/ai", null],\
           ["@types/zod", null],\
-          ["ai", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:5.0.76"],\
+          ["ai", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:5.0.78"],\
           ["zod", "npm:3.25.76"]\
         ],\
         "packagePeers": [\
@@ -678,22 +678,22 @@ const RAW_RUNTIME_STATE =
       }]\
     ]],\
     ["ai", [\
-      ["npm:5.0.76", {\
-        "packageLocation": "../../../.yarn/berry/cache/ai-npm-5.0.76-7d41909c7e-10c0.zip/node_modules/ai/",\
+      ["npm:5.0.78", {\
+        "packageLocation": "../../../.yarn/berry/cache/ai-npm-5.0.78-fdb584867f-10c0.zip/node_modules/ai/",\
         "packageDependencies": [\
-          ["ai", "npm:5.0.76"]\
+          ["ai", "npm:5.0.78"]\
         ],\
         "linkType": "SOFT"\
       }],\
-      ["virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:5.0.76", {\
-        "packageLocation": "./.yarn/__virtual__/ai-virtual-25d302d9a0/4/.yarn/berry/cache/ai-npm-5.0.76-7d41909c7e-10c0.zip/node_modules/ai/",\
+      ["virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:5.0.78", {\
+        "packageLocation": "./.yarn/__virtual__/ai-virtual-5b21f0110f/4/.yarn/berry/cache/ai-npm-5.0.78-fdb584867f-10c0.zip/node_modules/ai/",\
         "packageDependencies": [\
-          ["@ai-sdk/gateway", "virtual:25d302d9a058b10b5da6ad9454a2fb9a952d58ba64572ceb47a6db6a66a2291a06adf3cf27f9e2f5e6a06a6dd624b21f0163f97d92d6dc2cba84ae303717df1a#npm:2.0.0"],\
+          ["@ai-sdk/gateway", "virtual:5b21f0110f57b4845f465ccb4ce6ac78f80c3093880cf3d26ba08ac9f3605275b2d39a41b0be879493e321354263179f8800797e67cc6a8dd9b397de9f265dd5#npm:2.0.1"],\
           ["@ai-sdk/provider", "npm:2.0.0"],\
           ["@ai-sdk/provider-utils", "virtual:c1da33eefb9846ef13cb432ab9e4a1a20a2d2afacee9d808cb054103f14ad84fd9696206986608b46ef2f493fef3d811128c6cf885a3eb09148c0683413953f7#npm:3.0.12"],\
           ["@opentelemetry/api", "npm:1.9.0"],\
           ["@types/zod", null],\
-          ["ai", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:5.0.76"],\
+          ["ai", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:5.0.78"],\
           ["zod", "npm:3.25.76"]\
         ],\
         "packagePeers": [\
@@ -2032,7 +2032,7 @@ const RAW_RUNTIME_STATE =
           ["@types/minimist", "npm:1.2.5"],\
           ["@types/node", "npm:24.9.1"],\
           ["@types/react", "npm:19.2.2"],\
-          ["ai", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:5.0.76"],\
+          ["ai", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:5.0.78"],\
           ["concurrently", "npm:9.2.1"],\
           ["dotenv", "npm:17.2.3"],\
           ["ink", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:6.3.1"],\

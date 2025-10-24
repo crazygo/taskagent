@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { addLog } from '../logger.ts';
-import { Message } from '../types.ts';
+import type { Message } from '../types.ts';
 
 interface UseMessageQueueProps {
   runStreamForUserMessage: (message: Message) => Promise<void>;

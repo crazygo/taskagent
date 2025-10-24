@@ -1,10 +1,11 @@
-import { ChatLanguageModel } from '@ai-sdk/core';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { addLog } from '../logger.ts';
 
-export interface AiChatProvider {
-  chat(model: string): ChatLanguageModel;
-}
+type ChatModelFactory = ReturnType<typeof createOpenRouter>['chat'];
+
+export type AiChatProvider = {
+  chat: ChatModelFactory;
+};
 
 type CachedProvider = {
   provider: AiChatProvider;

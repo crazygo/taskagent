@@ -1,6 +1,10 @@
 
 import crypto from 'crypto';
-import { query, Options, SDKAssistantMessage } from '@anthropic-ai/claude-agent-sdk';
+import { query } from '@anthropic-ai/claude-agent-sdk';
+import type {
+  Options,
+  SDKAssistantMessage,
+} from '@anthropic-ai/claude-agent-sdk';
 
 export interface Task {
   id: string;
@@ -40,8 +44,6 @@ export class TaskManager {
       const options: Options = {
         model: process.env.ANTHROPIC_MODEL,
       };
-
-
 
       const result = await query({
         prompt: task.prompt,
