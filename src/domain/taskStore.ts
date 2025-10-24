@@ -16,15 +16,18 @@ export const useTaskStore = ({ pollIntervalMs = 1000 }: UseTaskStoreOptions = {}
     return () => clearInterval(interval);
   }, [pollIntervalMs, taskManager]);
 
-  const createTask = (prompt: string) => taskManager.createTask(prompt);
-  const createCliTask = (command: string, args: string[] = [], options?: { cwd?: string; env?: Record<string, string | undefined> }) =>
-    taskManager.createCliTask(command, args, options);
+  const createTask = (prompt: string, queryOptions?: { agents?: Record<string, any> }) => {
+    // console.log(`[taskStore.createTask] queryOptions RAW:`, queryOptions);
+    // if (queryOptions?.agents) {
+    //   console.log(`[taskStore.createTask] queryOptions.agents RAW:`, queryOptions.agents);
+    // }
+    return taskManager.createTask(prompt, queryOptions);
+  };
   const waitTask = (taskId: string) => taskManager.waitTask(taskId);
 
   return {
     tasks,
     createTask,
-    createCliTask,
     waitTask,
   };
 };

@@ -15,6 +15,7 @@ import { useTaskStore } from './src/domain/taskStore.ts';
 import { useConversationStore } from './src/domain/conversationStore.ts';
 import { Driver, getDriverEnum } from './src/drivers/types.ts';
 import { handlePlanReviewDo } from './src/drivers/plan-review-do/index.ts';
+import { closeTaskLogger } from './src/task-logger.ts';
 // Guard to prevent double submission in dev double-mount scenarios
 let __nonInteractiveSubmittedOnce = false;
 
@@ -250,3 +251,18 @@ const App = () => {
 
 // --- Render ---
 render(<App />);
+
+// --- Cleanup on exit ---
+process.on('exit', () => {
+    closeTaskLogger();
+});
+
+process.on('SIGINT', () => {
+    closeTaskLogger();
+    process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+    closeTaskLogger();
+    process.exit(0);
+});
