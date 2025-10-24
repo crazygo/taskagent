@@ -9,6 +9,7 @@
     "moduleDetection": "force",
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
+  "allowImportingTsExtensions": true,
 
     /* Strictness */
     "strict": true,
@@ -21,7 +22,8 @@
     "noEmit": true,
 
     /* JSX */
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "types": ["node"]
   },
   "include": [
     "ui.tsx",

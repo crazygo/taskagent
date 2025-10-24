@@ -15,6 +15,8 @@ import { useTaskStore } from './src/domain/taskStore.ts';
 import { useConversationStore } from './src/domain/conversationStore.ts';
 import { Driver, getDriverEnum } from './src/drivers/types.ts';
 import { handlePlanReviewDo } from './src/drivers/plan-review-do/index.ts';
+// Guard to prevent double submission in dev double-mount scenarios
+let __nonInteractiveSubmittedOnce = false;
 
 enum Kernel {
   CLAUDE_CODE = 'Claude Code',
@@ -74,7 +76,7 @@ const App = () => {
     const [selectedKernel, setSelectedKernel] = useState<Kernel>(Kernel.CLAUDE_CODE);
     const [selectedDriver, setSelectedDriver] = useState<Driver>(Driver.MANUAL);
     const [focusedControl, setFocusedControl] = useState<'input' | 'kernel' | 'driver' | 'tasks'>('input');
-    const { tasks, createTask } = useTaskStore();
+    const { tasks, createTask, waitTask } = useTaskStore();
 
     // 从 CLI 参数初始化 Driver（在 bootstrapConfig 确定后）
     useEffect(() => {
@@ -138,6 +140,8 @@ const App = () => {
                 nextMessageId,
                 setActiveMessages,
                 setFrozenMessages,
+                createTask,
+                waitTask,
             });
         }
 
@@ -174,6 +178,7 @@ const App = () => {
     }, [
         selectedDriver,
         createTask,
+        waitTask,
         flushPendingQueue,
         isProcessingQueueRef,
         isStreaming,
@@ -185,7 +190,7 @@ const App = () => {
     ]);
 
     useEffect(() => {
-        if (!nonInteractiveInput || hasProcessedNonInteractiveRef.current) {
+        if (!nonInteractiveInput || hasProcessedNonInteractiveRef.current || __nonInteractiveSubmittedOnce) {
             return;
         }
 
@@ -196,6 +201,7 @@ const App = () => {
         }
 
         hasProcessedNonInteractiveRef.current = true;
+        __nonInteractiveSubmittedOnce = true;
         addLog(`Non-interactive mode: Processing input "${nonInteractiveInput}"`);
         handleSubmit(nonInteractiveInput)
             .then(success => {
