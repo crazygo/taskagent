@@ -106,6 +106,17 @@ const App = () => {
         onFrozenMessagesChange: setFrozenMessages,
     });
 
+    const prevTasksLengthRef = useRef(tasks.length);
+
+    useEffect(() => {
+        if (tasks.length > prevTasksLengthRef.current) {
+            // A new task has been added
+            const newTaskIndex = tasks.length - 1;
+            setSelectedTab(`Task ${newTaskIndex + 1}`);
+        }
+        prevTasksLengthRef.current = tasks.length;
+    }, [tasks]); // Dependency on tasks array
+
     useInput((input, key) => {
         // 当命令菜单显示时，不响应 Tab 键（让 InputBar 处理）
         if (key.tab && isCommandMenuShown) {
@@ -169,16 +180,8 @@ const App = () => {
         // /task 命令：创建后台任务（所有 Driver 共享）
         if (userInput.startsWith('/task ')) {
             const prompt = userInput.substring(6);
-            const newTask = createTask(prompt);
+            createTask(prompt);
             setQuery('');
-            // Find the index of the new task in the updated tasks array
-            const newTabIndex = tasks.findIndex(task => task.id === newTask.id);
-            if (newTabIndex !== -1) {
-                setSelectedTab(`Task ${newTabIndex + 1}`);
-            } else {
-                // Fallback if for some reason the task isn't found immediately
-                setSelectedTab(`Task ${tasks.length}`); // Assuming it's added at the end
-            }
             return true;
         }
 
@@ -290,25 +293,25 @@ const App = () => {
 
     return (
         <Box flexDirection="column" height="100%">
-            <ChatPanel frozenMessages={frozenMessages} activeMessages={activeMessages} modelName={modelName} />
-
-            {activeTask && (
-                <TaskSpecificView 
-                    task={activeTask} 
-                    taskNumber={activeTaskNumber}
-                    isFocused={focusedControl === 'task'} 
-                />
-            )}
-
-            {!nonInteractiveInput && (
-                <>
-                    <InputBar
-                        value={query}
-                        onChange={setQuery}
-                        onSubmit={handleSubmit}
-                        isFocused={focusedControl === 'input'}
-                        onCommandMenuChange={setIsCommandMenuShown}
-                    />
+                        <ChatPanel frozenMessages={frozenMessages} activeMessages={activeMessages} modelName={modelName} />
+            
+                        {!nonInteractiveInput && (
+                            <>
+                                <InputBar
+                                    value={query}
+                                    onChange={setQuery}
+                                    onSubmit={handleSubmit}
+                                    isFocused={focusedControl === 'input'}
+                                    onCommandMenuChange={setIsCommandMenuShown}
+                                />
+                                {activeTask && (
+                                    <TaskSpecificView
+                                        task={activeTask}
+                                        taskNumber={activeTaskNumber}
+                                        isFocused={focusedControl === 'task'}
+                                    />
+                                )}
+            
                     <TabView
                         staticOptions={staticTabs}
                         tasks={tasks}
