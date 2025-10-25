@@ -45,7 +45,7 @@ export const TabView: React.FC<TabViewProps> = ({ staticOptions, tasks, selected
   }, { isActive: true });
 
   return (
-    <Box flexDirection="row" width="100%" paddingX={1}>
+    <Box flexDirection="row" width="100%">
       {allTabs.map(tab => {
         const selected = selectedTab === tab;
         const color = selected ? 'white' : (isFocused ? 'white' : 'gray');

@@ -293,25 +293,26 @@ const App = () => {
 
     return (
         <Box flexDirection="column" height="100%">
-                        <ChatPanel frozenMessages={frozenMessages} activeMessages={activeMessages} modelName={modelName} />
+            <ChatPanel frozenMessages={frozenMessages} activeMessages={activeMessages} modelName={modelName} />
             
-                        {!nonInteractiveInput && (
-                            <>
-                                <InputBar
-                                    value={query}
-                                    onChange={setQuery}
-                                    onSubmit={handleSubmit}
-                                    isFocused={focusedControl === 'input'}
-                                    onCommandMenuChange={setIsCommandMenuShown}
-                                />
-                                {activeTask && (
-                                    <TaskSpecificView
-                                        task={activeTask}
-                                        taskNumber={activeTaskNumber}
-                                        isFocused={focusedControl === 'task'}
-                                    />
-                                )}
-            
+            {!nonInteractiveInput && (
+                <>
+                    <Box paddingY={1}>
+                        <InputBar
+                            value={query}
+                            onChange={setQuery}
+                            onSubmit={handleSubmit}
+                            isFocused={focusedControl === 'input'}
+                            onCommandMenuChange={setIsCommandMenuShown}
+                        />
+                    </Box>
+                    {activeTask && (
+                        <TaskSpecificView
+                            task={activeTask}
+                            taskNumber={activeTaskNumber}
+                            isFocused={focusedControl === 'task'}
+                        />
+                    )}
                     <TabView
                         staticOptions={staticTabs}
                         tasks={tasks}
@@ -326,9 +327,7 @@ const App = () => {
             )}
         </Box>
     );
-};
-
-// --- Render ---
+};// --- Render ---
 render(<App />);
 
 // --- Cleanup on exit ---
