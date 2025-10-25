@@ -7,14 +7,14 @@ import { loadCliConfig } from './src/cli/config.ts';
 import type { Task } from './task-manager.ts';
 import { ensureAiProvider, type AiChatProvider } from './src/config/ai-provider.ts';
 import * as Types from './src/types.ts';
-import { ChatPanel } from './src/components/ChatPanel.tsx';
-import { BackgroundTasks } from './src/components/BackgroundTasks.tsx';
-import { DriverControls, KernelControls } from './src/components/StatusControls.tsx';
-import { InputBar } from './src/components/InputBar.tsx';
-import { useTaskStore } from './src/domain/taskStore.ts';
-import { useConversationStore } from './src/domain/conversationStore.ts';
-import { Driver, getDriverEnum } from './src/drivers/types.ts';
-import { handlePlanReviewDo } from './src/drivers/plan-review-do/index.ts';
+import { ChatPanel } from './src/components/ChatPanel.js';
+import { TabView } from './src/components/StatusControls.js';
+import { TaskSpecificView } from './src/components/TaskSpecificView.js';
+import { InputBar } from './src/components/InputBar.js';
+import { useTaskStore } from './src/domain/taskStore.js';
+import { useConversationStore } from './src/domain/conversationStore.js';
+import { Driver, getDriverEnum, getDriverName } from './src/drivers/types.js';
+import { handlePlanReviewDo } from './src/drivers/plan-review-do/index.js';
 import { closeTaskLogger } from './src/task-logger.ts';
 // Guard to prevent double submission in dev double-mount scenarios
 let __nonInteractiveSubmittedOnce = false;
@@ -75,8 +75,9 @@ const App = () => {
     const [activeMessages, setActiveMessages] = useState<Types.Message[]>([]);
     const [query, setQuery] = useState('');
     const [selectedKernel, setSelectedKernel] = useState<Kernel>(Kernel.CLAUDE_CODE);
-    const [selectedDriver, setSelectedDriver] = useState<Driver>(Driver.MANUAL);
-    const [focusedControl, setFocusedControl] = useState<'input' | 'kernel' | 'driver' | 'tasks'>('input');
+    const [selectedTab, setSelectedTab] = useState<string>(Driver.MANUAL);
+    const [focusedControl, setFocusedControl] = useState<'input' | 'kernel' | 'tabs' | 'task'>('input');
+    const [isCommandMenuShown, setIsCommandMenuShown] = useState(false);
     const { tasks, createTask, waitTask } = useTaskStore();
 
     // 从 CLI 参数初始化 Driver（在 bootstrapConfig 确定后）
@@ -84,7 +85,7 @@ const App = () => {
         if (bootstrapConfig?.driver) {
             const driverEnum = getDriverEnum(bootstrapConfig.driver);
             addLog(`[Driver Init] Setting driver from CLI: ${driverEnum}`);
-            setSelectedDriver(driverEnum);
+            setSelectedTab(driverEnum);
         }
     }, [bootstrapConfig?.driver]);
 
@@ -106,11 +107,26 @@ const App = () => {
     });
 
     useInput((input, key) => {
+        // 当命令菜单显示时，不响应 Tab 键（让 InputBar 处理）
+        if (key.tab && isCommandMenuShown) {
+            return;
+        }
+        
         if (key.tab) {
-            if (focusedControl === 'input') setFocusedControl('kernel');
-            else if (focusedControl === 'kernel') setFocusedControl('driver');
-            else if (focusedControl === 'driver') setFocusedControl('tasks');
-            else if (focusedControl === 'tasks') setFocusedControl('input');
+            const newFocusOrder: Array<typeof focusedControl> = ['input', 'tabs'];
+            if (activeTask) {
+                newFocusOrder.push('task');
+            }
+            const currentFocusIndex = newFocusOrder.indexOf(focusedControl);
+            const nextFocusIndex = (currentFocusIndex + 1) % newFocusOrder.length;
+            setFocusedControl(newFocusOrder[nextFocusIndex]!);
+        }
+    });
+
+    // 顶层仅做记录：Ctrl+N 何时被捕获（不改变行为，便于与 InputBar 日志对照）
+    useInput((input, key) => {
+        if (key.ctrl && (input === 'n' || input === 'N')) {
+            addLog(`[App] Ctrl+N detected (focusedControl=${focusedControl}, isCommandMenuShown=${isCommandMenuShown})`);
         }
     });
 
@@ -127,9 +143,9 @@ const App = () => {
             }
             
             // 自动切换到 Plan-Review-DO driver
-            if (selectedDriver !== Driver.PLAN_REVIEW_DO) {
-                addLog('[Command] Switching to Plan-Review-DO driver');
-                setSelectedDriver(Driver.PLAN_REVIEW_DO);
+            if (selectedTab !== Driver.PLAN_REVIEW_DO) {
+                addLog('[Command] Switching to Plan-Review-DO tab');
+                setSelectedTab(Driver.PLAN_REVIEW_DO);
             }
             
             const newUserMessage: Types.Message = {
@@ -153,8 +169,16 @@ const App = () => {
         // /task 命令：创建后台任务（所有 Driver 共享）
         if (userInput.startsWith('/task ')) {
             const prompt = userInput.substring(6);
-            createTask(prompt);
+            const newTask = createTask(prompt);
             setQuery('');
+            // Find the index of the new task in the updated tasks array
+            const newTabIndex = tasks.findIndex(task => task.id === newTask.id);
+            if (newTabIndex !== -1) {
+                setSelectedTab(`Task ${newTabIndex + 1}`);
+            } else {
+                // Fallback if for some reason the task isn't found immediately
+                setSelectedTab(`Task ${tasks.length}`); // Assuming it's added at the end
+            }
             return true;
         }
 
@@ -167,7 +191,7 @@ const App = () => {
         setQuery('');
 
         // Driver 路由
-        if (selectedDriver === Driver.PLAN_REVIEW_DO) {
+        if (selectedTab === Driver.PLAN_REVIEW_DO) {
             addLog('[Driver] Routing to Plan-Review-DO');
             return await handlePlanReviewDo(newUserMessage, {
                 nextMessageId,
@@ -209,7 +233,7 @@ const App = () => {
         }
         return succeeded && !flushFailed;
     }, [
-        selectedDriver,
+        selectedTab,
         createTask,
         waitTask,
         flushPendingQueue,
@@ -229,7 +253,7 @@ const App = () => {
 
         // 如果 CLI 指定了 driver，则等待 selectedDriver 与之匹配后再提交
         const desired = bootstrapConfig?.driver ? getDriverEnum(bootstrapConfig.driver) : null;
-        if (desired && selectedDriver !== desired) {
+        if (desired && selectedTab !== desired) {
             return; // 等待 driver 初始化完成
         }
 
@@ -247,37 +271,54 @@ const App = () => {
                     process.exit(1);
                 }, 100);
             });
-    }, [handleSubmit, nonInteractiveInput, selectedDriver, bootstrapConfig?.driver]);
+    }, [handleSubmit, nonInteractiveInput, selectedTab, bootstrapConfig?.driver]);
 
     // --- RENDER ---
+    const staticTabs = Object.values(Driver);
+    const taskTabs = tasks.map((_: Task, index: number) => `Task ${index + 1}`);
+    const allTabs = [...staticTabs, ...taskTabs];
+
+    let activeTask: Task | null = null;
+    let activeTaskNumber = 0;
+    if (selectedTab.startsWith('Task ')) {
+        const taskIndex = parseInt(selectedTab.replace('Task ', ''), 10) - 1;
+        if (taskIndex >= 0 && taskIndex < tasks.length) {
+            activeTask = tasks[taskIndex]!;
+            activeTaskNumber = taskIndex + 1;
+        }
+    }
+
     return (
-        <Box flexDirection="column">
+        <Box flexDirection="column" height="100%">
             <ChatPanel frozenMessages={frozenMessages} activeMessages={activeMessages} modelName={modelName} />
 
-            <BackgroundTasks tasks={tasks} isFocused={focusedControl === 'tasks'} />
+            {activeTask && (
+                <TaskSpecificView 
+                    task={activeTask} 
+                    taskNumber={activeTaskNumber}
+                    isFocused={focusedControl === 'task'} 
+                />
+            )}
 
             {!nonInteractiveInput && (
                 <>
-                    <KernelControls
-                        kernelOptions={Object.values(Kernel) as Kernel[]}
-                        selectedKernel={selectedKernel}
-                        onKernelChange={setSelectedKernel}
-                        isKernelFocused={focusedControl === 'kernel'}
-                    />
-
                     <InputBar
                         value={query}
                         onChange={setQuery}
                         onSubmit={handleSubmit}
                         isFocused={focusedControl === 'input'}
+                        onCommandMenuChange={setIsCommandMenuShown}
                     />
-
-                    <DriverControls
-                        driverOptions={Object.values(Driver) as Driver[]}
-                        selectedDriver={selectedDriver}
-                        onDriverChange={setSelectedDriver}
-                        isDriverFocused={focusedControl === 'driver'}
+                    <TabView
+                        staticOptions={staticTabs}
+                        tasks={tasks}
+                        selectedTab={selectedTab}
+                        onTabChange={setSelectedTab}
+                        isFocused={focusedControl === 'tabs'}
                     />
+                    <Box paddingX={1} backgroundColor="gray">
+                        <Text color="gray">Press Ctrl+N to switch view</Text>
+                    </Box>
                 </>
             )}
         </Box>

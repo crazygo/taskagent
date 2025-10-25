@@ -1,7 +1,7 @@
 import minimist from 'minimist';
-import { addLog } from '../logger.ts';
+import { addLog } from '../logger.js';
 
-export type DriverName = 'manual' | 'plan-review-do' | 'l2+' | 'custom';
+export type DriverName = 'manual' | 'plan-review-do';
 
 interface CliArgs {
   prompt?: string;
@@ -33,7 +33,7 @@ export const parseCliArgs = (): CliArgs => {
   };
   
   const coerceDriver = (): DriverName | undefined => {
-    const validDrivers: DriverName[] = ['manual', 'plan-review-do', 'l2+', 'custom'];
+    const validDrivers: DriverName[] = ['manual', 'plan-review-do'];
     if (typeof rawDriver === 'string' && validDrivers.includes(rawDriver as DriverName)) {
       return rawDriver as DriverName;
     }

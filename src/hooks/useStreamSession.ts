@@ -1,8 +1,8 @@
 import { useState, useRef } from 'react';
 import { streamText } from 'ai';
-import { addLog } from '../logger.ts';
-import type { AiChatProvider } from '../config/ai-provider.ts';
-import type { Message, LogMessage } from '../types.ts';
+import { addLog } from '../logger.js';
+import type { AiChatProvider } from '../config/ai-provider.js';
+import type { Message, LogMessage } from '../types.js';
 
 const STREAM_TOKEN_TIMEOUT_MS = 30_000;
 
@@ -152,17 +152,16 @@ export const useStreamSession = ({
         .slice(0, assistantLogIndex)
         .map(({ role, content }) => ({ role, content }));
 
-      const streamOptions: Record<string, any> = {
+      const streamOptions = {
         model: aiProvider.chat(modelName),
         messages: messagesPayload,
         abortSignal: abortController.signal,
+        ...reasoningEnabled && { 
+          providerOptions: {
+            openrouter: { reasoning: { effort: 'medium' } },
+          }
+        }
       };
-
-      if (reasoningEnabled) {
-        streamOptions.providerOptions = {
-          openrouter: { reasoning: { effort: 'medium' } },
-        };
-      }
 
       const result: any = await streamText(streamOptions);
 

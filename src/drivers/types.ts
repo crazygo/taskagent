@@ -6,7 +6,7 @@
  * - l2+: 自动提交模式（未来实现）
  * - custom: 自定义模式（未来实现）
  */
-export type DriverName = 'manual' | 'plan-review-do' | 'l2+' | 'custom';
+export type DriverName = 'manual' | 'plan-review-do';
 
 /**
  * Driver 枚举（用于 UI 显示）
@@ -14,8 +14,6 @@ export type DriverName = 'manual' | 'plan-review-do' | 'l2+' | 'custom';
 export enum Driver {
   MANUAL = 'Agent',
   PLAN_REVIEW_DO = 'Plan-Review-DO',
-  AUTO_COMMIT = 'L2+',
-  CUSTOM = 'Task',
 }
 
 /**
@@ -25,8 +23,6 @@ export function getDriverEnum(name: DriverName): Driver {
   const map: Record<DriverName, Driver> = {
     'manual': Driver.MANUAL,
     'plan-review-do': Driver.PLAN_REVIEW_DO,
-    'l2+': Driver.AUTO_COMMIT,
-    'custom': Driver.CUSTOM,
   };
   return map[name];
 }
@@ -38,8 +34,6 @@ export function getDriverName(driver: Driver): DriverName {
   const map: Record<Driver, DriverName> = {
     [Driver.MANUAL]: 'manual',
     [Driver.PLAN_REVIEW_DO]: 'plan-review-do',
-    [Driver.AUTO_COMMIT]: 'l2+',
-    [Driver.CUSTOM]: 'custom',
   };
   return map[driver];
 }
