@@ -12,10 +12,10 @@ export type DriverName = 'manual' | 'plan-review-do' | 'l2+' | 'custom';
  * Driver 枚举（用于 UI 显示）
  */
 export enum Driver {
-  MANUAL = 'Manual',
+  MANUAL = 'Agent',
   PLAN_REVIEW_DO = 'Plan-Review-DO',
   AUTO_COMMIT = 'L2+',
-  CUSTOM = 'Custom',
+  CUSTOM = 'Task',
 }
 
 /**

@@ -9,7 +9,7 @@ import { ensureAiProvider, type AiChatProvider } from './src/config/ai-provider.
 import * as Types from './src/types.ts';
 import { ChatPanel } from './src/components/ChatPanel.tsx';
 import { BackgroundTasks } from './src/components/BackgroundTasks.tsx';
-import { StatusControls } from './src/components/StatusControls.tsx';
+import { DriverControls, KernelControls } from './src/components/StatusControls.tsx';
 import { InputBar } from './src/components/InputBar.tsx';
 import { useTaskStore } from './src/domain/taskStore.ts';
 import { useConversationStore } from './src/domain/conversationStore.ts';
@@ -117,6 +117,38 @@ const App = () => {
     const handleSubmit = useCallback(async (userInput: string): Promise<boolean> => {
         addLog('--- New Submission ---');
         if (!userInput) return false;
+
+        // /plan-review-do 命令：切换到 Plan-Review-DO driver 并执行
+        if (userInput.startsWith('/plan-review-do ')) {
+            const prompt = userInput.substring(16).trim();
+            if (!prompt) {
+                addLog('[Command] /plan-review-do requires a prompt');
+                return false;
+            }
+            
+            // 自动切换到 Plan-Review-DO driver
+            if (selectedDriver !== Driver.PLAN_REVIEW_DO) {
+                addLog('[Command] Switching to Plan-Review-DO driver');
+                setSelectedDriver(Driver.PLAN_REVIEW_DO);
+            }
+            
+            const newUserMessage: Types.Message = {
+                id: nextMessageId(),
+                role: 'user',
+                content: prompt,
+            };
+            
+            setQuery('');
+            
+            addLog('[Command] Executing with Plan-Review-DO');
+            return await handlePlanReviewDo(newUserMessage, {
+                nextMessageId,
+                setActiveMessages,
+                setFrozenMessages,
+                createTask,
+                waitTask,
+            });
+        }
 
         // /task 命令：创建后台任务（所有 Driver 共享）
         if (userInput.startsWith('/task ')) {
@@ -226,6 +258,13 @@ const App = () => {
 
             {!nonInteractiveInput && (
                 <>
+                    <KernelControls
+                        kernelOptions={Object.values(Kernel) as Kernel[]}
+                        selectedKernel={selectedKernel}
+                        onKernelChange={setSelectedKernel}
+                        isKernelFocused={focusedControl === 'kernel'}
+                    />
+
                     <InputBar
                         value={query}
                         onChange={setQuery}
@@ -233,14 +272,10 @@ const App = () => {
                         isFocused={focusedControl === 'input'}
                     />
 
-                    <StatusControls
-                        kernelOptions={Object.values(Kernel) as Kernel[]}
+                    <DriverControls
                         driverOptions={Object.values(Driver) as Driver[]}
-                        selectedKernel={selectedKernel}
                         selectedDriver={selectedDriver}
-                        onKernelChange={setSelectedKernel}
                         onDriverChange={setSelectedDriver}
-                        isKernelFocused={focusedControl === 'kernel'}
                         isDriverFocused={focusedControl === 'driver'}
                     />
                 </>
