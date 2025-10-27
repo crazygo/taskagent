@@ -12,6 +12,7 @@ interface Command {
 const COMMANDS: Command[] = [
   { name: 'plan-review-do', description: 'Execute task with plan-review-do workflow' },
   { name: 'task', description: 'Create a background task' },
+  { name: 'newsession', description: 'Start a fresh Claude agent session' },
 ];
 
 interface InputBarProps {
