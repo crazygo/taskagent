@@ -106,7 +106,7 @@ export const useStreamSession = ({
   const runStreamForUserMessage = async (userMessage: Message): Promise<void> => {
     let streamError: Error | null = null;
     const normalizedUserMessage: Message = { ...userMessage, isPending: false };
-    addLog(`[Stream] Starting turn with user content: ${normalizedUserMessage.content.replace(/\s+/g, ' ').slice(0, 120)}`);
+
     setIsStreaming(true);
 
     // Render: keep only pending placeholders then append current user message
@@ -179,7 +179,6 @@ export const useStreamSession = ({
 
       if (result && 'fullStream' in result && result.fullStream) {
         for await (const part of result.fullStream as AsyncIterable<any>) {
-          addLog(`[Stream] Raw part: ${JSON.stringify(part)}`);
           const type = String(part?.type ?? '');
           const normalizedType = type.toLowerCase();
 
@@ -244,18 +243,12 @@ export const useStreamSession = ({
           if (combinedReasoningDelta.length > 0) {
             assistantReasoning += combinedReasoningDelta;
             lastTokenAtRef.current = Date.now();
-            addLog(
-              `[Stream] Reasoning delta (${type || 'unknown'}): ${combinedReasoningDelta.replace(/\s+/g, ' ').slice(0, 120)}`
-            );
             handled = true;
           }
 
           if (textDelta.length > 0) {
             assistantContent += textDelta;
             lastTokenAtRef.current = Date.now();
-            addLog(
-              `[Stream] Text delta (${type || 'unknown'}): ${textDelta.replace(/\s+/g, ' ').slice(0, 120)}`
-            );
             conversationLogRef.current[assistantLogIndex] = { role: 'assistant', content: assistantContent };
             handled = true;
           }
@@ -275,11 +268,11 @@ export const useStreamSession = ({
       }
 
       assistantSucceeded = true;
-      addLog('[Stream] Completed assistant response.');
+
     } catch (error) {
       const rawMessage = error instanceof Error ? error.message : String(error);
       const displayMessage = timedOut ? 'Stream timeout (30s without response).' : rawMessage;
-      addLog(`[Stream] Error: ${displayMessage}`);
+
       conversationLogRef.current.splice(assistantLogIndex, 1);
       setActiveMessages(prev => prev.filter(msg => msg.id !== assistantMessageId));
       pushSystemMessage(`Error: ${displayMessage}`);

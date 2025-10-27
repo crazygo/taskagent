@@ -2,6 +2,7 @@
 import React, {useState, useEffect, useRef, useCallback} from 'react';
 import {render, Box, Text, useInput} from 'ink';
 import { randomUUID } from 'crypto';
+import {inspect} from 'util';
 import { query, type SDKAssistantMessage } from '@anthropic-ai/claude-agent-sdk';
 
 import { addLog } from './src/logger.ts';
@@ -40,6 +41,69 @@ const STATIC_TABS: readonly Driver[] = [
 
 const formatSessionId = (sessionId: string) =>
   sessionId.length > 8 ? `${sessionId.slice(0, 8)}...` : sessionId;
+
+const formatErrorForDisplay = (error: unknown, seen: WeakSet<object> = new WeakSet()): string | null => {
+    if (typeof error === 'object' && error !== null) {
+        const objectError = error as object;
+        if (seen.has(objectError)) {
+            return null;
+        }
+        seen.add(objectError);
+    }
+
+    if (error instanceof Error) {
+        const sections: string[] = [];
+        const stack = error.stack;
+        if (stack) {
+            const stackLines = stack.split('\n');
+            const stackBody = stackLines.length > 1 ? stackLines.slice(1).join('\n').trim() : '';
+            if (stackBody) {
+                sections.push(`stack:\n${stackBody}`);
+            }
+        }
+
+        const maybeDetails = error as Error & {
+            stderr?: string;
+            stdout?: string;
+            cause?: unknown;
+            [key: string]: unknown;
+        };
+
+        if (typeof maybeDetails.stderr === 'string' && maybeDetails.stderr.trim()) {
+            sections.push(`stderr:\n${maybeDetails.stderr.trim()}`);
+        }
+        if (typeof maybeDetails.stdout === 'string' && maybeDetails.stdout.trim()) {
+            sections.push(`stdout:\n${maybeDetails.stdout.trim()}`);
+        }
+        if (maybeDetails.cause) {
+            const causeDetails = formatErrorForDisplay(maybeDetails.cause, seen);
+            if (causeDetails && causeDetails.trim()) {
+                sections.push(`cause:\n${causeDetails.trim()}`);
+            }
+        }
+
+        const ownKeys = Object.getOwnPropertyNames(error).filter(key =>
+            !['name', 'message', 'stack', 'cause', 'stderr', 'stdout'].includes(key)
+        );
+        for (const key of ownKeys) {
+            const value = maybeDetails[key];
+            if (value !== undefined) {
+                sections.push(`${key}:\n${inspect(value, { depth: 4 })}`);
+            }
+        }
+
+        if (sections.length === 0) {
+            return null;
+        }
+        return sections.join('\n\n');
+    }
+
+    if (typeof error === 'object' && error !== null) {
+        return inspect(error, { depth: 4 });
+    }
+
+    return typeof error === 'string' ? error : String(error);
+};
 
 
 // --- Components ---
@@ -89,7 +153,7 @@ const App = () => {
     // --- STATE ---
     const [frozenMessages, setFrozenMessages] = useState<Types.Message[]>([]);
     const [activeMessages, setActiveMessages] = useState<Types.Message[]>([]);
-    const [query, setQuery] = useState('');
+    const [inputValue, setInputValue] = useState('');
     const [selectedKernel, setSelectedKernel] = useState<Kernel>(Kernel.CLAUDE_CODE);
     const [selectedTab, setSelectedTab] = useState<string>(Driver.CHAT);
     const [focusedControl, setFocusedControl] = useState<'input' | 'kernel' | 'tabs' | 'task'>('input');
@@ -132,6 +196,7 @@ const App = () => {
         errorNotified: false,
     });
     const lastAnnouncedAgentSessionRef = useRef<string | null>(null);
+    const agentSessionInitializedRef = useRef<boolean>(false);
 
     const appendSystemMessage = useCallback((content: string, boxed = false) => {
         const systemMessage: Types.Message = {
@@ -193,12 +258,16 @@ const App = () => {
                     if (cancelled) return;
                     setWorkspaceSettings(updatedSettings);
                     addLog(`[Agent] Created new session ${sessionId} for workspace ${workspacePath}`);
+                    agentSessionInitializedRef.current = false;
                 }
 
                 if (cancelled) return;
                 setAgentSessionId(sessionId);
                 lastAnnouncedAgentSessionRef.current = null;
                 agentWorkspaceStatusRef.current.errorNotified = false;
+                if (settings.sessions.length > 0) {
+                    agentSessionInitializedRef.current = true;
+                }
             } catch (error) {
                 if (cancelled) return;
                 const message = error instanceof Error ? error.message : String(error);
@@ -287,6 +356,7 @@ const App = () => {
             lastAnnouncedAgentSessionRef.current = null;
             appendSystemMessage(`[Agent] Started new Claude session ${formatSessionId(newSessionId)}.`);
             addLog(`[Agent] Created new session ${newSessionId} for workspace ${workspacePath}`);
+            agentSessionInitializedRef.current = false;
             return newSessionId;
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
@@ -335,12 +405,20 @@ const App = () => {
         let assistantReasoning = '';
 
         try {
+            const options: any = {
+                model: process.env.ANTHROPIC_MODEL,
+                cwd: bootstrapConfig.workspacePath,
+            };
+
+            if (agentSessionInitializedRef.current) {
+                options.resume = agentSessionId;
+            } else {
+                options.extraArgs = { 'session-id': agentSessionId };
+            }
+
             const result = query({
                 prompt,
-                options: {
-                    model: process.env.ANTHROPIC_MODEL,
-                    extraArgs: { 'session-id': agentSessionId },
-                },
+                options,
             });
 
             const updateAssistant = () => {
@@ -381,12 +459,15 @@ const App = () => {
 
             setFrozenMessages(prev => [...prev, ...completedMessages]);
             addLog(`[Agent] Response completed (${assistantContent.length} chars).`);
+            agentSessionInitializedRef.current = true;
             return true;
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
-            addLog(`[Agent] Error: ${message}`);
+            const details = formatErrorForDisplay(error);
+            const combinedMessage = details ? `${message}\n${details}` : message;
+            addLog(`[Agent] Error: ${combinedMessage}`);
             setFrozenMessages(prev => [...prev, userMessage]);
-            appendSystemMessage(`[Agent] Error: ${message}`, true);
+            appendSystemMessage(`[Agent] Error: ${combinedMessage}`, true);
             return false;
         } finally {
             setActiveMessages(prev => prev.filter(msg => msg.isPending));
@@ -407,7 +488,7 @@ const App = () => {
         if (trimmedInput.length === 0) return false;
 
         if (trimmedInput === '/newsession') {
-            setQuery('');
+            setInputValue('');
             if (selectedTab !== Driver.AGENT) {
                 appendSystemMessage('The /newsession command is only available in the Agent tab.', true);
                 return false;
@@ -435,7 +516,7 @@ const App = () => {
                 content: prompt,
             };
             
-            setQuery('');
+            setInputValue('');
             
             addLog('[Command] Executing with Plan-Review-DO');
             return await handlePlanReviewDo(newUserMessage, {
@@ -455,7 +536,7 @@ const App = () => {
             return true;
         }
 
-        setQuery('');
+        setInputValue('');
 
         if (selectedTab === Driver.PLAN_REVIEW_DO) {
             const newUserMessage: Types.Message = {
@@ -591,8 +672,8 @@ const App = () => {
                 <>
                     <Box paddingY={1}>
                         <InputBar
-                            value={query}
-                            onChange={setQuery}
+                        value={inputValue}
+                        onChange={setInputValue}
                             onSubmit={handleSubmit}
                             isFocused={focusedControl === 'input'}
                             onCommandMenuChange={setIsCommandMenuShown}
@@ -614,7 +695,7 @@ const App = () => {
                         isFocused={focusedControl === 'tabs'}
                     />
                     <Box paddingX={1} backgroundColor="gray">
-                        <Text color="gray">
+                        <Text>
                             {isEscActive ? "[Press ESC again to clear input]" : "[Press Ctrl+N to switch view]"}
                         </Text>
                     </Box>

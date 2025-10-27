@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Newline, Static, Text } from 'ink';
+import { Box, Newline, Static, Text, useStdout } from 'ink';
 import * as Types from '../types.ts';
 
 interface MessageProps {
@@ -7,27 +7,8 @@ interface MessageProps {
 }
 
 const MessageComponent: React.FC<MessageProps> = ({ message }) => {
-  let prefix = '';
-  let textColor: 'white' | 'gray' | 'yellow' = 'white';
-  let boxProps = {} as Record<string, unknown>;
-
-  if (message.role === 'user') {
-    prefix = '> ';
-    textColor = 'white';
-  } else if (message.role === 'assistant') {
-    prefix = '✦ ';
-    textColor = 'white';
-  } else if (message.role === 'system') {
-    prefix = 'ℹ️ ';
-    textColor = 'yellow';
-    if (message.isBoxed) {
-      boxProps = {
-        borderStyle: 'round',
-        borderColor: 'red',
-        paddingX: 1,
-      };
-    }
-  }
+  const { stdout } = useStdout();
+  const fullWidth = Math.max(1, stdout?.columns ?? 80);
 
   const pendingSuffix = message.isPending ? ' (queued)' : '';
   const allReasoningLines = (message.reasoning ?? '')
@@ -38,6 +19,50 @@ const MessageComponent: React.FC<MessageProps> = ({ message }) => {
     ? (message.content ?? '').replace(/^\s+/, '')
     : (message.content ?? '');
   const contentLines = normalizedContent.split(/\r?\n/);
+
+  if (message.role === 'user') {
+    const renderLine = (line: string, index: number) => {
+      const renderedPrefix = index === 0 ? '> ' : '  ';
+      const suffix = index === 0 ? pendingSuffix : '';
+      return (
+        <Box
+          key={`${message.id}-user-${index}`}
+          flexDirection="row"
+          width={fullWidth}
+          paddingX={1}
+          backgroundColor="gray"
+        >
+          <Text color="white">{renderedPrefix}</Text>
+          <Text color="white">{line || ' '}</Text>
+          {suffix ? <Text color="white">{suffix}</Text> : null}
+          <Box flexGrow={1} />
+        </Box>
+      );
+    };
+
+    return (
+      <Box flexDirection="column" width={fullWidth}>
+        {contentLines.map((line, index) => renderLine(line, index))}
+      </Box>
+    );
+  }
+
+  let prefix = '';
+  let textColor: 'white' | 'gray' | 'yellow' | undefined;
+  const boxProps: Record<string, unknown> = {};
+
+  if (message.role === 'assistant') {
+    prefix = '✦ ';
+    textColor = undefined;
+  } else if (message.role === 'system') {
+    prefix = 'ℹ️ ';
+    textColor = 'yellow';
+    if (message.isBoxed) {
+      boxProps.borderStyle = 'round';
+      boxProps.borderColor = 'red';
+      boxProps.paddingX = 1;
+    }
+  }
 
   return (
     <Box {...boxProps} flexDirection="column">
