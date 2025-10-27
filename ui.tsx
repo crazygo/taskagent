@@ -1,8 +1,8 @@
 
-import React, {useState, useEffect, useRef, useCallback} from 'react';
-import {render, Box, Text, useInput} from 'ink';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { render, Box, Text, useInput } from 'ink';
 import { randomUUID } from 'crypto';
-import {inspect} from 'util';
+import { inspect } from 'util';
 import { query, type SDKAssistantMessage } from '@anthropic-ai/claude-agent-sdk';
 
 import { addLog } from './src/logger.ts';
@@ -24,23 +24,29 @@ import { loadWorkspaceSettings, writeWorkspaceSettings, type WorkspaceSettings }
 let __nonInteractiveSubmittedOnce = false;
 
 enum Kernel {
-  CLAUDE_CODE = 'Claude Code',
-  GEMINI = 'Gemini',
-  CODEX = 'Codex',
+    CLAUDE_CODE = 'Claude Code',
+    GEMINI = 'Gemini',
+    CODEX = 'Codex',
 }
 
 const STATIC_TABS: readonly Driver[] = [
-  Driver.CHAT,
-  Driver.AGENT,
-  Driver.PLAN_REVIEW_DO,
-  Driver.STORY,
-  Driver.UX,
-  Driver.ARCHITECTURE,
-  Driver.TECH_PLAN,
+    Driver.CHAT,
+    Driver.AGENT,
+    Driver.PLAN_REVIEW_DO,
+    Driver.STORY,
+    Driver.UX,
+    Driver.ARCHITECTURE,
+    Driver.TECH_PLAN,
 ];
 
+type AgentPromptJob = {
+    rawInput: string;
+    prompt: string;
+    pendingMessageIds?: number[];
+};
+
 const formatSessionId = (sessionId: string) =>
-  sessionId.length > 8 ? `${sessionId.slice(0, 8)}...` : sessionId;
+    sessionId.length > 8 ? `${sessionId.slice(0, 8)}...` : sessionId;
 
 const formatErrorForDisplay = (error: unknown, seen: WeakSet<object> = new WeakSet()): string | null => {
     if (typeof error === 'object' && error !== null) {
@@ -197,6 +203,7 @@ const App = () => {
     });
     const lastAnnouncedAgentSessionRef = useRef<string | null>(null);
     const agentSessionInitializedRef = useRef<boolean>(false);
+    const agentPendingQueueRef = useRef<AgentPromptJob[]>([]);
 
     const appendSystemMessage = useCallback((content: string, boxed = false) => {
         const systemMessage: Types.Message = {
@@ -206,7 +213,7 @@ const App = () => {
             isBoxed: boxed,
         };
         setFrozenMessages(prev => [...prev, systemMessage]);
-        setActiveMessages(prev => [...prev.filter(msg => msg.isPending), systemMessage]);
+        setActiveMessages(prev => prev.filter(msg => msg.isPending));
     }, [nextMessageId, setActiveMessages, setFrozenMessages]);
 
     useEffect(() => {
@@ -306,7 +313,7 @@ const App = () => {
         if (key.tab && isCommandMenuShown) {
             return;
         }
-        
+
         if (key.tab) {
             const newFocusOrder: Array<typeof focusedControl> = ['input', 'tabs'];
             if (activeTask) {
@@ -366,21 +373,8 @@ const App = () => {
         }
     }, [bootstrapConfig?.workspacePath, appendSystemMessage, isAgentStreaming]);
 
-    const runAgentTurn = useCallback(async (rawInput: string): Promise<boolean> => {
-        const prompt = rawInput.trim();
-        if (prompt.length === 0) {
-            return false;
-        }
-
-        if (!agentSessionId) {
-            appendSystemMessage('[Agent] Session not ready yet. Switch to the Agent tab again to initialize.', true);
-            return false;
-        }
-
-        if (isAgentStreaming) {
-            appendSystemMessage('[Agent] Still processing previous request. Please wait.');
-            return false;
-        }
+    const startAgentPrompt = useCallback(async (job: AgentPromptJob): Promise<boolean> => {
+        const { rawInput, prompt, pendingMessageIds } = job;
 
         const userMessage: Types.Message = {
             id: nextMessageId(),
@@ -396,7 +390,12 @@ const App = () => {
             reasoning: '',
         };
 
-        setActiveMessages(prev => [...prev.filter(msg => msg.isPending), userMessage, assistantPlaceholder]);
+        setActiveMessages(prev => {
+            const retainedPending = prev.filter(msg =>
+                msg.isPending && !(pendingMessageIds?.includes(msg.id))
+            );
+            return [...retainedPending, userMessage, assistantPlaceholder];
+        });
 
         setIsAgentStreaming(true);
         addLog(`[Agent] Sending prompt with session ${agentSessionId}: ${prompt.replace(/\s+/g, ' ').slice(0, 120)}`);
@@ -472,14 +471,76 @@ const App = () => {
         } finally {
             setActiveMessages(prev => prev.filter(msg => msg.isPending));
             setIsAgentStreaming(false);
+            if (agentPendingQueueRef.current.length > 0) {
+                const nextJob = agentPendingQueueRef.current.shift();
+                if (nextJob) {
+                    void startAgentPrompt(nextJob);
+                }
+            }
         }
+    }, [
+        agentSessionId,
+        appendSystemMessage,
+        bootstrapConfig.workspacePath,
+        nextMessageId,
+        setActiveMessages,
+        setFrozenMessages,
+    ]);
+
+    const runAgentTurn = useCallback(async (rawInput: string): Promise<boolean> => {
+        const prompt = rawInput.trim();
+        if (prompt.length === 0) {
+            return false;
+        }
+
+        if (!agentSessionId) {
+            appendSystemMessage('[Agent] Session not ready yet. Switch to the Agent tab again to initialize.', true);
+            return false;
+        }
+
+        const isBusy = isAgentStreaming || agentPendingQueueRef.current.length > 0;
+
+        if (isBusy) {
+            const pendingUserMessageId = nextMessageId();
+            const pendingAssistantMessageId = nextMessageId();
+
+            const pendingUserMessage: Types.Message = {
+                id: pendingUserMessageId,
+                role: 'user',
+                content: rawInput,
+                isPending: true,
+            };
+
+            const pendingAssistantMessage: Types.Message = {
+                id: pendingAssistantMessageId,
+                role: 'assistant',
+                content: '',
+                reasoning: '',
+                isPending: true,
+            };
+
+            setActiveMessages(prev => [...prev.filter(msg => msg.isPending), pendingUserMessage, pendingAssistantMessage]);
+
+            agentPendingQueueRef.current.push({
+                rawInput,
+                prompt,
+                pendingMessageIds: [pendingUserMessageId, pendingAssistantMessageId],
+            });
+
+            appendSystemMessage(
+                `[Agent] Still processing previous request. Your message has been queued (${agentPendingQueueRef.current.length} pending).`
+            );
+            return true;
+        }
+
+        return await startAgentPrompt({ rawInput, prompt });
     }, [
         agentSessionId,
         appendSystemMessage,
         isAgentStreaming,
         nextMessageId,
         setActiveMessages,
-        setFrozenMessages,
+        startAgentPrompt,
     ]);
 
     const handleSubmit = useCallback(async (userInput: string): Promise<boolean> => {
@@ -503,21 +564,21 @@ const App = () => {
                 addLog('[Command] /plan-review-do requires a prompt');
                 return false;
             }
-            
+
             // 自动切换到 Plan-Review-DO driver
             if (selectedTab !== Driver.PLAN_REVIEW_DO) {
                 addLog('[Command] Switching to Plan-Review-DO tab');
                 setSelectedTab(Driver.PLAN_REVIEW_DO);
             }
-            
+
             const newUserMessage: Types.Message = {
                 id: nextMessageId(),
                 role: 'user',
                 content: prompt,
             };
-            
+
             setInputValue('');
-            
+
             addLog('[Command] Executing with Plan-Review-DO');
             return await handlePlanReviewDo(newUserMessage, {
                 nextMessageId,
@@ -667,13 +728,13 @@ const App = () => {
                 modelName={modelName}
                 workspacePath={bootstrapConfig.workspacePath}
             />
-            
+
             {!nonInteractiveInput && (
                 <>
                     <Box paddingY={1}>
                         <InputBar
-                        value={inputValue}
-                        onChange={setInputValue}
+                            value={inputValue}
+                            onChange={setInputValue}
                             onSubmit={handleSubmit}
                             isFocused={focusedControl === 'input'}
                             onCommandMenuChange={setIsCommandMenuShown}

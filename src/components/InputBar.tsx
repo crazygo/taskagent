@@ -170,17 +170,6 @@ export const InputBar: React.FC<InputBarProps> = ({ value, onChange, onSubmit, i
 
   // 仅记录变化轨迹，不做抑制
   const handleChange = (next: string) => {
-    const prev = prevValueRef.current;
-    let delta = '';
-    if (next.length > prev.length) {
-      delta = `+"${next.slice(prev.length)}"`;
-    } else if (next.length < prev.length) {
-      delta = `-"${prev.slice(next.length)}"`;
-    } else {
-      // same length, likely edit within
-      delta = 'len=same';
-    }
-    addLog(`[InputBar] onChange prev="${prev}" next="${next}" delta=${delta}`);
     onChange(next);
   };
 
