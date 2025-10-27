@@ -1,6 +1,8 @@
 
 import React, {useState, useEffect, useRef, useCallback} from 'react';
 import {render, Box, Text, useInput} from 'ink';
+import { randomUUID } from 'crypto';
+import { query, type SDKAssistantMessage } from '@anthropic-ai/claude-agent-sdk';
 
 import { addLog } from './src/logger.ts';
 import { loadCliConfig } from './src/cli/config.ts';
@@ -16,6 +18,7 @@ import { useConversationStore } from './src/domain/conversationStore.js';
 import { Driver, getDriverEnum, getDriverName } from './src/drivers/types.js';
 import { handlePlanReviewDo } from './src/drivers/plan-review-do/index.js';
 import { closeTaskLogger } from './src/task-logger.ts';
+import { loadWorkspaceSettings, writeWorkspaceSettings, type WorkspaceSettings } from './src/workspace/settings.ts';
 // Guard to prevent double submission in dev double-mount scenarios
 let __nonInteractiveSubmittedOnce = false;
 
@@ -24,6 +27,19 @@ enum Kernel {
   GEMINI = 'Gemini',
   CODEX = 'Codex',
 }
+
+const STATIC_TABS: readonly Driver[] = [
+  Driver.CHAT,
+  Driver.AGENT,
+  Driver.PLAN_REVIEW_DO,
+  Driver.STORY,
+  Driver.UX,
+  Driver.ARCHITECTURE,
+  Driver.TECH_PLAN,
+];
+
+const formatSessionId = (sessionId: string) =>
+  sessionId.length > 8 ? `${sessionId.slice(0, 8)}...` : sessionId;
 
 
 // --- Components ---
@@ -75,10 +91,13 @@ const App = () => {
     const [activeMessages, setActiveMessages] = useState<Types.Message[]>([]);
     const [query, setQuery] = useState('');
     const [selectedKernel, setSelectedKernel] = useState<Kernel>(Kernel.CLAUDE_CODE);
-    const [selectedTab, setSelectedTab] = useState<string>(Driver.MANUAL);
+    const [selectedTab, setSelectedTab] = useState<string>(Driver.CHAT);
     const [focusedControl, setFocusedControl] = useState<'input' | 'kernel' | 'tabs' | 'task'>('input');
     const [isCommandMenuShown, setIsCommandMenuShown] = useState(false);
     const [isEscActive, setIsEscActive] = useState(false);
+    const [agentSessionId, setAgentSessionId] = useState<string | null>(null);
+    const [, setWorkspaceSettings] = useState<WorkspaceSettings | null>(null);
+    const [isAgentStreaming, setIsAgentStreaming] = useState(false);
     const { tasks, createTask, waitTask } = useTaskStore();
 
     // 从 CLI 参数初始化 Driver（在 bootstrapConfig 确定后）
@@ -108,6 +127,22 @@ const App = () => {
     });
 
     const prevTasksLengthRef = useRef(tasks.length);
+    const agentWorkspaceStatusRef = useRef<{ missingNotified: boolean; errorNotified: boolean }>({
+        missingNotified: false,
+        errorNotified: false,
+    });
+    const lastAnnouncedAgentSessionRef = useRef<string | null>(null);
+
+    const appendSystemMessage = useCallback((content: string, boxed = false) => {
+        const systemMessage: Types.Message = {
+            id: nextMessageId(),
+            role: 'system',
+            content,
+            isBoxed: boxed,
+        };
+        setFrozenMessages(prev => [...prev, systemMessage]);
+        setActiveMessages(prev => [...prev.filter(msg => msg.isPending), systemMessage]);
+    }, [nextMessageId, setActiveMessages, setFrozenMessages]);
 
     useEffect(() => {
         if (tasks.length > prevTasksLengthRef.current) {
@@ -117,6 +152,85 @@ const App = () => {
         }
         prevTasksLengthRef.current = tasks.length;
     }, [tasks]); // Dependency on tasks array
+
+    useEffect(() => {
+        if (selectedTab !== Driver.AGENT) {
+            return;
+        }
+
+        if (agentSessionId) {
+            return;
+        }
+
+        const workspacePath = bootstrapConfig?.workspacePath;
+
+        if (!workspacePath) {
+            if (!agentWorkspaceStatusRef.current.missingNotified) {
+                appendSystemMessage('[Agent] Missing workspace. Launch with --workspace <path> to retain sessions.', true);
+                agentWorkspaceStatusRef.current.missingNotified = true;
+            }
+            return;
+        }
+
+        agentWorkspaceStatusRef.current.missingNotified = false;
+
+        let cancelled = false;
+
+        (async () => {
+            try {
+                const settings = await loadWorkspaceSettings(workspacePath);
+                if (cancelled) return;
+
+                setWorkspaceSettings(settings);
+
+                let sessionId = settings.sessions.at(-1);
+                if (!sessionId) {
+                    sessionId = randomUUID();
+                    const updatedSettings: WorkspaceSettings = {
+                        sessions: [...settings.sessions, sessionId],
+                    };
+                    await writeWorkspaceSettings(workspacePath, updatedSettings);
+                    if (cancelled) return;
+                    setWorkspaceSettings(updatedSettings);
+                    addLog(`[Agent] Created new session ${sessionId} for workspace ${workspacePath}`);
+                }
+
+                if (cancelled) return;
+                setAgentSessionId(sessionId);
+                lastAnnouncedAgentSessionRef.current = null;
+                agentWorkspaceStatusRef.current.errorNotified = false;
+            } catch (error) {
+                if (cancelled) return;
+                const message = error instanceof Error ? error.message : String(error);
+                addLog(`[Agent] Workspace initialization failed: ${message}`);
+                if (!agentWorkspaceStatusRef.current.errorNotified) {
+                    appendSystemMessage(`[Agent] Failed to initialize workspace: ${message}`, true);
+                    agentWorkspaceStatusRef.current.errorNotified = true;
+                }
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [selectedTab, bootstrapConfig?.workspacePath, agentSessionId, appendSystemMessage]);
+
+    useEffect(() => {
+        if (selectedTab !== Driver.AGENT) {
+            return;
+        }
+        if (!agentSessionId) {
+            return;
+        }
+        if (lastAnnouncedAgentSessionRef.current === agentSessionId) {
+            return;
+        }
+        const workspacePath = bootstrapConfig?.workspacePath ?? '(no workspace)';
+        appendSystemMessage(
+            `[Agent] Using Claude session ${formatSessionId(agentSessionId)} for workspace ${workspacePath}.`
+        );
+        lastAnnouncedAgentSessionRef.current = agentSessionId;
+    }, [selectedTab, agentSessionId, bootstrapConfig?.workspacePath, appendSystemMessage]);
 
     useInput((input, key) => {
         // 当命令菜单显示时，不响应 Tab 键（让 InputBar 处理）
@@ -146,9 +260,160 @@ const App = () => {
         setIsEscActive(isEscActive);
     }, []);
 
+    const createNewAgentSession = useCallback(async (): Promise<string | null> => {
+        const workspacePath = bootstrapConfig?.workspacePath;
+        if (!workspacePath) {
+            appendSystemMessage('[Agent] Cannot create a new session without --workspace.', true);
+            return null;
+        }
+
+        if (isAgentStreaming) {
+            appendSystemMessage('[Agent] Wait for the current response to finish before creating a new session.', true);
+            return null;
+        }
+
+        try {
+            const settings = await loadWorkspaceSettings(workspacePath);
+            const newSessionId = randomUUID();
+            const updatedSettings: WorkspaceSettings = {
+                sessions: [
+                    ...settings.sessions.filter(session => typeof session === 'string' && session.trim().length > 0),
+                    newSessionId,
+                ],
+            };
+            await writeWorkspaceSettings(workspacePath, updatedSettings);
+            setWorkspaceSettings(updatedSettings);
+            setAgentSessionId(newSessionId);
+            lastAnnouncedAgentSessionRef.current = null;
+            appendSystemMessage(`[Agent] Started new Claude session ${formatSessionId(newSessionId)}.`);
+            addLog(`[Agent] Created new session ${newSessionId} for workspace ${workspacePath}`);
+            return newSessionId;
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            appendSystemMessage(`[Agent] Failed to create new session: ${message}`, true);
+            addLog(`[Agent] Failed to create new session: ${message}`);
+            return null;
+        }
+    }, [bootstrapConfig?.workspacePath, appendSystemMessage, isAgentStreaming]);
+
+    const runAgentTurn = useCallback(async (rawInput: string): Promise<boolean> => {
+        const prompt = rawInput.trim();
+        if (prompt.length === 0) {
+            return false;
+        }
+
+        if (!agentSessionId) {
+            appendSystemMessage('[Agent] Session not ready yet. Switch to the Agent tab again to initialize.', true);
+            return false;
+        }
+
+        if (isAgentStreaming) {
+            appendSystemMessage('[Agent] Still processing previous request. Please wait.');
+            return false;
+        }
+
+        const userMessage: Types.Message = {
+            id: nextMessageId(),
+            role: 'user',
+            content: rawInput,
+        };
+
+        const assistantMessageId = nextMessageId();
+        const assistantPlaceholder: Types.Message = {
+            id: assistantMessageId,
+            role: 'assistant',
+            content: '',
+            reasoning: '',
+        };
+
+        setActiveMessages(prev => [...prev.filter(msg => msg.isPending), userMessage, assistantPlaceholder]);
+
+        setIsAgentStreaming(true);
+        addLog(`[Agent] Sending prompt with session ${agentSessionId}: ${prompt.replace(/\s+/g, ' ').slice(0, 120)}`);
+
+        let assistantContent = '';
+        let assistantReasoning = '';
+
+        try {
+            const result = query({
+                prompt,
+                options: {
+                    model: process.env.ANTHROPIC_MODEL,
+                    extraArgs: { 'session-id': agentSessionId },
+                },
+            });
+
+            const updateAssistant = () => {
+                setActiveMessages(prev =>
+                    prev.map(msg =>
+                        msg.id === assistantMessageId
+                            ? { ...msg, content: assistantContent, reasoning: assistantReasoning }
+                            : msg
+                    )
+                );
+            };
+
+            for await (const message of result) {
+                if (message.type === 'assistant') {
+                    const assistantMessage = message as SDKAssistantMessage;
+                    for (const block of assistantMessage.message.content) {
+                        if (block.type === 'text' && typeof block.text === 'string') {
+                            assistantContent += block.text;
+                            updateAssistant();
+                        }
+                        if (block.type === 'reasoning' && typeof block.text === 'string') {
+                            assistantReasoning += block.text;
+                            updateAssistant();
+                        }
+                    }
+                }
+            }
+
+            const completedMessages: Types.Message[] = [
+                userMessage,
+                {
+                    id: assistantMessageId,
+                    role: 'assistant',
+                    content: assistantContent,
+                    reasoning: assistantReasoning,
+                },
+            ];
+
+            setFrozenMessages(prev => [...prev, ...completedMessages]);
+            addLog(`[Agent] Response completed (${assistantContent.length} chars).`);
+            return true;
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            addLog(`[Agent] Error: ${message}`);
+            setFrozenMessages(prev => [...prev, userMessage]);
+            appendSystemMessage(`[Agent] Error: ${message}`, true);
+            return false;
+        } finally {
+            setActiveMessages(prev => prev.filter(msg => msg.isPending));
+            setIsAgentStreaming(false);
+        }
+    }, [
+        agentSessionId,
+        appendSystemMessage,
+        isAgentStreaming,
+        nextMessageId,
+        setActiveMessages,
+        setFrozenMessages,
+    ]);
+
     const handleSubmit = useCallback(async (userInput: string): Promise<boolean> => {
         addLog('--- New Submission ---');
-        if (!userInput) return false;
+        const trimmedInput = userInput.trim();
+        if (trimmedInput.length === 0) return false;
+
+        if (trimmedInput === '/newsession') {
+            setQuery('');
+            if (selectedTab !== Driver.AGENT) {
+                appendSystemMessage('The /newsession command is only available in the Agent tab.', true);
+                return false;
+            }
+            return (await createNewAgentSession()) !== null;
+        }
 
         // /plan-review-do 命令：切换到 Plan-Review-DO driver 并执行
         if (userInput.startsWith('/plan-review-do ')) {
@@ -190,16 +455,14 @@ const App = () => {
             return true;
         }
 
-        const newUserMessage: Types.Message = {
-            id: nextMessageId(),
-            role: 'user',
-            content: userInput,
-        };
-
         setQuery('');
 
-        // Driver 路由
         if (selectedTab === Driver.PLAN_REVIEW_DO) {
+            const newUserMessage: Types.Message = {
+                id: nextMessageId(),
+                role: 'user',
+                content: userInput,
+            };
             addLog('[Driver] Routing to Plan-Review-DO');
             return await handlePlanReviewDo(newUserMessage, {
                 nextMessageId,
@@ -210,12 +473,23 @@ const App = () => {
             });
         }
 
-        // 占位驱动 - 暂时使用 Manual 模式逻辑
-        if ([Driver.STORY, Driver.UX, Driver.ARCHITECTURE, Driver.TECH_PLAN].includes(selectedTab as Driver)) {
-            addLog(`[Driver] Using ${selectedTab} mode (placeholder - fallback to Manual)`);
+        if (selectedTab === Driver.AGENT) {
+            return await runAgentTurn(userInput);
+        }
+
+        const newUserMessage: Types.Message = {
+            id: nextMessageId(),
+            role: 'user',
+            content: userInput,
+        };
+
+        const placeholderDrivers = [Driver.STORY, Driver.UX, Driver.ARCHITECTURE, Driver.TECH_PLAN];
+        if (selectedTab === Driver.CHAT) {
+            addLog('[Driver] Using Chat mode');
+        } else if (placeholderDrivers.includes(selectedTab as Driver)) {
+            addLog(`[Driver] Using ${selectedTab} mode (placeholder - fallback to Chat)`);
         } else {
-            // Manual Driver（原有逻辑）
-            addLog('[Driver] Using Manual mode');
+            addLog(`[Driver] Using ${selectedTab} mode (fallback to Chat)`);
         }
 
         if (isStreaming || isProcessingQueueRef.current) {
@@ -246,17 +520,20 @@ const App = () => {
         }
         return succeeded && !flushFailed;
     }, [
-        selectedTab,
+        appendSystemMessage,
+        createNewAgentSession,
         createTask,
-        waitTask,
         flushPendingQueue,
         isProcessingQueueRef,
         isStreaming,
         nextMessageId,
         pendingUserInputsRef,
+        runAgentTurn,
         runStreamForUserMessage,
+        selectedTab,
         setActiveMessages,
         setFrozenMessages,
+        waitTask,
     ]);
 
     useEffect(() => {
@@ -287,7 +564,7 @@ const App = () => {
     }, [handleSubmit, nonInteractiveInput, selectedTab, bootstrapConfig?.driver]);
 
     // --- RENDER ---
-    const staticTabs = Object.values(Driver);
+    const staticTabs = STATIC_TABS;
     const taskTabs = tasks.map((_: Task, index: number) => `Task ${index + 1}`);
     const allTabs = [...staticTabs, ...taskTabs];
 
@@ -303,7 +580,12 @@ const App = () => {
 
     return (
         <Box flexDirection="column" height="100%">
-            <ChatPanel frozenMessages={frozenMessages} activeMessages={activeMessages} modelName={modelName} />
+            <ChatPanel
+                frozenMessages={frozenMessages}
+                activeMessages={activeMessages}
+                modelName={modelName}
+                workspacePath={bootstrapConfig.workspacePath}
+            />
             
             {!nonInteractiveInput && (
                 <>

@@ -1,12 +1,11 @@
 import minimist from 'minimist';
 import { addLog } from '../logger.js';
-
-export type DriverName = 'manual' | 'plan-review-do';
+import type { DriverName } from '../drivers/types.js';
 
 interface CliArgs {
   prompt?: string;
   driver?: DriverName;
-  // Add other flags/arguments here as needed
+  workspace?: string;
 }
 
 export const parseCliArgs = (): CliArgs => {
@@ -33,9 +32,26 @@ export const parseCliArgs = (): CliArgs => {
   };
   
   const coerceDriver = (): DriverName | undefined => {
-    const validDrivers: DriverName[] = ['manual', 'plan-review-do'];
-    if (typeof rawDriver === 'string' && validDrivers.includes(rawDriver as DriverName)) {
-      return rawDriver as DriverName;
+    const validDrivers: DriverName[] = ['chat', 'agent', 'manual', 'plan-review-do'];
+    if (typeof rawDriver === 'string') {
+      const normalized = rawDriver.toLowerCase();
+      if (validDrivers.includes(normalized as DriverName)) {
+        return normalized as DriverName;
+      }
+    }
+    return undefined;
+  };
+
+  const coerceWorkspace = (): string | undefined => {
+    if (typeof argv.workspace === 'string' && argv.workspace.trim().length > 0) {
+      return argv.workspace.trim();
+    }
+    if (Array.isArray(argv.workspace) && argv.workspace.length > 0) {
+      const first = argv.workspace.find((value: unknown) => typeof value === 'string' && value.trim().length > 0);
+      return typeof first === 'string' ? first.trim() : undefined;
+    }
+    if (typeof argv.w === 'string' && argv.w.trim().length > 0) {
+      return argv.w.trim();
     }
     return undefined;
   };
@@ -43,10 +59,13 @@ export const parseCliArgs = (): CliArgs => {
   const result = {
     prompt: coercePrompt(),
     driver: coerceDriver(),
+    workspace: coerceWorkspace(),
   } as CliArgs;
 
   try {
-    addLog(`[CLI] Parsed args -> driver: ${result.driver ?? 'undefined'}, prompt: ${result.prompt ?? 'undefined'}`);
+    addLog(
+      `[CLI] Parsed args -> driver: ${result.driver ?? 'undefined'}, prompt: ${result.prompt ?? 'undefined'}, workspace: ${result.workspace ?? 'undefined'}`
+    );
   } catch {}
 
   return result;

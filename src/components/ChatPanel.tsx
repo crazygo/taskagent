@@ -72,16 +72,19 @@ const ActiveHistory: React.FC<HistoryProps> = ({ messages }) => (
 
 interface WelcomeScreenProps {
   modelName: string;
+  workspacePath?: string | null;
 }
 
-const WelcomeScreen = React.memo<WelcomeScreenProps>(({ modelName }) => (
+const WelcomeScreen = React.memo<WelcomeScreenProps>(({ modelName, workspacePath }) => (
   <Box borderStyle="round" paddingX={2} flexDirection="column">
     <Box>
       <Box flexGrow={1} flexDirection="column">
         <Text>TaskAgent v0.0.1</Text>
         <Text>Agent Model: {modelName || 'Not Set'}</Text>
         <Text>Coder Model: {modelName || 'Not Set'}</Text>
-        <Text>Working Directory: {process.cwd()}</Text>
+        <Text>
+          Working Directory: {workspacePath?.trim().length ? workspacePath : process.cwd()}
+        </Text>
       </Box>
     </Box>
   </Box>
@@ -91,12 +94,13 @@ interface ChatPanelProps {
   frozenMessages: Types.Message[];
   activeMessages: Types.Message[];
   modelName: string;
+  workspacePath?: string | null;
 }
 
-export const ChatPanel: React.FC<ChatPanelProps> = ({ frozenMessages, activeMessages, modelName }) => {
+export const ChatPanel: React.FC<ChatPanelProps> = ({ frozenMessages, activeMessages, modelName, workspacePath }) => {
   const staticItems = [
     <Box key="welcome-screen-wrapper" flexDirection="column">
-      <WelcomeScreen modelName={modelName} />
+      <WelcomeScreen modelName={modelName} workspacePath={workspacePath} />
       <Newline />
     </Box>,
     ...frozenMessages.map(msg => (
