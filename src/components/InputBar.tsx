@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import { CommandMenu } from './CommandMenu.tsx';
@@ -20,18 +20,54 @@ interface InputBarProps {
   onSubmit: (value: string) => void | Promise<unknown>;
   isFocused: boolean;
   onCommandMenuChange?: (isShown: boolean) => void;
+  onEscStateChange?: (isEscActive: boolean) => void;
 }
 
-export const InputBar: React.FC<InputBarProps> = ({ value, onChange, onSubmit, isFocused, onCommandMenuChange }) => {
+export const InputBar: React.FC<InputBarProps> = ({ value, onChange, onSubmit, isFocused, onCommandMenuChange, onEscStateChange }) => {
   const [showCommandMenu, setShowCommandMenu] = useState(false);
   const [filteredCommands, setFilteredCommands] = useState<Command[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [inputVersion, setInputVersion] = useState(0); // bump to remount input and move cursor to end
+  const [isEscActive, setIsEscActive] = useState(false);
   // 撤回 Ctrl+N 对输入框的干预，仅做日志观测
   const prevValueRef = useRef(value);
+  const escTimerRef = useRef<NodeJS.Timeout | null>(null);
   useEffect(() => {
     prevValueRef.current = value;
   }, [value]);
+
+  // Handle first ESC press
+  const handleFirstEsc = useCallback(() => {
+    // Clear any existing timer
+    if (escTimerRef.current) {
+      clearTimeout(escTimerRef.current);
+    }
+    
+    // Set ESC active state
+    setIsEscActive(true);
+    onEscStateChange?.(true);
+    
+    // Start 1-second timer
+    escTimerRef.current = setTimeout(() => {
+      setIsEscActive(false);
+      onEscStateChange?.(false);
+      escTimerRef.current = null;
+    }, 1000);
+  }, [onEscStateChange]);
+
+  // Handle second ESC press
+  const handleSecondEsc = useCallback(() => {
+    // Clear input and reset state
+    onChange('');
+    setIsEscActive(false);
+    onEscStateChange?.(false);
+    
+    // Clear timer
+    if (escTimerRef.current) {
+      clearTimeout(escTimerRef.current);
+      escTimerRef.current = null;
+    }
+  }, [onChange, onEscStateChange]);
 
   // 当下拉命令菜单显示时，阻止 TextInput 的回车提交
   const handleTextInputSubmit = (text: string) => {
@@ -74,6 +110,16 @@ export const InputBar: React.FC<InputBarProps> = ({ value, onChange, onSubmit, i
     onCommandMenuChange?.(isShown);
   }, [value, onCommandMenuChange]);
 
+  // Cleanup timer on component unmount
+  useEffect(() => {
+    return () => {
+      if (escTimerRef.current) {
+        clearTimeout(escTimerRef.current);
+        escTimerRef.current = null;
+      }
+    };
+  }, []);
+
   // 仅记录：输入框层面捕获到 Ctrl+N，不做任何拦截
   useInput((input, key) => {
     if (key.ctrl && (input === 'n' || input === 'N')) {
@@ -109,6 +155,17 @@ export const InputBar: React.FC<InputBarProps> = ({ value, onChange, onSubmit, i
       setShowCommandMenu(false);
     }
   }, { isActive: isFocused && showCommandMenu });
+
+  // Handle double-ESC clearing mechanism
+  useInput((input, key) => {
+    if (!key.escape) return;
+    
+    if (isEscActive) {
+      handleSecondEsc();
+    } else {
+      handleFirstEsc();
+    }
+  }, { isActive: isFocused && !showCommandMenu });
 
   // 仅记录变化轨迹，不做抑制
   const handleChange = (next: string) => {

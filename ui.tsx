@@ -78,6 +78,7 @@ const App = () => {
     const [selectedTab, setSelectedTab] = useState<string>(Driver.MANUAL);
     const [focusedControl, setFocusedControl] = useState<'input' | 'kernel' | 'tabs' | 'task'>('input');
     const [isCommandMenuShown, setIsCommandMenuShown] = useState(false);
+    const [isEscActive, setIsEscActive] = useState(false);
     const { tasks, createTask, waitTask } = useTaskStore();
 
     // 从 CLI 参数初始化 Driver（在 bootstrapConfig 确定后）
@@ -140,6 +141,10 @@ const App = () => {
             addLog(`[App] Ctrl+N detected (focusedControl=${focusedControl}, isCommandMenuShown=${isCommandMenuShown})`);
         }
     });
+
+    const handleEscStateChange = useCallback((isEscActive: boolean) => {
+        setIsEscActive(isEscActive);
+    }, []);
 
     const handleSubmit = useCallback(async (userInput: string): Promise<boolean> => {
         addLog('--- New Submission ---');
@@ -205,8 +210,13 @@ const App = () => {
             });
         }
 
-        // Manual Driver（原有逻辑）
-        addLog('[Driver] Using Manual mode');
+        // 占位驱动 - 暂时使用 Manual 模式逻辑
+        if ([Driver.STORY, Driver.UX, Driver.ARCHITECTURE, Driver.TECH_PLAN].includes(selectedTab as Driver)) {
+            addLog(`[Driver] Using ${selectedTab} mode (placeholder - fallback to Manual)`);
+        } else {
+            // Manual Driver（原有逻辑）
+            addLog('[Driver] Using Manual mode');
+        }
 
         if (isStreaming || isProcessingQueueRef.current) {
             addLog(`Stream in progress. Queuing user input: ${userInput}`);
@@ -304,6 +314,7 @@ const App = () => {
                             onSubmit={handleSubmit}
                             isFocused={focusedControl === 'input'}
                             onCommandMenuChange={setIsCommandMenuShown}
+                            onEscStateChange={handleEscStateChange}
                         />
                     </Box>
                     {activeTask && (
@@ -321,7 +332,9 @@ const App = () => {
                         isFocused={focusedControl === 'tabs'}
                     />
                     <Box paddingX={1} backgroundColor="gray">
-                        <Text color="gray">Press Ctrl+N to switch view</Text>
+                        <Text color="gray">
+                            {isEscActive ? "[Press ESC again to clear input]" : "[Press Ctrl+N to switch view]"}
+                        </Text>
                     </Box>
                 </>
             )}
