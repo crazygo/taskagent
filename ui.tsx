@@ -53,6 +53,7 @@ type AgentPermissionRequest = {
     summary: string;
     complete: (result: PermissionResult) => void;
     cancel: () => void;
+    placeholderMessageId?: number;
 };
 
 type AgentPermissionDecision =
@@ -321,16 +322,45 @@ const App = () => {
     const agentPermissionQueueRef = useRef<number[]>([]);
     const [agentPermissionPrompt, setAgentPermissionPrompt] = useState<AgentPermissionPromptState | null>(null);
 
-    const appendSystemMessage = useCallback((content: string, boxed = false) => {
+    const finalizeActiveMessages = useCallback(() => {
+        setActiveMessages(prev => {
+            if (prev.length === 0) {
+                return prev;
+            }
+            const completed = prev.filter(msg => !msg.isPending);
+            if (completed.length > 0) {
+                setFrozenMessages(frozen => [...frozen, ...completed]);
+            }
+            return prev.filter(msg => msg.isPending);
+        });
+    }, [setActiveMessages, setFrozenMessages]);
+
+    const finalizeMessageById = useCallback((messageId: number) => {
+        setActiveMessages(prev => {
+            const messageToFinalize = prev.find(msg => msg.id === messageId);
+            if (messageToFinalize) {
+                setFrozenMessages(frozen => [...frozen, { ...messageToFinalize, isPending: false }]);
+            }
+            return prev.filter(msg => msg.id !== messageId);
+        });
+    }, [setActiveMessages, setFrozenMessages]);
+
+    const appendSystemMessage = useCallback((content: string, boxed = false, shouldFinalize = true) => {
+        if (shouldFinalize) {
+            finalizeActiveMessages();
+        }
         const systemMessage: Types.Message = {
             id: nextMessageId(),
             role: 'system',
             content,
             isBoxed: boxed,
         };
-        setFrozenMessages(prev => [...prev, systemMessage]);
-        setActiveMessages(prev => prev.filter(msg => msg.isPending));
-    }, [nextMessageId, setActiveMessages, setFrozenMessages]);
+        if (shouldFinalize) {
+            setFrozenMessages(prev => [...prev, systemMessage]);
+        } else {
+            setActiveMessages(prev => [...prev, systemMessage]);
+        }
+    }, [finalizeActiveMessages, nextMessageId, setFrozenMessages, setActiveMessages]);
 
     const activateNextAgentPermissionPrompt = useCallback(() => {
         const queue = agentPermissionQueueRef.current;
@@ -361,14 +391,40 @@ const App = () => {
         const toolName = request.toolName;
         const hasSuggestions = Boolean(request.suggestions && request.suggestions.length > 0);
 
+        // 更新 placeholder 消息，显示权限详情和操作结果
+        if (request.placeholderMessageId !== undefined) {
+            setActiveMessages(prev => prev.map(msg => {
+                if (msg.id !== request.placeholderMessageId) {
+                    return msg;
+                }
+                
+                let resultContent: string;
+                if (decision.kind === 'allow') {
+                    const rememberNote = decision.always && hasSuggestions ? ' (remembered for this session)' : '';
+                    resultContent = `[Agent] Permission #${id} · ${toolName}\n\n${request.summary}\n\n✅ Approved${rememberNote}`;
+                } else {
+                    const reason = decision.reason?.trim().length ? decision.reason.trim() : 'Denied by user';
+                    resultContent = `[Agent] Permission #${id} · ${toolName}\n\n${request.summary}\n\n❌ Denied: ${reason}`;
+                }
+                
+                // 移除 isPending 属性，但不设置为 false，这样消息不会被 finalizeActiveMessages 移走
+                const { isPending, ...msgWithoutPending } = msg;
+                return {
+                    ...msgWithoutPending,
+                    content: resultContent,
+                };
+            }));
+
+            // Finalize the permission message immediately after user action
+            finalizeMessageById(request.placeholderMessageId);
+        }
+
         if (decision.kind === 'allow') {
             request.complete({
                 behavior: 'allow',
                 updatedInput: request.input,
                 updatedPermissions: decision.always && hasSuggestions ? request.suggestions : undefined,
             });
-            const rememberNote = decision.always && hasSuggestions ? ' (remembered for this session)' : '';
-            appendSystemMessage(`[Agent] Approved permission #${id} for "${toolName}"${rememberNote}.`);
             addLog(`[Agent] Permission #${id} approved for "${toolName}"${decision.always && hasSuggestions ? ' with remember' : ''}.`);
         } else {
             const reason = decision.reason?.trim().length ? decision.reason.trim() : 'Denied by user';
@@ -377,11 +433,10 @@ const App = () => {
                 message: reason,
                 interrupt: decision.interrupt ?? false,
             });
-            appendSystemMessage(`[Agent] Denied permission #${id} for "${toolName}": ${reason}`);
             addLog(`[Agent] Permission #${id} denied for "${toolName}": ${reason}`);
         }
         return true;
-    }, [appendSystemMessage]);
+    }, [appendSystemMessage, setActiveMessages, finalizeMessageById]);
 
     const handleAgentPermissionCommand = useCallback((input: string): boolean | null => {
         const trimmed = input.trim();
@@ -430,16 +485,26 @@ const App = () => {
             const summary = formatToolInputSummary(input);
             const hasSuggestions = Boolean(suggestions && suggestions.length > 0);
 
-            appendSystemMessage(
-                [
-                    `[Agent] Permission required (#${requestId}) for tool "${toolName}".`,
-                    summary ? `Input:\n${summary}` : 'No input provided.',
-                    hasSuggestions
-                        ? 'Use ←/→ to choose Allow, Deny, or Always allow, then press Enter.'
-                        : 'Use ←/→ to choose Allow or Deny, then press Enter.',
-                ].join('\n'),
-                true
-            );
+            const placeholderMessageId = nextMessageId();
+            const placeholderMessage: Types.Message = {
+                id: placeholderMessageId,
+                role: 'system',
+                content: `[Agent] Waiting for permission #${requestId} on "${toolName}"…`,
+                isPending: true,
+            };
+            setActiveMessages(prev => {
+                const newMessages = [...prev];
+                const lastMessage = newMessages.length > 0 ? newMessages[newMessages.length - 1] : null;
+
+                // If the last message is an assistant placeholder, insert the permission message before it.
+                if (lastMessage && lastMessage.role === 'assistant') {
+                    newMessages.splice(newMessages.length - 1, 0, placeholderMessage);
+                } else {
+                    newMessages.push(placeholderMessage);
+                }
+                return newMessages;
+            });
+
             addLog(`[Agent] Permission request #${requestId} pending for tool "${toolName}".`);
 
             return new Promise<PermissionResult>(resolve => {
@@ -467,6 +532,7 @@ const App = () => {
                     input,
                     suggestions,
                     summary,
+                    placeholderMessageId,
                     complete: finalize,
                     cancel: () =>
                         finalize({
@@ -480,6 +546,7 @@ const App = () => {
                     if (!agentPermissionRequestsRef.current.has(requestId)) {
                         return;
                     }
+                    setActiveMessages(prev => prev.filter(msg => msg.id !== placeholderMessageId));
                     appendSystemMessage(`[Agent] Permission request #${requestId} was cancelled by the agent.`, true);
                     addLog(`[Agent] Permission request #${requestId} cancelled by agent/runtime.`);
                     request.cancel();
@@ -499,7 +566,7 @@ const App = () => {
                 signal.addEventListener('abort', abortHandler, { once: true });
             });
         },
-        [activateNextAgentPermissionPrompt, agentPermissionPrompt, appendSystemMessage]
+        [activateNextAgentPermissionPrompt, agentPermissionPrompt, finalizeActiveMessages, nextMessageId, appendSystemMessage, setActiveMessages]
     );
 
     const handlePermissionPromptSubmit = useCallback(
@@ -691,32 +758,29 @@ const App = () => {
     const startAgentPrompt = useCallback(async (job: AgentPromptJob): Promise<boolean> => {
         const { rawInput, prompt, pendingMessageIds } = job;
 
+        const userMessageId = nextMessageId();
         const userMessage: Types.Message = {
-            id: nextMessageId(),
+            id: userMessageId,
             role: 'user',
             content: rawInput,
-        };
-
-        const assistantMessageId = nextMessageId();
-        const assistantPlaceholder: Types.Message = {
-            id: assistantMessageId,
-            role: 'assistant',
-            content: '',
-            reasoning: '',
         };
 
         setActiveMessages(prev => {
             const retainedPending = prev.filter(msg =>
                 msg.isPending && !(pendingMessageIds?.includes(msg.id))
             );
-            return [...retainedPending, userMessage, assistantPlaceholder];
+            return [...retainedPending, userMessage];
         });
+
+        // Finalize the user message so it's added to the history
+        finalizeMessageById(userMessageId);
 
         setIsAgentStreaming(true);
         addLog(`[Agent] Sending prompt with session ${agentSessionId}: ${prompt.replace(/\s+/g, ' ').slice(0, 120)}`);
 
         let assistantContent = '';
         let assistantReasoning = '';
+        let currentAssistantMessageId: number | null = null;
 
         try {
             const options: any = {
@@ -737,9 +801,12 @@ const App = () => {
             });
 
             const updateAssistant = () => {
+                if (!currentAssistantMessageId) {
+                    return;
+                }
                 setActiveMessages(prev =>
                     prev.map(msg =>
-                        msg.id === assistantMessageId
+                        msg.id === currentAssistantMessageId
                             ? { ...msg, content: assistantContent, reasoning: assistantReasoning }
                             : msg
                     )
@@ -749,12 +816,24 @@ const App = () => {
             for await (const message of result) {
                 if (message.type === 'assistant') {
                     const assistantMessage = message as SDKAssistantMessage;
+
+                    // Create a new message shell if one doesn't exist for this turn
+                    if (currentAssistantMessageId === null) {
+                        currentAssistantMessageId = nextMessageId();
+                        const newAssistantMessage: Types.Message = {
+                            id: currentAssistantMessageId,
+                            role: 'assistant',
+                            content: '',
+                            reasoning: '',
+                        };
+                        setActiveMessages(prev => [...prev, newAssistantMessage]);
+                    }
+
                     for (const block of assistantMessage.message.content) {
                         if (block.type === 'text' && typeof block.text === 'string') {
                             assistantContent += block.text;
                             updateAssistant();
-                        }
-                        if (block.type === 'reasoning' && typeof block.text === 'string') {
+                        } else if (block.type === 'reasoning' && typeof block.text === 'string') {
                             assistantReasoning += block.text;
                             updateAssistant();
                         }
@@ -762,18 +841,12 @@ const App = () => {
                 }
             }
 
-            const completedMessages: Types.Message[] = [
-                userMessage,
-                {
-                    id: assistantMessageId,
-                    role: 'assistant',
-                    content: assistantContent,
-                    reasoning: assistantReasoning,
-                },
-            ];
-
-            setFrozenMessages(prev => [...prev, ...completedMessages]);
-            addLog(`[Agent] Response completed (${assistantContent.length} chars).`);
+            // Finalize the assistant message after the stream is complete
+            if (currentAssistantMessageId) {
+                finalizeMessageById(currentAssistantMessageId);
+            }
+            
+            addLog(`[Agent] Response completed.`);
             agentSessionInitializedRef.current = true;
             return true;
         } catch (error) {
@@ -781,11 +854,11 @@ const App = () => {
             const details = formatErrorForDisplay(error);
             const combinedMessage = details ? `${message}\n${details}` : message;
             addLog(`[Agent] Error: ${combinedMessage}`);
-            setFrozenMessages(prev => [...prev, userMessage]);
+            // Finalize the user message on error as well
+            finalizeMessageById(userMessageId);
             appendSystemMessage(`[Agent] Error: ${combinedMessage}`, true);
             return false;
         } finally {
-            setActiveMessages(prev => prev.filter(msg => msg.isPending));
             setIsAgentStreaming(false);
             if (agentPendingQueueRef.current.length > 0) {
                 const nextJob = agentPendingQueueRef.current.shift();
@@ -802,6 +875,8 @@ const App = () => {
         setActiveMessages,
         setFrozenMessages,
         handleAgentPermissionRequest,
+        finalizeActiveMessages,
+        finalizeMessageById,
     ]);
 
     const runAgentTurn = useCallback(async (rawInput: string): Promise<boolean> => {
