@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 
-import type { AgentPermissionOption, AgentPermissionPromptProps } from './agent-permission-types.js';
+import type { AgentPermissionOption, AgentPermissionPromptProps } from './AgentPermissionPrompt.types.js';
 
 export const AgentPermissionPromptComponent: React.FC<AgentPermissionPromptProps> = ({ prompt, onSubmit, isFocused }) => {
     const options: Array<{ key: AgentPermissionOption; label: string }> = prompt.hasSuggestions

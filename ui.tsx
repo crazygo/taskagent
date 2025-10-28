@@ -15,7 +15,7 @@ import { ChatPanel } from './src/components/ChatPanel.js';
 import { TabView } from './src/components/StatusControls.js';
 import { TaskSpecificView } from './src/components/TaskSpecificView.js';
 import { InputBar } from './src/components/InputBar.js';
-import type { AgentPermissionPromptState, AgentPermissionOption } from './src/components/agent-permission-types.js';
+import type { AgentPermissionPromptState, AgentPermissionOption } from './src/components/AgentPermissionPrompt.types.js';
 import { AgentPermissionPromptComponent } from './src/components/AgentPermissionPrompt.js';
 import { useTaskStore } from './src/domain/taskStore.js';
 import { useConversationStore } from './src/domain/conversationStore.js';
