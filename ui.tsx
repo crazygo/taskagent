@@ -1,11 +1,12 @@
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { render, Box, Text, useInput } from 'ink';
 import { randomUUID } from 'crypto';
 import { inspect } from 'util';
-import { query, type SDKAssistantMessage, type PermissionUpdate, type PermissionResult } from '@anthropic-ai/claude-agent-sdk';
+import { type PermissionUpdate, type PermissionResult } from '@anthropic-ai/claude-agent-sdk';
 
 import { addLog } from './src/logger.ts';
+import { createBaseClaudeFlow } from './src/agent/flows/baseClaudeFlow.ts';
 import { loadCliConfig } from './src/cli/config.ts';
 import type { Task } from './task-manager.ts';
 import { ensureAiProvider, type AiChatProvider } from './src/config/ai-provider.ts';
@@ -585,6 +586,31 @@ const App = () => {
         [agentPermissionPrompt, resolveAgentPermission]
     );
 
+    const baseClaudeFlow = useMemo(
+        () =>
+            createBaseClaudeFlow({
+                nextMessageId,
+                setActiveMessages,
+                finalizeMessageById,
+                canUseTool: handleAgentPermissionRequest,
+                workspacePath: bootstrapConfig?.workspacePath,
+            }),
+        [
+            nextMessageId,
+            setActiveMessages,
+            finalizeMessageById,
+            handleAgentPermissionRequest,
+            bootstrapConfig?.workspacePath,
+        ]
+    );
+
+    const agentFlowRegistry = useMemo(
+        () => ({
+            default: baseClaudeFlow,
+        }),
+        [baseClaudeFlow]
+    );
+
     useEffect(() => {
         if (agentPermissionPrompt) {
             setFocusedControl('permission');
@@ -778,192 +804,18 @@ const App = () => {
         setIsAgentStreaming(true);
         addLog(`[Agent] Sending prompt with session ${agentSessionId}: ${prompt.replace(/\s+/g, ' ').slice(0, 120)}`);
 
-        // 移除累加变量，改为独立消息处理
-        let assistantChars = 0;
-        let reasoningChars = 0;
-
         try {
-            const options: any = {
-                model: process.env.ANTHROPIC_MODEL,
-                cwd: bootstrapConfig.workspacePath,
-                canUseTool: handleAgentPermissionRequest,
-            };
+            const activeAgentFlow = agentFlowRegistry.default;
 
-            if (agentSessionInitializedRef.current) {
-                options.resume = agentSessionId;
-            } else {
-                options.extraArgs = { 'session-id': agentSessionId };
-            }
-
-            const result = query({
+            await activeAgentFlow.handleUserInput({
                 prompt,
-                options,
+                agentSessionId: agentSessionId!,
+                sessionInitialized: agentSessionInitializedRef.current,
             });
 
-            addLog('[Agent] Stream opened; awaiting events...');
-
-            // Diagnostics: track timing and counters for intermediate events
-            const streamStartAt = Date.now();
-            let firstEventAt: number | null = null;
-            let firstAssistantAt: number | null = null;
-            let eventCount = 0;
-
-            const truncate = (s: string, n = 200) => (s.length <= n ? s : s.slice(0, n) + '…');
-
-            // Pairing maps for tool_use <-> tool_result (logs only; no UI changes)
-            const toolUseStartAt = new Map<string, number>();
-            const toolUseName = new Map<string, string>();
-
-            // 移除updateAssistant函数，因为每个delta将立即创建独立消息
-
-            for await (const message of result) {
-                try {
-                    const t = (message as any)?.type ?? 'unknown';
-                    eventCount += 1;
-                    if (firstEventAt === null) firstEventAt = Date.now();
-                    const sinceStartMs = Date.now() - streamStartAt;
-                    const sinceStart = (sinceStartMs / 1000).toFixed(3);
-                    addLog(`[Agent] Event #${eventCount} type=${t} (+${sinceStart}s)`);
-                } catch {}
-
-                if (message.type === 'assistant') {
-                    const assistantMessage = message as SDKAssistantMessage;
-                    try {
-                        const blocksLen = Array.isArray((assistantMessage as any)?.message?.content)
-                            ? (assistantMessage as any).message.content.length
-                            : 0;
-                        addLog(`[Agent] Assistant blocks=${blocksLen}`);
-                    } catch {}
-                    if (firstAssistantAt === null) firstAssistantAt = Date.now();
-
-                    for (const block of assistantMessage.message.content) {
-                        if (block.type === 'text' && typeof block.text === 'string') {
-                            if (block.text) {
-                                const textMessageId = nextMessageId();
-                                const newTextMessage: Types.Message = {
-                                    id: textMessageId,
-                                    role: 'assistant',
-                                    content: block.text,
-                                    reasoning: '',
-                                };
-                                setActiveMessages(prev => [...prev, newTextMessage]);
-                                finalizeMessageById(textMessageId);
-                                assistantChars += block.text.length;
-                                addLog(`[Agent] ▲ text delta len=${block.text.length}: ${JSON.stringify(block.text)}`);
-                            }
-                        } else if (block.type === 'reasoning' && typeof block.text === 'string') {
-                            if (block.text) {
-                                const reasoningMessageId = nextMessageId();
-                                const newReasoningMessage: Types.Message = {
-                                    id: reasoningMessageId,
-                                    role: 'assistant',
-                                    content: '',
-                                    reasoning: block.text,
-                                };
-                                setActiveMessages(prev => [...prev, newReasoningMessage]);
-                                finalizeMessageById(reasoningMessageId);
-                                reasoningChars += block.text.length;
-                                addLog(`[Agent] ▲ reasoning delta len=${block.text.length}: ${JSON.stringify(block.text)}`);
-                            }
-                        } else if ((block as any)?.type === 'tool_use') {
-                            const id = String((block as any)?.id ?? (block as any)?.tool_use_id ?? 'unknown');
-                            const name = String((block as any)?.name ?? (block as any)?.tool?.name ?? 'unknown');
-                            const input = (block as any)?.input ?? (block as any)?.arguments ?? (block as any)?.params;
-                            toolUseStartAt.set(id, Date.now());
-                            toolUseName.set(id, name);
-                            addLog(`[ToolUse] start id=${id} name=${name}`);
-                            try {
-                                addLog(`[ToolUse] input full id=${id}: ${JSON.stringify(input)}`);
-                            } catch {
-                                addLog(`[ToolUse] input inspect id=${id}: ${inspect(input, { depth: 6 })}`);
-                            }
-                            const description = (input && typeof (input as any).description === 'string')
-                                ? String((input as any).description)
-                                : '';
-                            const line = description
-                                ? `event: tool_use, id: ${id}, description: ${description}`
-                                : `event: tool_use, id: ${id}`;
-                            const toolUseMessageId = nextMessageId();
-                            setActiveMessages(prev => [...prev, { id: toolUseMessageId, role: 'system', content: line }]);
-                            finalizeMessageById(toolUseMessageId);
-                        }
-                    }
-                } else {
-                    // Log non-assistant events for visibility (e.g., tools)
-                    try {
-                        const m: any = message;
-                        const kind = m?.type ?? 'unknown';
-                        const name = m?.tool?.name ?? m?.name ?? m?.tool_name ?? m?.event ?? 'unknown';
-                        const action = m?.action ?? m?.status ?? m?.event ?? undefined;
-                        const inputObj = m?.input ?? m?.arguments ?? m?.params ?? undefined;
-                        const stdout = m?.stdout;
-                        const stderr = m?.stderr;
-                        const parts: string[] = [];
-                        parts.push(`kind=${String(kind)}`);
-                        if (name) parts.push(`name=${String(name)}`);
-                        if (action) parts.push(`action=${String(action)}`);
-                        if (inputObj !== undefined) {
-                            try { parts.push(`input=${truncate(JSON.stringify(inputObj))}`); } catch {}
-                        }
-                        if (typeof stdout === 'string' && stdout.length > 0) parts.push(`stdout_len=${stdout.length}`);
-                        if (typeof stderr === 'string' && stderr.length > 0) parts.push(`stderr_len=${stderr.length}`);
-                        addLog(`[Agent] Non-assistant: ${parts.join(' | ')}`);
-                        // Log FULL event payload to debug.log (untruncated)
-                        try {
-                            addLog(`[Agent] Event full (type=${String(kind)}): ${JSON.stringify(m)}`);
-                        } catch (e) {
-                            try { addLog(`[Agent] Event full (inspect) type=${String(kind)}: ${inspect(m, { depth: 6 })}`); } catch {}
-                        }
-                    } catch {
-                        addLog('[Agent] Non-assistant event (unserializable)');
-                    }
-
-                    // Additionally, if this is a user message with tool_result blocks, log pairing info
-                    try {
-                        const um: any = message;
-                        if (um?.type === 'user' && Array.isArray(um?.message?.content)) {
-                            for (const b of um.message.content) {
-                                if ((b?.type === 'tool_result')) {
-                                    const rid = String(b?.tool_use_id ?? 'unknown');
-                                    const name = toolUseName.get(rid) ?? 'unknown';
-                                    const started = toolUseStartAt.get(rid);
-                                    const duration = started ? (Date.now() - started) : undefined;
-                                    addLog(`[ToolResult] id=${rid} name=${name} duration_ms=${duration ?? 'n/a'}`);
-                                    try {
-                                        addLog(`[ToolResult] full id=${rid}: ${JSON.stringify(b)}`);
-                                    } catch {
-                                        addLog(`[ToolResult] inspect id=${rid}: ${inspect(b, { depth: 6 })}`);
-                                    }
-                                    const out = b?.content ?? b?.result ?? b?.stdout ?? b?.stderr ?? '';
-                                    if (typeof out === 'string') {
-                                        addLog(`[ToolResult] out_len id=${rid} = ${out.length}`);
-                                    }
-                                    const toolResultMessageId = nextMessageId();
-                                    setActiveMessages(prev => [...prev, { id: toolResultMessageId, role: 'system', content: `event: tool_result, tool_use_id: ${rid}` }]);
-                                    finalizeMessageById(toolResultMessageId);
-                                    toolUseStartAt.delete(rid);
-                                    toolUseName.delete(rid);
-                                }
-                            }
-                        }
-                    } catch {
-                        // ignore logging errors
-                    }
-                }
-            }
-
-            // Summary after stream finishes
-            const totalSeconds = ((Date.now() - streamStartAt) / 1000).toFixed(2);
-            const firstEvtSec = firstEventAt ? ((firstEventAt - streamStartAt) / 1000).toFixed(2) : 'n/a';
-            const firstAsstSec = firstAssistantAt ? ((firstAssistantAt - streamStartAt) / 1000).toFixed(2) : 'n/a';
-            addLog(`[Agent] Stream summary: events=${eventCount}, assistant_chars=${assistantChars}, reasoning_chars=${reasoningChars}, t=${totalSeconds}s, t_first_evt=${firstEvtSec}s, t_first_asst=${firstAsstSec}s`);
-            addLog(`[Agent] Tool pairing summary: pending_starts=${toolUseStartAt.size}`);
-
-            // 不再需要finalize assistant消息，因为每个delta已经立即finalize
-            
-            addLog(`[Agent] Response completed.`);
             agentSessionInitializedRef.current = true;
             return true;
+
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
             const details = formatErrorForDisplay(error);
@@ -984,13 +836,10 @@ const App = () => {
         }
     }, [
         agentSessionId,
+        agentFlowRegistry,
         appendSystemMessage,
-        bootstrapConfig.workspacePath,
         nextMessageId,
         setActiveMessages,
-        setFrozenMessages,
-        handleAgentPermissionRequest,
-        finalizeActiveMessages,
         finalizeMessageById,
     ]);
 
