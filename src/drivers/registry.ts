@@ -72,7 +72,7 @@ export const DRIVER_MANIFEST: readonly DriverManifestEntry[] = [
         id: Driver.STORY,
         label: Driver.STORY,
         slash: 'story',
-        description: '生成结构化 Stories 文档',
+        description: 'Generate structured Stories document',
         requiresSession: true,
         handler: async (message, context) => {
             if (!context.session) {
