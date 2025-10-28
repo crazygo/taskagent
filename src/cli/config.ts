@@ -1,16 +1,41 @@
+import { join } from 'node:path';
 import { loadEnv } from '../env.ts';
 import { parseCliArgs } from './args.ts';
+import { addLog } from '../logger.ts';
+import type { DriverName } from '../drivers/types.ts';
 
 export interface CliConfig {
   prompt?: string;
-  // Add other config properties here as needed
+  driver?: DriverName;
+  workspacePath: string;
 }
 
 export const loadCliConfig = (): CliConfig => {
   loadEnv(); // Load environment variables and perform checks
   const cliArgs = parseCliArgs(); // Parse CLI arguments
 
-  return {
+  let workspacePath = cliArgs.workspace;
+
+  if (!workspacePath || workspacePath.trim().length === 0) {
+    const home = process.env.HOME || process.env.USERPROFILE || '';
+    if (home) {
+      workspacePath = join(home, '.askman', 'tests');
+    } else {
+      workspacePath = process.cwd();
+    }
+  }
+
+  const cfg: CliConfig = {
     prompt: cliArgs.prompt,
+    driver: cliArgs.driver,
+    workspacePath,
   };
+
+  try {
+    addLog(
+      `[CLI] Config -> driver: ${cfg.driver ?? 'undefined'}, prompt: ${cfg.prompt ?? 'undefined'}, workspace: ${cfg.workspacePath ?? 'undefined'}`
+    );
+  } catch {}
+
+  return cfg;
 };

@@ -3,8 +3,10 @@
   "dependencies": {
     "@ai-sdk/openai": "^2.0.48",
     "@anthropic-ai/claude-agent-sdk": "^0.1.25",
+    "@langchain/core": "^1.0.1",
+    "@langchain/langgraph": "^1.0.1",
     "@openrouter/ai-sdk-provider": "https://github.com/crazygo/ai-sdk-provider/releases/download/1.2.1/openrouter-ai-sdk-provider-1.2.1.tgz",
-    "ai": "^5.0.68",
+    "ai": "^5.0.78",
     "dotenv": "^17.2.3",
     "ink": "^6.3.1",
     "ink-text-input": "^6.0.0",
@@ -26,8 +28,8 @@
   "main": "ui.js",
   "name": "taskagent",
   "scripts": {
-    "start": "tsx ui.tsx",
-    "start:test": "concurrently --raw --kill-others \"yarn start\" \"sleep 5\"",
+    "start": "tsx ui.tsx --",
+    "start:test": "concurrently --raw --kill-others --success first \"yarn start\" \"sleep 5\"",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "type": "module",
