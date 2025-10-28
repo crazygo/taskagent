@@ -1,4 +1,5 @@
 ---
 alwaysApply: true
 ---
-对话中分析性质文档、临时中转文档放在 .cursor/docs 目录下，文件名以时间戳作为前缀，格式为 yyyy-mm-dd-hh-mm-{document-name}.md
+对话中分析性质文档、临时中转文档、Plan 文档，需要放在 .cursor/docs 目录下。
+  - 文件名以`年月日时分`作为前缀，格式为 yyyy-mm-dd-hh-mm-{document-name}.md
