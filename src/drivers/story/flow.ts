@@ -256,7 +256,7 @@ export async function runStoryFlow(task: string, hooks: StoryFlowHooks): Promise
                 reasoning: aggregates.reasoning.trim() || undefined,
             });
 
-            pushSystemMessage(`✅ Story flow · ${node.label} 完成`, node.id === 'organize');
+            pushSystemMessage(`✅ Story flow · ${node.label} completed`, node.id === 'organize');
             addLog(`[StoryFlow] Completed node=${node.id} text_len=${aggregates.text.length}`);
             if (!sessionInitialized) {
                 hooks.session.markInitialized();
