@@ -1,0 +1,1 @@
+{"type":"fact","content":"Story driver now runs a three-node Claude flow (structurer, reviewer, organizer) via runClaudeStream to stream stories, coverage review, and grouped documents into the UI.","metadata":{"confidence":0.8,"tags":["story-driver","architecture"],"source":"code-update"},"timestamp":"2025-10-28T14:54:25Z"}

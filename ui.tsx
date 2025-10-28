@@ -21,6 +21,7 @@ import { useTaskStore } from './src/domain/taskStore.js';
 import { useConversationStore } from './src/domain/conversationStore.js';
 import { Driver, getDriverEnum, getDriverName } from './src/drivers/types.js';
 import { handlePlanReviewDo } from './src/drivers/plan-review-do/index.js';
+import { handleStoryDriver } from './src/drivers/story/index.js';
 import { closeTaskLogger } from './src/task-logger.ts';
 import { loadWorkspaceSettings, writeWorkspaceSettings, type WorkspaceSettings } from './src/workspace/settings.ts';
 // Guard to prevent double submission in dev double-mount scenarios
@@ -873,6 +874,38 @@ const App = () => {
             });
         }
 
+        // /story 命令：切换到 Story driver 并执行
+        if (userInput.startsWith('/story ')) {
+            const prompt = userInput.substring(7).trim();
+            if (!prompt) {
+                addLog('[Command] /story requires a prompt');
+                return false;
+            }
+
+            if (selectedTab !== Driver.STORY) {
+                addLog('[Command] Switching to Story tab');
+                setSelectedTab(Driver.STORY);
+            }
+
+            const newUserMessage: Types.Message = {
+                id: nextMessageId(),
+                role: 'user',
+                content: prompt,
+            };
+
+            setInputValue('');
+
+            addLog('[Command] Executing Story driver');
+            return await handleStoryDriver(newUserMessage, {
+                nextMessageId,
+                setActiveMessages,
+                setFrozenMessages,
+                finalizeMessageById,
+                canUseTool: handleAgentPermissionRequest,
+                workspacePath: bootstrapConfig?.workspacePath,
+            });
+        }
+
         // /task 命令：创建后台任务（所有 Driver 共享）
         if (userInput.startsWith('/task ')) {
             const prompt = userInput.substring(6);
@@ -896,6 +929,23 @@ const App = () => {
                 setFrozenMessages,
                 createTask,
                 waitTask,
+            });
+        }
+
+        if (selectedTab === Driver.STORY) {
+            const newUserMessage: Types.Message = {
+                id: nextMessageId(),
+                role: 'user',
+                content: userInput,
+            };
+            addLog('[Driver] Routing to Story');
+            return await handleStoryDriver(newUserMessage, {
+                nextMessageId,
+                setActiveMessages,
+                setFrozenMessages,
+                finalizeMessageById,
+                canUseTool: handleAgentPermissionRequest,
+                workspacePath: bootstrapConfig?.workspacePath,
             });
         }
 
@@ -947,12 +997,15 @@ const App = () => {
         return succeeded && !flushFailed;
     }, [
         appendSystemMessage,
+        bootstrapConfig?.workspacePath,
         createNewAgentSession,
         createTask,
+        finalizeMessageById,
         flushPendingQueue,
+        handleAgentPermissionCommand,
+        handleAgentPermissionRequest,
         isProcessingQueueRef,
         isStreaming,
-        handleAgentPermissionCommand,
         nextMessageId,
         pendingUserInputsRef,
         runAgentTurn,
@@ -960,6 +1013,8 @@ const App = () => {
         selectedTab,
         setActiveMessages,
         setFrozenMessages,
+        setInputValue,
+        setSelectedTab,
         waitTask,
     ]);
 
