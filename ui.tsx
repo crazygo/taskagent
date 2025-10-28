@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { render, Box, Text, useInput } from 'ink';
 import { randomUUID } from 'crypto';
 import { inspect } from 'util';
-import { query, type SDKAssistantMessage } from '@anthropic-ai/claude-agent-sdk';
+import { query, type SDKAssistantMessage, type PermissionUpdate, type PermissionResult } from '@anthropic-ai/claude-agent-sdk';
 
 import { addLog } from './src/logger.ts';
 import { loadCliConfig } from './src/cli/config.ts';
@@ -45,8 +45,29 @@ type AgentPromptJob = {
     pendingMessageIds?: number[];
 };
 
+type AgentPermissionRequest = {
+    id: number;
+    toolName: string;
+    input: Record<string, unknown>;
+    suggestions?: PermissionUpdate[];
+    summary: string;
+    complete: (result: PermissionResult) => void;
+    cancel: () => void;
+};
+
+type AgentPermissionDecision =
+    | { kind: 'allow'; always?: boolean }
+    | { kind: 'deny'; reason?: string; interrupt?: boolean };
+
+type AgentPermissionPromptState = {
+    requestId: number;
+    toolName: string;
+    summary: string;
+    hasSuggestions: boolean;
+};
+
 const formatSessionId = (sessionId: string) =>
-    sessionId.length > 8 ? `${sessionId.slice(0, 8)}...` : sessionId;
+  sessionId.length > 8 ? `${sessionId.slice(0, 8)}...` : sessionId;
 
 const formatErrorForDisplay = (error: unknown, seen: WeakSet<object> = new WeakSet()): string | null => {
     if (typeof error === 'object' && error !== null) {
@@ -111,6 +132,97 @@ const formatErrorForDisplay = (error: unknown, seen: WeakSet<object> = new WeakS
     return typeof error === 'string' ? error : String(error);
 };
 
+const formatToolInputSummary = (input: Record<string, unknown>, maxLength = 600): string => {
+    try {
+        const json = JSON.stringify(input, null, 2);
+        if (!json) {
+            return '(empty input)';
+        }
+        if (json.length <= maxLength) {
+            return json;
+        }
+        return `${json.slice(0, maxLength)}…`;
+    } catch {
+        return '(unable to display tool input)';
+    }
+};
+
+type AgentPermissionOption = 'allow' | 'deny' | 'always';
+
+interface AgentPermissionPromptProps {
+    prompt: AgentPermissionPromptState;
+    onSubmit: (option: AgentPermissionOption) => void;
+    isFocused: boolean;
+}
+
+const AgentPermissionPromptComponent: React.FC<AgentPermissionPromptProps> = ({ prompt, onSubmit, isFocused }) => {
+    const options: Array<{ key: AgentPermissionOption; label: string }> = prompt.hasSuggestions
+        ? [
+              { key: 'allow', label: 'Allow' },
+              { key: 'deny', label: 'Deny' },
+              { key: 'always', label: 'Always Allow' },
+          ]
+        : [
+              { key: 'allow', label: 'Allow' },
+              { key: 'deny', label: 'Deny' },
+          ];
+
+    const [selectedIndex, setSelectedIndex] = useState(0);
+
+    useEffect(() => {
+        setSelectedIndex(0);
+    }, [prompt.requestId, prompt.hasSuggestions]);
+
+    useInput(
+        (_input, key) => {
+            if (!isFocused) {
+                return;
+            }
+            if (key.leftArrow || key.upArrow) {
+                setSelectedIndex(prev => (prev + options.length - 1) % options.length);
+            } else if (key.rightArrow || key.downArrow || key.tab) {
+                setSelectedIndex(prev => (prev + 1) % options.length);
+            } else if (key.return) {
+                const option = options[selectedIndex];
+                onSubmit(option.key);
+            }
+        },
+        { isActive: isFocused }
+    );
+
+    const summaryLines = prompt.summary.split('\n').filter(line => line.trim().length > 0).slice(0, 20);
+
+    return (
+        <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1} paddingY={0}>
+            <Text color="cyan">{`Permission #${prompt.requestId} · ${prompt.toolName}`}</Text>
+            <Text> </Text>
+            {summaryLines.length === 0 ? (
+                <Text color="gray">{'(empty input)'}</Text>
+            ) : (
+                summaryLines.map((line, index) => (
+                    <Text key={`${prompt.requestId}-summary-${index}`} color="gray">
+                        {line}
+                    </Text>
+                ))
+            )}
+            <Text> </Text>
+            <Box flexDirection="row">
+                {options.map((option, index) => (
+                    <React.Fragment key={option.key}>
+                        <Text inverse={index === selectedIndex}>{` ${option.label} `}</Text>
+                        {index < options.length - 1 ? <Text> </Text> : null}
+                    </React.Fragment>
+                ))}
+            </Box>
+            <Text color="gray">
+                {prompt.hasSuggestions
+                    ? 'Use ←/→ to switch, Enter to confirm. "Always Allow" remembers this permission.'
+                    : 'Use ←/→ to switch, Enter to confirm.'}
+            </Text>
+        </Box>
+    );
+};
+
 
 // --- Components ---
 
@@ -162,7 +274,7 @@ const App = () => {
     const [inputValue, setInputValue] = useState('');
     const [selectedKernel, setSelectedKernel] = useState<Kernel>(Kernel.CLAUDE_CODE);
     const [selectedTab, setSelectedTab] = useState<string>(Driver.CHAT);
-    const [focusedControl, setFocusedControl] = useState<'input' | 'kernel' | 'tabs' | 'task'>('input');
+    const [focusedControl, setFocusedControl] = useState<'input' | 'kernel' | 'tabs' | 'task' | 'permission'>('input');
     const [isCommandMenuShown, setIsCommandMenuShown] = useState(false);
     const [isEscActive, setIsEscActive] = useState(false);
     const [agentSessionId, setAgentSessionId] = useState<string | null>(null);
@@ -204,6 +316,10 @@ const App = () => {
     const lastAnnouncedAgentSessionRef = useRef<string | null>(null);
     const agentSessionInitializedRef = useRef<boolean>(false);
     const agentPendingQueueRef = useRef<AgentPromptJob[]>([]);
+    const agentPermissionRequestsRef = useRef<Map<number, AgentPermissionRequest>>(new Map());
+    const nextAgentPermissionIdRef = useRef<number>(1);
+    const agentPermissionQueueRef = useRef<number[]>([]);
+    const [agentPermissionPrompt, setAgentPermissionPrompt] = useState<AgentPermissionPromptState | null>(null);
 
     const appendSystemMessage = useCallback((content: string, boxed = false) => {
         const systemMessage: Types.Message = {
@@ -215,6 +331,201 @@ const App = () => {
         setFrozenMessages(prev => [...prev, systemMessage]);
         setActiveMessages(prev => prev.filter(msg => msg.isPending));
     }, [nextMessageId, setActiveMessages, setFrozenMessages]);
+
+    const activateNextAgentPermissionPrompt = useCallback(() => {
+        const queue = agentPermissionQueueRef.current;
+        while (queue.length > 0) {
+            const nextId = queue.shift()!;
+            const nextRequest = agentPermissionRequestsRef.current.get(nextId);
+            if (!nextRequest) {
+                continue;
+            }
+            setAgentPermissionPrompt({
+                requestId: nextId,
+                toolName: nextRequest.toolName,
+                summary: nextRequest.summary,
+                hasSuggestions: Boolean(nextRequest.suggestions && nextRequest.suggestions.length > 0),
+            });
+            return;
+        }
+        setAgentPermissionPrompt(null);
+    }, []);
+
+    const resolveAgentPermission = useCallback((id: number, decision: AgentPermissionDecision): boolean => {
+        const request = agentPermissionRequestsRef.current.get(id);
+        if (!request) {
+            appendSystemMessage(`[Agent] No pending permission request with id ${id}.`, true);
+            return false;
+        }
+
+        const toolName = request.toolName;
+        const hasSuggestions = Boolean(request.suggestions && request.suggestions.length > 0);
+
+        if (decision.kind === 'allow') {
+            request.complete({
+                behavior: 'allow',
+                updatedInput: request.input,
+                updatedPermissions: decision.always && hasSuggestions ? request.suggestions : undefined,
+            });
+            const rememberNote = decision.always && hasSuggestions ? ' (remembered for this session)' : '';
+            appendSystemMessage(`[Agent] Approved permission #${id} for "${toolName}"${rememberNote}.`);
+            addLog(`[Agent] Permission #${id} approved for "${toolName}"${decision.always && hasSuggestions ? ' with remember' : ''}.`);
+        } else {
+            const reason = decision.reason?.trim().length ? decision.reason.trim() : 'Denied by user';
+            request.complete({
+                behavior: 'deny',
+                message: reason,
+                interrupt: decision.interrupt ?? false,
+            });
+            appendSystemMessage(`[Agent] Denied permission #${id} for "${toolName}": ${reason}`);
+            addLog(`[Agent] Permission #${id} denied for "${toolName}": ${reason}`);
+        }
+        return true;
+    }, [appendSystemMessage]);
+
+    const handleAgentPermissionCommand = useCallback((input: string): boolean | null => {
+        const trimmed = input.trim();
+        if (!trimmed.toLowerCase().startsWith('/allow') && !trimmed.toLowerCase().startsWith('/deny')) {
+            return null;
+        }
+
+        const parts = trimmed.split(/\s+/);
+        const command = parts[0].toLowerCase();
+
+        if (parts.length < 2) {
+            appendSystemMessage(
+                command === '/allow'
+                    ? '[Agent] Usage: /allow <id> [always]'
+                    : '[Agent] Usage: /deny <id> [reason]',
+                true
+            );
+            return false;
+        }
+
+        const id = Number.parseInt(parts[1] ?? '', 10);
+        if (!Number.isInteger(id)) {
+            appendSystemMessage('[Agent] Permission id must be an integer.', true);
+            return false;
+        }
+
+        if (command === '/allow') {
+            let always = false;
+            for (const token of parts.slice(2)) {
+                const normalized = token.toLowerCase();
+                if (normalized === 'always' || normalized === '--always') {
+                    always = true;
+                }
+            }
+            return resolveAgentPermission(id, { kind: 'allow', always });
+        }
+
+        const reason = parts.slice(2).join(' ').trim();
+        return resolveAgentPermission(id, { kind: 'deny', reason });
+    }, [appendSystemMessage, resolveAgentPermission]);
+
+    const handleAgentPermissionRequest = useCallback(
+        (toolName: string, input: Record<string, unknown>, options: { signal: AbortSignal; suggestions?: PermissionUpdate[] }) => {
+            const { signal, suggestions } = options;
+            const requestId = nextAgentPermissionIdRef.current++;
+            const summary = formatToolInputSummary(input);
+            const hasSuggestions = Boolean(suggestions && suggestions.length > 0);
+
+            appendSystemMessage(
+                [
+                    `[Agent] Permission required (#${requestId}) for tool "${toolName}".`,
+                    summary ? `Input:\n${summary}` : 'No input provided.',
+                    hasSuggestions
+                        ? 'Use ←/→ to choose Allow, Deny, or Always allow, then press Enter.'
+                        : 'Use ←/→ to choose Allow or Deny, then press Enter.',
+                ].join('\n'),
+                true
+            );
+            addLog(`[Agent] Permission request #${requestId} pending for tool "${toolName}".`);
+
+            return new Promise<PermissionResult>(resolve => {
+                let settled = false;
+                let abortHandler: (() => void) | null = null;
+
+                const finalize = (result: PermissionResult) => {
+                    if (settled) {
+                        return;
+                    }
+                    settled = true;
+                    if (abortHandler) {
+                        signal.removeEventListener('abort', abortHandler);
+                    }
+                    agentPermissionRequestsRef.current.delete(requestId);
+                    agentPermissionQueueRef.current = agentPermissionQueueRef.current.filter(id => id !== requestId);
+                    resolve(result);
+                    setAgentPermissionPrompt(prev => (prev && prev.requestId === requestId ? null : prev));
+                    activateNextAgentPermissionPrompt();
+                };
+
+                const request: AgentPermissionRequest = {
+                    id: requestId,
+                    toolName,
+                    input,
+                    suggestions,
+                    summary,
+                    complete: finalize,
+                    cancel: () =>
+                        finalize({
+                            behavior: 'deny',
+                            message: 'Permission request cancelled.',
+                            interrupt: false,
+                        }),
+                };
+
+                abortHandler = () => {
+                    if (!agentPermissionRequestsRef.current.has(requestId)) {
+                        return;
+                    }
+                    appendSystemMessage(`[Agent] Permission request #${requestId} was cancelled by the agent.`, true);
+                    addLog(`[Agent] Permission request #${requestId} cancelled by agent/runtime.`);
+                    request.cancel();
+                };
+
+                agentPermissionRequestsRef.current.set(requestId, request);
+                agentPermissionQueueRef.current.push(requestId);
+                if (!agentPermissionPrompt) {
+                    activateNextAgentPermissionPrompt();
+                }
+
+                if (signal.aborted) {
+                    abortHandler();
+                    return;
+                }
+
+                signal.addEventListener('abort', abortHandler, { once: true });
+            });
+        },
+        [activateNextAgentPermissionPrompt, agentPermissionPrompt, appendSystemMessage]
+    );
+
+    const handlePermissionPromptSubmit = useCallback(
+        (option: AgentPermissionOption) => {
+            if (!agentPermissionPrompt) {
+                return;
+            }
+            if (option === 'allow') {
+                resolveAgentPermission(agentPermissionPrompt.requestId, { kind: 'allow' });
+            } else if (option === 'always') {
+                resolveAgentPermission(agentPermissionPrompt.requestId, { kind: 'allow', always: true });
+            } else {
+                resolveAgentPermission(agentPermissionPrompt.requestId, { kind: 'deny' });
+            }
+        },
+        [agentPermissionPrompt, resolveAgentPermission]
+    );
+
+    useEffect(() => {
+        if (agentPermissionPrompt) {
+            setFocusedControl('permission');
+            setInputValue('');
+        } else if (focusedControl === 'permission') {
+            setFocusedControl('input');
+        }
+    }, [agentPermissionPrompt, focusedControl]);
 
     useEffect(() => {
         if (tasks.length > prevTasksLengthRef.current) {
@@ -310,6 +621,10 @@ const App = () => {
 
     useInput((input, key) => {
         // 当命令菜单显示时，不响应 Tab 键（让 InputBar 处理）
+        if (agentPermissionPrompt) {
+            return;
+        }
+
         if (key.tab && isCommandMenuShown) {
             return;
         }
@@ -407,6 +722,7 @@ const App = () => {
             const options: any = {
                 model: process.env.ANTHROPIC_MODEL,
                 cwd: bootstrapConfig.workspacePath,
+                canUseTool: handleAgentPermissionRequest,
             };
 
             if (agentSessionInitializedRef.current) {
@@ -485,6 +801,7 @@ const App = () => {
         nextMessageId,
         setActiveMessages,
         setFrozenMessages,
+        handleAgentPermissionRequest,
     ]);
 
     const runAgentTurn = useCallback(async (rawInput: string): Promise<boolean> => {
@@ -548,6 +865,14 @@ const App = () => {
         const trimmedInput = userInput.trim();
         if (trimmedInput.length === 0) return false;
 
+        const permissionHandled = handleAgentPermissionCommand(trimmedInput);
+        if (permissionHandled !== null) {
+            if (permissionHandled) {
+                setInputValue('');
+            }
+            return permissionHandled;
+        }
+
         if (trimmedInput === '/newsession') {
             setInputValue('');
             if (selectedTab !== Driver.AGENT) {
@@ -593,7 +918,7 @@ const App = () => {
         if (userInput.startsWith('/task ')) {
             const prompt = userInput.substring(6);
             createTask(prompt);
-            setQuery('');
+            setInputValue('');
             return true;
         }
 
@@ -668,6 +993,7 @@ const App = () => {
         flushPendingQueue,
         isProcessingQueueRef,
         isStreaming,
+        handleAgentPermissionCommand,
         nextMessageId,
         pendingUserInputsRef,
         runAgentTurn,
@@ -732,14 +1058,22 @@ const App = () => {
             {!nonInteractiveInput && (
                 <>
                     <Box paddingY={1}>
-                        <InputBar
-                            value={inputValue}
-                            onChange={setInputValue}
-                            onSubmit={handleSubmit}
-                            isFocused={focusedControl === 'input'}
-                            onCommandMenuChange={setIsCommandMenuShown}
-                            onEscStateChange={handleEscStateChange}
-                        />
+                        {agentPermissionPrompt ? (
+                            <AgentPermissionPromptComponent
+                                prompt={agentPermissionPrompt}
+                                onSubmit={handlePermissionPromptSubmit}
+                                isFocused={focusedControl === 'permission'}
+                            />
+                        ) : (
+                            <InputBar
+                                value={inputValue}
+                                onChange={setInputValue}
+                                onSubmit={handleSubmit}
+                                isFocused={focusedControl === 'input'}
+                                onCommandMenuChange={setIsCommandMenuShown}
+                                onEscStateChange={handleEscStateChange}
+                            />
+                        )}
                     </Box>
                     {activeTask && (
                         <TaskSpecificView

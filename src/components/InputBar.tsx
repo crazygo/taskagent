@@ -13,6 +13,8 @@ const COMMANDS: Command[] = [
   { name: 'plan-review-do', description: 'Execute task with plan-review-do workflow' },
   { name: 'task', description: 'Create a background task' },
   { name: 'newsession', description: 'Start a fresh Claude agent session' },
+  { name: 'allow', description: 'Approve a pending agent permission (usage: /allow <id> [always])' },
+  { name: 'deny', description: 'Reject a pending agent permission (usage: /deny <id> [reason])' },
 ];
 
 interface InputBarProps {
