@@ -265,7 +265,7 @@ export async function runStoryFlow(task: string, hooks: StoryFlowHooks): Promise
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
             addLog(`[StoryFlow] Node ${node.id} failed: ${message}`);
-            pushSystemMessage(`❌ Story flow · ${node.label} 失败：${message}`, true);
+            pushSystemMessage(`❌ Story flow · ${node.label} failed: ${message}`, true);
             throw error;
         }
     }
