@@ -881,8 +881,8 @@ const App = () => {
                                 ? String((input as any).description)
                                 : '';
                             const line = description
-                                ? `event: tool_use, id=${id}, description: ${description}`
-                                : `event: tool_use, id=${id}`;
+                                ? `event: tool_use, id: ${id}, description: ${description}`
+                                : `event: tool_use, id: ${id}`;
                             const toolUseMessageId = nextMessageId();
                             setActiveMessages(prev => [...prev, { id: toolUseMessageId, role: 'system', content: line }]);
                             finalizeMessageById(toolUseMessageId);
