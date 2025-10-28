@@ -969,6 +969,28 @@ const App = () => {
             return await runAgentTurn(userInput);
         }
 
+        setInputValue('');
+
+        if (selectedTab === Driver.PLAN_REVIEW_DO) {
+            const newUserMessage: Types.Message = {
+                id: nextMessageId(),
+                role: 'user',
+                content: userInput,
+            };
+            addLog('[Driver] Routing to Plan-Review-DO');
+            return await handlePlanReviewDo(newUserMessage, {
+                nextMessageId,
+                setActiveMessages,
+                setFrozenMessages,
+                createTask,
+                waitTask,
+            });
+        }
+
+        if (selectedTab === Driver.AGENT) {
+            return await runAgentTurn(userInput);
+        }
+
         const newUserMessage: Types.Message = {
             id: nextMessageId(),
             role: 'user',
@@ -1016,6 +1038,7 @@ const App = () => {
         handleAgentPermissionCommand,
         isProcessingQueueRef,
         isStreaming,
+        handleAgentPermissionCommand,
         nextMessageId,
         pendingUserInputsRef,
         runAgentTurn,
