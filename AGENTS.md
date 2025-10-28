@@ -29,6 +29,11 @@ Your primary role is to act as an interactive CLI agent for software engineering
 - **Memory**: Remember key facts and instructions provided by the user, especially regarding workflow (e.g., how to run and test the application).
 - **Testing Workflow**: Utilize the `yarn start:test` command for quick, automated checks of application initialization and UI rendering, as detailed in `AGENTS.md`.
 
+## Agent Roles & Capabilities
+
+- **[Memory Systems Analyst](memory/AGENTS.md)**: Use for tasks involving the analysis of conversations or documents to extract and store structured memories (events, facts, skills).
+- **[Source Code Conventions](src/AGENTS.md)**: Implementation-level guidance for TUI streaming, message/state management, error boundaries, performance, and Ink UI.
+
 ## C4 definition
 - C4 Level 1: System Context and User Interactions
 - C4 Level 2: Containers
@@ -37,12 +42,9 @@ Your primary role is to act as an interactive CLI agent for software engineering
 - Component: A C4 Level 3 architectural element. 
 - React component: A specific code-level implementation detail using React (e.g., a .tsx file exporting a function).
 
-## Agent Roles & Capabilities
+## Story & Commit Policy
 
-- **[Memory Systems Analyst](memory/AGENTS.md)**: Use for tasks involving the analysis of conversations or documents to extract and store structured memories (events, facts, skills).
-- **[Source Code Conventions](src/AGENTS.md)**: Implementation-level guidance for TUI streaming, message/state management, error boundaries, performance, and Ink UI.
-
-- Story List 格式模板
+### Story List 模板
 当用户要求输出 "story list" 时，使用以下简洁格式总结需求：
 
 ```markdown
@@ -73,29 +75,26 @@ And [额外期望]
 Given that [前置条件]
 When [用户动作] 
 Then [期望结果]
-
-
----
-
-## 💡 Problems Solved
-[简洁描述此次修改解决的问题]
 ```
 
- **适用范围：**
- - 分析 git diff 生成 story
- - 总结对话历史中的需求
- - 解读 PRD 文档
- - 任何需要结构化需求输出的场景
- 
- **关键原则：**
- - 避免重复（不要 Success Criteria 部分，BDD 场景已经是验收标准）
- - 专注用户价值，不写技术实现
- - **始终从用户视角描述**，不提及代码符号、函数名、技术术语
- - 场景描述简洁明确，使用自然语言描述用户行为和期望
- - Given-When-Then 格式保持一致
+### 💡 Problems Solved
+[简洁描述此次修改解决的问题]
 
-- Commit 要求:
- - 使用 Story AC的格式，总结变更，并加入到 Commit Message 中
+### 适用范围
+- 分析 git diff 生成 story
+- 总结对话历史中的需求
+- 解读 PRD 文档
+- 任何需要结构化需求输出的场景
+ 
+### 关键原则
+- 避免重复（不要 Success Criteria 部分，BDD 场景已经是验收标准）
+- 专注用户价值，不写技术实现
+- **始终从用户视角描述**，不提及代码符号、函数名、技术术语
+- 场景描述简洁明确，使用自然语言描述用户行为和期望
+- Given-When-Then 格式保持一致
+
+### Commit 要求
+- 使用 Story AC 的格式，总结变更，并加入到 Commit Message 中
  
  
 
