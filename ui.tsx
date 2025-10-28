@@ -728,7 +728,7 @@ const App = () => {
             if (entry.requiresSession) {
                 const sessionId = await ensureAgentSession();
                 if (!sessionId) {
-                    appendSystemMessage(`[${entry.label}] 无法初始化 Claude session。`, true);
+                    appendSystemMessage(`[${entry.label}] Failed to initialize Claude session.`, true);
                     addLog(`[Driver] Failed to ensure Claude session for ${entry.label}`);
                     return false;
                 }
