@@ -11,30 +11,36 @@ import { loadCliConfig } from './src/cli/config.ts';
 import type { Task } from './task-manager.ts';
 import { ensureAiProvider, type AiChatProvider } from './src/config/ai-provider.ts';
 import * as Types from './src/types.ts';
-import { ChatPanel } from './src/components/ChatPanel.js';
-import { TabView } from './src/components/StatusControls.js';
-import { TaskSpecificView } from './src/components/TaskSpecificView.js';
-import { InputBar } from './src/components/InputBar.js';
-import type { AgentPermissionPromptState, AgentPermissionOption } from './src/components/AgentPermissionPrompt.types.js';
-import { AgentPermissionPromptComponent } from './src/components/AgentPermissionPrompt.js';
-import { useTaskStore } from './src/domain/taskStore.js';
-import { useConversationStore } from './src/domain/conversationStore.js';
-import { Driver, getDriverEnum, getDriverName } from './src/drivers/types.js';
-import { handlePlanReviewDo } from './src/drivers/plan-review-do/index.js';
-import { handleStoryDriver } from './src/drivers/story/index.js';
+import { ChatPanel } from './src/components/ChatPanel.tsx';
+import { TabView } from './src/components/StatusControls.tsx';
+import { TaskSpecificView } from './src/components/TaskSpecificView.tsx';
+import { InputBar } from './src/components/InputBar.tsx';
+import type { AgentPermissionPromptState, AgentPermissionOption } from './src/components/AgentPermissionPrompt.types.ts';
+import { AgentPermissionPromptComponent } from './src/components/AgentPermissionPrompt.tsx';
+import { useTaskStore } from './src/domain/taskStore.ts';
+import { useConversationStore } from './src/domain/conversationStore.ts';
+import { Driver, getDriverEnum, getDriverName } from './src/drivers/types.ts';
+import {
+    DRIVER_TABS,
+    getDriverBySlash,
+    getDriverByLabel,
+    getDriverCommandEntries,
+    type DriverManifestEntry,
+} from './src/drivers/registry.ts';
 import { closeTaskLogger } from './src/task-logger.ts';
 import { loadWorkspaceSettings, writeWorkspaceSettings, type WorkspaceSettings } from './src/workspace/settings.ts';
 // Guard to prevent double submission in dev double-mount scenarios
 let __nonInteractiveSubmittedOnce = false;
 
-const STATIC_TABS: readonly Driver[] = [
+const STATIC_TABS: readonly string[] = [
     Driver.CHAT,
     Driver.AGENT,
-    Driver.PLAN_REVIEW_DO,
-    Driver.STORY,
-    Driver.UX,
-    Driver.ARCHITECTURE,
-    Driver.TECH_PLAN,
+    ...DRIVER_TABS,
+];
+
+const BASE_COMMANDS: readonly { name: string; description: string }[] = [
+    { name: 'task', description: 'Create a background task' },
+    { name: 'newsession', description: 'Start a fresh Claude agent session' },
 ];
 
 type AgentPromptJob = {
@@ -532,6 +538,12 @@ const App = () => {
         [baseClaudeFlow]
     );
 
+    const driverCommandEntries = useMemo(() => getDriverCommandEntries(), []);
+    const inputCommands = useMemo(
+        () => [...BASE_COMMANDS, ...driverCommandEntries],
+        [driverCommandEntries]
+    );
+
     useEffect(() => {
         if (agentPermissionPrompt) {
             setFocusedControl('permission');
@@ -702,6 +714,74 @@ const App = () => {
         }
     }, [bootstrapConfig?.workspacePath, appendSystemMessage, isAgentStreaming]);
 
+    const ensureAgentSession = useCallback(async (): Promise<string | null> => {
+        if (agentSessionId) {
+            return agentSessionId;
+        }
+        return await createNewAgentSession();
+    }, [agentSessionId, createNewAgentSession]);
+
+    const runDriverEntry = useCallback(
+        async (entry: DriverManifestEntry, prompt: string): Promise<boolean> => {
+            let sessionContext = undefined as { id: string; initialized: boolean; markInitialized: () => void } | undefined;
+
+            if (entry.requiresSession) {
+                const sessionId = await ensureAgentSession();
+                if (!sessionId) {
+                    appendSystemMessage(`[${entry.label}] 无法初始化 Claude session。`, true);
+                    addLog(`[Driver] Failed to ensure Claude session for ${entry.label}`);
+                    return false;
+                }
+
+                sessionContext = {
+                    id: sessionId,
+                    initialized: agentSessionInitializedRef.current,
+                    markInitialized: () => {
+                        agentSessionInitializedRef.current = true;
+                    },
+                };
+            }
+
+            const userMessage: Types.Message = {
+                id: nextMessageId(),
+                role: 'user',
+                content: prompt,
+            };
+
+            try {
+                addLog(`[Driver] Dispatching to ${entry.label}`);
+                return await entry.handler(userMessage, {
+                    nextMessageId,
+                    setActiveMessages,
+                    setFrozenMessages,
+                    finalizeMessageById,
+                    canUseTool: handleAgentPermissionRequest,
+                    workspacePath: bootstrapConfig?.workspacePath,
+                    createTask,
+                    waitTask,
+                    session: sessionContext,
+                });
+            } catch (error) {
+                const message = error instanceof Error ? error.message : String(error);
+                addLog(`[Driver] Error in ${entry.label}: ${message}`);
+                appendSystemMessage(`[${entry.label}] Error: ${message}`, true);
+                return false;
+            }
+        },
+        [
+            appendSystemMessage,
+            bootstrapConfig?.workspacePath,
+            createTask,
+            ensureAgentSession,
+            finalizeMessageById,
+            handleAgentPermissionRequest,
+            nextMessageId,
+            setActiveMessages,
+            setFrozenMessages,
+            waitTask,
+        ]
+    );
+
     const startAgentPrompt = useCallback(async (job: AgentPromptJob): Promise<boolean> => {
         const { rawInput, prompt, pendingMessageIds } = job;
 
@@ -842,111 +922,47 @@ const App = () => {
             return (await createNewAgentSession()) !== null;
         }
 
-        // /plan-review-do 命令：切换到 Plan-Review-DO driver 并执行
-        if (userInput.startsWith('/plan-review-do ')) {
-            const prompt = userInput.substring(16).trim();
-            if (!prompt) {
-                addLog('[Command] /plan-review-do requires a prompt');
-                return false;
+        const slashMatch = userInput.startsWith('/')
+            ? /^\/([^\s]+)(?:\s+([\s\S]*))?$/.exec(userInput)
+            : null;
+
+        if (slashMatch) {
+            const command = slashMatch[1]?.toLowerCase() ?? '';
+            const rest = slashMatch[2] ?? '';
+
+            if (command === 'task') {
+                const prompt = rest.length > 0 ? rest : '';
+                if (!prompt) {
+                    addLog('[Command] /task requires a prompt');
+                    return false;
+                }
+                createTask(prompt);
+                setInputValue('');
+                return true;
             }
 
-            // 自动切换到 Plan-Review-DO driver
-            if (selectedTab !== Driver.PLAN_REVIEW_DO) {
-                addLog('[Command] Switching to Plan-Review-DO tab');
-                setSelectedTab(Driver.PLAN_REVIEW_DO);
+            const driverEntry = getDriverBySlash(command);
+            if (driverEntry) {
+                const prompt = rest.trim();
+                if (!prompt) {
+                    addLog(`[Command] /${command} requires a prompt`);
+                    return false;
+                }
+                if (selectedTab !== driverEntry.label) {
+                    addLog(`[Command] Switching to ${driverEntry.label} tab`);
+                    setSelectedTab(driverEntry.label);
+                }
+                setInputValue('');
+                return await runDriverEntry(driverEntry, prompt);
             }
-
-            const newUserMessage: Types.Message = {
-                id: nextMessageId(),
-                role: 'user',
-                content: prompt,
-            };
-
-            setInputValue('');
-
-            addLog('[Command] Executing with Plan-Review-DO');
-            return await handlePlanReviewDo(newUserMessage, {
-                nextMessageId,
-                setActiveMessages,
-                setFrozenMessages,
-                createTask,
-                waitTask,
-            });
-        }
-
-        // /story 命令：切换到 Story driver 并执行
-        if (userInput.startsWith('/story ')) {
-            const prompt = userInput.substring(7).trim();
-            if (!prompt) {
-                addLog('[Command] /story requires a prompt');
-                return false;
-            }
-
-            if (selectedTab !== Driver.STORY) {
-                addLog('[Command] Switching to Story tab');
-                setSelectedTab(Driver.STORY);
-            }
-
-            const newUserMessage: Types.Message = {
-                id: nextMessageId(),
-                role: 'user',
-                content: prompt,
-            };
-
-            setInputValue('');
-
-            addLog('[Command] Executing Story driver');
-            return await handleStoryDriver(newUserMessage, {
-                nextMessageId,
-                setActiveMessages,
-                setFrozenMessages,
-                finalizeMessageById,
-                canUseTool: handleAgentPermissionRequest,
-                workspacePath: bootstrapConfig?.workspacePath,
-            });
-        }
-
-        // /task 命令：创建后台任务（所有 Driver 共享）
-        if (userInput.startsWith('/task ')) {
-            const prompt = userInput.substring(6);
-            createTask(prompt);
-            setInputValue('');
-            return true;
         }
 
         setInputValue('');
 
-        if (selectedTab === Driver.PLAN_REVIEW_DO) {
-            const newUserMessage: Types.Message = {
-                id: nextMessageId(),
-                role: 'user',
-                content: userInput,
-            };
-            addLog('[Driver] Routing to Plan-Review-DO');
-            return await handlePlanReviewDo(newUserMessage, {
-                nextMessageId,
-                setActiveMessages,
-                setFrozenMessages,
-                createTask,
-                waitTask,
-            });
-        }
-
-        if (selectedTab === Driver.STORY) {
-            const newUserMessage: Types.Message = {
-                id: nextMessageId(),
-                role: 'user',
-                content: userInput,
-            };
-            addLog('[Driver] Routing to Story');
-            return await handleStoryDriver(newUserMessage, {
-                nextMessageId,
-                setActiveMessages,
-                setFrozenMessages,
-                finalizeMessageById,
-                canUseTool: handleAgentPermissionRequest,
-                workspacePath: bootstrapConfig?.workspacePath,
-            });
+        const activeDriver = getDriverByLabel(selectedTab);
+        if (activeDriver) {
+            addLog(`[Driver] Routing to ${activeDriver.label}`);
+            return await runDriverEntry(activeDriver, userInput);
         }
 
         if (selectedTab === Driver.AGENT) {
@@ -959,11 +975,8 @@ const App = () => {
             content: userInput,
         };
 
-        const placeholderDrivers = [Driver.STORY, Driver.UX, Driver.ARCHITECTURE, Driver.TECH_PLAN];
         if (selectedTab === Driver.CHAT) {
             addLog('[Driver] Using Chat mode');
-        } else if (placeholderDrivers.includes(selectedTab as Driver)) {
-            addLog(`[Driver] Using ${selectedTab} mode (placeholder - fallback to Chat)`);
         } else {
             addLog(`[Driver] Using ${selectedTab} mode (fallback to Chat)`);
         }
@@ -997,25 +1010,20 @@ const App = () => {
         return succeeded && !flushFailed;
     }, [
         appendSystemMessage,
-        bootstrapConfig?.workspacePath,
         createNewAgentSession,
         createTask,
-        finalizeMessageById,
         flushPendingQueue,
         handleAgentPermissionCommand,
-        handleAgentPermissionRequest,
         isProcessingQueueRef,
         isStreaming,
         nextMessageId,
         pendingUserInputsRef,
         runAgentTurn,
+        runDriverEntry,
         runStreamForUserMessage,
         selectedTab,
-        setActiveMessages,
-        setFrozenMessages,
         setInputValue,
         setSelectedTab,
-        waitTask,
     ]);
 
     useEffect(() => {
@@ -1086,6 +1094,7 @@ const App = () => {
                                 isFocused={focusedControl === 'input'}
                                 onCommandMenuChange={setIsCommandMenuShown}
                                 onEscStateChange={handleEscStateChange}
+                                commands={inputCommands}
                             />
                         )}
                     </Box>

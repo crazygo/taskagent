@@ -1,4 +1,3 @@
-import { randomUUID } from 'crypto';
 import type { Dispatch, SetStateAction } from 'react';
 
 import type { PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
@@ -20,6 +19,11 @@ export interface StoryFlowHooks {
     finalizeMessageById: (messageId: number) => void;
     canUseTool: (toolName: string, input: Record<string, unknown>, options: { signal: AbortSignal; suggestions?: PermissionUpdate[] }) => Promise<unknown>;
     workspacePath?: string;
+    session: {
+        id: string;
+        initialized: boolean;
+        markInitialized: () => void;
+    };
 }
 
 export interface StoryFlowState {
@@ -62,8 +66,11 @@ export async function runStoryFlow(task: string, hooks: StoryFlowHooks): Promise
         transcript: [],
     };
 
-    const sessionId = randomUUID();
-    let sessionInitialized = false;
+    const sessionId = hooks.session.id;
+    if (!sessionId) {
+        throw new Error('StoryFlow requires a valid Claude session id');
+    }
+    let sessionInitialized = hooks.session.initialized;
 
     const pushSystemMessage = (content: string, boxed = false) => {
         const message: Types.Message = {
@@ -251,6 +258,10 @@ export async function runStoryFlow(task: string, hooks: StoryFlowHooks): Promise
 
             pushSystemMessage(`✅ Story flow · ${node.label} 完成`, node.id === 'organize');
             addLog(`[StoryFlow] Completed node=${node.id} text_len=${aggregates.text.length}`);
+            if (!sessionInitialized) {
+                hooks.session.markInitialized();
+                sessionInitialized = true;
+            }
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
             addLog(`[StoryFlow] Node ${node.id} failed: ${message}`);

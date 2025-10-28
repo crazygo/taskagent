@@ -4,18 +4,10 @@ import TextInput from 'ink-text-input';
 import { CommandMenu } from './CommandMenu.tsx';
 import { addLog } from '../logger.ts';
 
-interface Command {
+export interface Command {
   name: string;
   description: string;
 }
-
-const COMMANDS: Command[] = [
-  { name: 'plan-review-do', description: 'Execute task with plan-review-do workflow' },
-  { name: 'task', description: 'Create a background task' },
-  { name: 'newsession', description: 'Start a fresh Claude agent session' },
-  { name: 'allow', description: 'Approve a pending agent permission (usage: /allow <id> [always])' },
-  { name: 'deny', description: 'Reject a pending agent permission (usage: /deny <id> [reason])' },
-];
 
 interface InputBarProps {
   value: string;
@@ -24,9 +16,18 @@ interface InputBarProps {
   isFocused: boolean;
   onCommandMenuChange?: (isShown: boolean) => void;
   onEscStateChange?: (isEscActive: boolean) => void;
+  commands: Command[];
 }
 
-export const InputBar: React.FC<InputBarProps> = ({ value, onChange, onSubmit, isFocused, onCommandMenuChange, onEscStateChange }) => {
+export const InputBar: React.FC<InputBarProps> = ({
+  value,
+  onChange,
+  onSubmit,
+  isFocused,
+  onCommandMenuChange,
+  onEscStateChange,
+  commands,
+}) => {
   const [showCommandMenu, setShowCommandMenu] = useState(false);
   const [filteredCommands, setFilteredCommands] = useState<Command[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -103,15 +104,15 @@ export const InputBar: React.FC<InputBarProps> = ({ value, onChange, onSubmit, i
 
     const query = afterSlash.toLowerCase();
     const filtered = query === ''
-      ? COMMANDS
-      : COMMANDS.filter(cmd => cmd.name.startsWith(query));
+      ? commands
+      : commands.filter(cmd => cmd.name.startsWith(query));
 
     setFilteredCommands(filtered);
     const isShown = filtered.length > 0;
     setShowCommandMenu(isShown);
     setSelectedIndex(0);
     onCommandMenuChange?.(isShown);
-  }, [value, onCommandMenuChange]);
+  }, [value, commands, onCommandMenuChange]);
 
   // Cleanup timer on component unmount
   useEffect(() => {

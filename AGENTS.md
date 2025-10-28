@@ -34,6 +34,11 @@ Your primary role is to act as an interactive CLI agent for software engineering
 - **[Memory Systems Analyst](memory/AGENTS.md)**: Use for tasks involving the analysis of conversations or documents to extract and store structured memories (events, facts, skills).
 - **[Source Code Conventions](src/AGENTS.md)**: Implementation-level guidance for TUI streaming, message/state management, error boundaries, performance, and Ink UI.
 
+## Document Placement
+
+Analysis documents, temporary documents, and plan documents generated during conversations should be placed in the `memory/docs` directory.
+- Filenames should use a timestamp prefix in the format `yyyy-mm-dd-hh-mm-{document-name}.md`
+
 ## C4 definition
 - C4 Level 1: System Context and User Interactions
 - C4 Level 2: Containers

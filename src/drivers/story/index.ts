@@ -18,6 +18,11 @@ export interface StoryDriverCallbacks {
     finalizeMessageById: (messageId: number) => void;
     canUseTool: (toolName: string, input: Record<string, unknown>, options: { signal: AbortSignal; suggestions?: PermissionUpdate[] }) => Promise<unknown>;
     workspacePath?: string;
+    session: {
+        id: string;
+        initialized: boolean;
+        markInitialized: () => void;
+    };
 }
 
 export async function handleStoryDriver(
@@ -37,6 +42,7 @@ export async function handleStoryDriver(
             finalizeMessageById: callbacks.finalizeMessageById,
             canUseTool: callbacks.canUseTool,
             workspacePath: callbacks.workspacePath,
+            session: callbacks.session,
         });
 
         addLog(
