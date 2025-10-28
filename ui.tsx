@@ -15,6 +15,8 @@ import { ChatPanel } from './src/components/ChatPanel.js';
 import { TabView } from './src/components/StatusControls.js';
 import { TaskSpecificView } from './src/components/TaskSpecificView.js';
 import { InputBar } from './src/components/InputBar.js';
+import type { AgentPermissionPromptState, AgentPermissionOption } from './src/components/agent-permission-types.js';
+import { AgentPermissionPromptComponent } from './src/components/AgentPermissionPrompt.js';
 import { useTaskStore } from './src/domain/taskStore.js';
 import { useConversationStore } from './src/domain/conversationStore.js';
 import { Driver, getDriverEnum, getDriverName } from './src/drivers/types.js';
@@ -23,12 +25,6 @@ import { closeTaskLogger } from './src/task-logger.ts';
 import { loadWorkspaceSettings, writeWorkspaceSettings, type WorkspaceSettings } from './src/workspace/settings.ts';
 // Guard to prevent double submission in dev double-mount scenarios
 let __nonInteractiveSubmittedOnce = false;
-
-enum Kernel {
-    CLAUDE_CODE = 'Claude Code',
-    GEMINI = 'Gemini',
-    CODEX = 'Codex',
-}
 
 const STATIC_TABS: readonly Driver[] = [
     Driver.CHAT,
@@ -60,13 +56,6 @@ type AgentPermissionRequest = {
 type AgentPermissionDecision =
     | { kind: 'allow'; always?: boolean }
     | { kind: 'deny'; reason?: string; interrupt?: boolean };
-
-type AgentPermissionPromptState = {
-    requestId: number;
-    toolName: string;
-    summary: string;
-    hasSuggestions: boolean;
-};
 
 const formatSessionId = (sessionId: string) =>
   sessionId.length > 8 ? `${sessionId.slice(0, 8)}...` : sessionId;
@@ -149,83 +138,6 @@ const formatToolInputSummary = (input: Record<string, unknown>, maxLength = 600)
     }
 };
 
-type AgentPermissionOption = 'allow' | 'deny' | 'always';
-
-interface AgentPermissionPromptProps {
-    prompt: AgentPermissionPromptState;
-    onSubmit: (option: AgentPermissionOption) => void;
-    isFocused: boolean;
-}
-
-const AgentPermissionPromptComponent: React.FC<AgentPermissionPromptProps> = ({ prompt, onSubmit, isFocused }) => {
-    const options: Array<{ key: AgentPermissionOption; label: string }> = prompt.hasSuggestions
-        ? [
-              { key: 'allow', label: 'Allow' },
-              { key: 'deny', label: 'Deny' },
-              { key: 'always', label: 'Always Allow' },
-          ]
-        : [
-              { key: 'allow', label: 'Allow' },
-              { key: 'deny', label: 'Deny' },
-          ];
-
-    const [selectedIndex, setSelectedIndex] = useState(0);
-
-    useEffect(() => {
-        setSelectedIndex(0);
-    }, [prompt.requestId, prompt.hasSuggestions]);
-
-    useInput(
-        (_input, key) => {
-            if (!isFocused) {
-                return;
-            }
-            if (key.leftArrow || key.upArrow) {
-                setSelectedIndex(prev => (prev + options.length - 1) % options.length);
-            } else if (key.rightArrow || key.downArrow || key.tab) {
-                setSelectedIndex(prev => (prev + 1) % options.length);
-            } else if (key.return) {
-                const option = options[selectedIndex];
-                onSubmit(option.key);
-            }
-        },
-        { isActive: isFocused }
-    );
-
-    const summaryLines = prompt.summary.split('\n').filter(line => line.trim().length > 0).slice(0, 20);
-
-    return (
-        <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1} paddingY={0}>
-            <Text color="cyan">{`Permission #${prompt.requestId} · ${prompt.toolName}`}</Text>
-            <Text> </Text>
-            {summaryLines.length === 0 ? (
-                <Text color="gray">{'(empty input)'}</Text>
-            ) : (
-                summaryLines.map((line, index) => (
-                    <Text key={`${prompt.requestId}-summary-${index}`} color="gray">
-                        {line}
-                    </Text>
-                ))
-            )}
-            <Text> </Text>
-            <Box flexDirection="row">
-                {options.map((option, index) => (
-                    <React.Fragment key={option.key}>
-                        <Text inverse={index === selectedIndex}>{` ${option.label} `}</Text>
-                        {index < options.length - 1 ? <Text> </Text> : null}
-                    </React.Fragment>
-                ))}
-            </Box>
-            <Text color="gray">
-                {prompt.hasSuggestions
-                    ? 'Use ←/→ to switch, Enter to confirm. "Always Allow" remembers this permission.'
-                    : 'Use ←/→ to switch, Enter to confirm.'}
-            </Text>
-        </Box>
-    );
-};
-
-
 // --- Components ---
 
 const App = () => {
@@ -274,9 +186,8 @@ const App = () => {
     const [frozenMessages, setFrozenMessages] = useState<Types.Message[]>([]);
     const [activeMessages, setActiveMessages] = useState<Types.Message[]>([]);
     const [inputValue, setInputValue] = useState('');
-    const [selectedKernel, setSelectedKernel] = useState<Kernel>(Kernel.CLAUDE_CODE);
     const [selectedTab, setSelectedTab] = useState<string>(Driver.CHAT);
-    const [focusedControl, setFocusedControl] = useState<'input' | 'kernel' | 'tabs' | 'task' | 'permission'>('input');
+    const [focusedControl, setFocusedControl] = useState<'input' | 'tabs' | 'task' | 'permission'>('input');
     const [isCommandMenuShown, setIsCommandMenuShown] = useState(false);
     const [isEscActive, setIsEscActive] = useState(false);
     const [agentSessionId, setAgentSessionId] = useState<string | null>(null);
@@ -445,10 +356,13 @@ const App = () => {
             return null;
         }
 
-        const parts = trimmed.split(/\s+/);
-        const command = parts[0].toLowerCase();
+        const [commandRaw, ...argTokens] = trimmed.split(/\s+/);
+        if (!commandRaw) {
+            return null;
+        }
+        const command = commandRaw.toLowerCase();
 
-        if (parts.length < 2) {
+        if (argTokens.length < 1) {
             appendSystemMessage(
                 command === '/allow'
                     ? '[Agent] Usage: /allow <id> [always]'
@@ -458,15 +372,21 @@ const App = () => {
             return false;
         }
 
-        const id = Number.parseInt(parts[1] ?? '', 10);
-        if (!Number.isInteger(id)) {
+        const [idToken, ...restTokens] = argTokens;
+        if (!idToken) {
+            appendSystemMessage('[Agent] Permission id must be provided.', true);
+            return false;
+        }
+
+        const id = Number.parseInt(idToken, 10);
+        if (Number.isNaN(id)) {
             appendSystemMessage('[Agent] Permission id must be an integer.', true);
             return false;
         }
 
         if (command === '/allow') {
             let always = false;
-            for (const token of parts.slice(2)) {
+            for (const token of restTokens) {
                 const normalized = token.toLowerCase();
                 if (normalized === 'always' || normalized === '--always') {
                     always = true;
@@ -475,7 +395,7 @@ const App = () => {
             return resolveAgentPermission(id, { kind: 'allow', always });
         }
 
-        const reason = parts.slice(2).join(' ').trim();
+        const reason = restTokens.join(' ').trim();
         return resolveAgentPermission(id, { kind: 'deny', reason });
     }, [appendSystemMessage, resolveAgentPermission]);
 
