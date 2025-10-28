@@ -195,7 +195,7 @@ const App = () => {
     const [isAgentStreaming, setIsAgentStreaming] = useState(false);
     const { tasks, createTask, waitTask } = useTaskStore();
 
-    // 从 CLI 参数初始化 Driver（在 bootstrapConfig 确定后）
+    // Initialize Driver from CLI arguments (after bootstrapConfig is determined)
     useEffect(() => {
         if (bootstrapConfig?.driver) {
             const driverEnum = getDriverEnum(bootstrapConfig.driver);
