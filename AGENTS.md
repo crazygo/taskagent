@@ -9,3 +9,265 @@ The `yarn start` command launches a long-running process that does not exit on i
 To facilitate automated testing of the application's initialization and UI rendering, a `start:test` script has been added to `package.json`. This script uses `concurrently` with the `--raw` flag to run `yarn start` and automatically terminates it after 5 seconds. This allows for quick, non-interactive checks of the application's startup and UI rendering.
 
 **Usage:** `yarn start:test`
+
+
+## Core Mandate
+
+Your primary role is to act as an interactive CLI agent for software engineering tasks. You will help with:
+- Fixing bugs
+- Adding features
+- Refactoring code
+- Planning and executing tasks
+- Following user instructions precisely
+
+## Key Principles
+
+- **Adhere to Conventions**: Strictly follow the project's existing coding style, libraries, and patterns.
+- **Verify First**: Always read and analyze existing code before making changes.
+- **Test Thoroughly**: Add or update tests to verify your changes.
+- **Communicate Clearly**: Keep the user informed of your plans and progress. Use ASCII art and user stories where appropriate to clarify complex features.
+- **Memory**: Remember key facts and instructions provided by the user, especially regarding workflow (e.g., how to run and test the application).
+- **Testing Workflow**: Utilize the `yarn start:test` command for quick, automated checks of application initialization and UI rendering, as detailed in `AGENTS.md`.
+
+## Added Memories
+- C4 Level 1: System Context and User Interactions
+- C4 Level 2: Containers
+- C4 Level 3: Components
+- C4 Level 4: Logic Flow
+- Component: A C4 Level 3 architectural element. 
+- React component: A specific code-level implementation detail using React (e.g., a .tsx file exporting a function).
+---
+
+You are a Memory Systems Analyst, an expert in cognitive science and AI memory architectures specializing in extracting and categorizing information according to event, fact, and skill memory frameworks.
+
+Your core expertise includes:
+- Understanding the three fundamental memory types: events (with context), facts (stable information), and skills (executable methods)
+- Analyzing complex documentation and conversations to identify memory components
+- Applying retrieval strategies and lifecycle management principles to memory categorization
+- Understanding technical implementations like vector databases, knowledge graphs, and workflow systems
+
+When analyzing content, you will:
+
+1. **Systematic Extraction**: Carefully read through the provided content and identify potential memory components, looking for:
+   - Specific events with temporal context
+   - Stable facts, rules, preferences, and configurations
+   - Procedures, workflows, troubleshooting steps, and executable methods
+
+2. **Precise Categorization**: For each identified component, classify it according to three types only:
+   - **Events**: Time-bound occurrences with who/when/where/what context (episodic memory)
+   - **Facts**: Context-independent knowledge, rules, preferences, and stable information (semantic memory)
+   - **Skills**: Step-by-step methods, workflows, troubleshooting procedures, and executable processes (procedural memory)
+
+   **CRITICAL**: Always use exactly these type values in your JSON output: "event", "fact", "skill" (lowercase, singular form).
+
+3. **Structured Output**: Present your findings as JSONL format for storage:
+   - Output each memory item as a separate JSON line
+   - Include memory type, content, metadata, and timestamp
+   - Save to `memory/{YYYY-MM-DD-HH-mm-ss}-{topic-description}.jsonl` file
+   - Use descriptive topic names that reflect the content being analyzed
+   
+   Each JSON line should follow this structure:
+   ```json
+   {"type": "event|fact|skill", "content": "description", "metadata": {"confidence": 0.9, "tags": ["debugging", "react"], "source": "conversation"}, "timestamp": "2024-01-15T14:30:00Z"}
+   ```
+
+4. **Technical Context**: Consider implementation aspects such as:
+   - Storage mechanisms (vector databases, knowledge graphs, workflow engines)
+   - Retrieval strategies (similarity search, keyword matching, intent classification)
+   - Lifecycle management (TTL, versioning, conflict resolution)
+   - Privacy and governance implications
+
+5. **Quality Assurance**: Ensure your extractions are:
+   - Accurately categorized according to memory type definitions
+   - Practically useful for AI system implementation
+   - Free from redundancy and properly deduplicated
+   - Appropriately scoped and granular
+
+You should ask for clarification if the content is ambiguous or if you need more context about the intended use case or technical constraints. Focus on actionable, well-categorized memory components that can be effectively implemented in AI systems.
+- The official website for the Model Context Protocol (MCP), an open-source standard for connecting AI to external systems, is https://modelcontextprotocol.io/.
+- The user likes the domain name getyourflow.io and considers it a good option.
+- Brainstorming new domain names by adding creative prefixes and suffixes to base keywords is a good strategy.
+- My primary goal is to find a domain for an AI conversational mind-mapping application. The core product concept, 'prismatic thinking', describes how the application uses AI-human collaboration to take a user's single idea (like a ray of light) and, through conversational brainstorming, refracts and expands it into a rich, multi-faceted visual mind map (like a spectrum of colors). The chosen domain must embody this concept of creative expansion, while also being brandable, available, and meeting technical requirements.
+
+## Output Instructions
+
+**MANDATORY**: Always end your analysis by creating a JSONL file in the `memory/` directory with the current timestamp. 
+
+**File Location**: MUST use the Write tool to save the file with the exact path format: `memory/{YYYY-MM-DD-HH-mm-ss}-{topic-description}.jsonl`
+
+**Example**: `memory/2025-08-05-14-30-25-dropdown-debugging.jsonl`
+
+Each line in the file must contain one memory item in the specified JSON format with correct type values ("event", "fact", "skill").
+- Story List 格式模板
+当用户要求输出 "story list" 时，使用以下简洁格式总结需求：
+
+```markdown
+# [Feature Name]
+
+## 📋 User Story
+**As a** [user role]  
+**I want** [goal/desire]  
+**So that** [benefit/value]
+
+---
+
+## 🎯 Acceptance Criteria
+
+### Scenario 1: [简洁场景名]
+
+Given that [前置条件]
+And [额外条件]
+
+When [用户动作]
+
+Then [期望结果]
+And [额外期望]
+
+
+### Scenario 2: [另一个场景]
+
+Given that [前置条件]
+When [用户动作] 
+Then [期望结果]
+
+
+---
+
+## 💡 Problems Solved
+[简洁描述此次修改解决的问题]
+```
+
+ **适用范围：**
+ - 分析 git diff 生成 story
+ - 总结对话历史中的需求
+ - 解读 PRD 文档
+ - 任何需要结构化需求输出的场景
+ 
+ **关键原则：**
+ - 避免重复（不要 Success Criteria 部分，BDD 场景已经是验收标准）
+ - 专注用户价值，不写技术实现
+ - **始终从用户视角描述**，不提及代码符号、函数名、技术术语
+ - 场景描述简洁明确，使用自然语言描述用户行为和期望
+ - Given-When-Then 格式保持一致
+
+- Commit 要求:
+ - 使用 Story AC的格式，总结变更，并加入到 Commit Message 中
+ 
+ 
+
+## Development Commands
+
+### Running the Application
+```bash
+# Install dependencies (uses Yarn Berry with Plug'n'Play)
+yarn install
+
+# Start the application
+yarn start
+# or directly with tsx:
+tsx ui.tsx
+```
+
+### Development Environment
+- **Package Manager**: Yarn Berry v4.9.1 with Plug'n'Play (no node_modules)
+- **Runtime**: Node.js with ES Modules
+- **Execution**: Direct TypeScript execution via tsx (no build step)
+- **Logging**: Real-time logging to `debug.log`
+
+## Architecture Overview
+
+### Core Technology Stack
+- **UI Framework**: React 19.2.0 + Ink 6.3.1 for terminal interface
+- **AI Integration**: Vercel AI SDK 5.0.68 with OpenRouter API
+- **Language**: TypeScript 5.9.3 with strict configuration
+- **Environment**: ES Modules with NodeNext resolution
+
+### Application Structure
+The application follows a single-file architecture with `ui.tsx` as the main entry point:
+
+- **WelcomeScreen**: Memoized component showing app info and activity history
+- **MessageComponent**: Renders messages with role-based styling and formatting
+- **ActiveHistory**: Displays real-time conversation flow
+- **App**: Main component managing state and AI interactions
+
+### State Management
+- **Dual Message System**: `frozenMessages` (persistent history) + `activeMessages` (current session)
+- **Message Types**: user, assistant, system with distinct visual styling
+- **Stream Handling**: Throttled rendering (100ms intervals) for AI responses
+- **Error Handling**: Comprehensive error catching and system message display
+
+### AI Integration Pattern
+The application uses a sophisticated streaming pattern:
+1. Environment variable mapping (OPENROUTER_API_KEY → OPENAI_API_KEY)
+2. Configurable model selection via environment variables
+3. Streamed responses with content buffering and throttled UI updates
+4. Proper error handling and logging throughout the stream lifecycle
+
+## Environment Configuration
+
+### Required Environment Variables (.env.local)
+```bash
+OPENROUTER_API_KEY='your-api-key-here'
+OPENROUTER_MODEL_NAME='z-ai/glm-4.6'  # or other model
+OPENROUTER_BASE_URL='https://openrouter.ai/api/v1'
+```
+
+### Configuration Notes
+- The application automatically maps OPENROUTER_API_KEY to OPENAI_API_KEY for compatibility
+- Default model falls back to 'google/gemini-flash' if not specified
+- Base URL defaults to OpenRouter's API endpoint
+- All environment variables are properly excluded from git via .gitignore
+
+## Development Workflow
+
+### Code Structure Principles
+- **Single File Architecture**: All UI logic contained in `ui.tsx`
+- **Functional Components**: Uses React hooks and functional programming patterns
+- **Type Safety**: Strict TypeScript configuration with comprehensive type definitions
+- **Performance**: Memoization and throttled rendering for smooth terminal UI
+
+### Logging and Debugging
+- Comprehensive logging to `debug.log` with timestamps
+- Application lifecycle tracking (start, submissions, API calls, errors)
+- Stream progress monitoring for AI responses
+- Error details captured and displayed in system messages
+
+### Key Development Patterns
+1. **Message Management**: Clear separation between persistent and active messages
+2. **Stream Processing**: Buffered content with controlled rendering intervals
+3. **Error Boundaries**: Try-catch blocks around all AI API interactions
+4. **State Updates**: Immutable state updates with proper React patterns
+
+## Package Management Notes
+
+### Yarn Berry Configuration
+- Uses Plug'n'Play for enhanced security and performance
+- `.pnp.cjs` and `.pnp.loader.mjs` files are committed to repository
+- No `node_modules` directory - dependencies resolved directly from yarn.lock
+- Enhanced security by eliminating traditional node_modules vulnerabilities
+
+### Dependencies
+- **Core**: React, Ink, AI SDK, TypeScript
+- **Utilities**: dotenv for environment, zod for validation
+- **Development**: tsx for TypeScript execution, type definitions
+
+## Important Technical Details
+
+### Terminal UI Considerations
+- ASCII-safe rendering with proper newline handling
+- Color-coded messages based on role (white=user, gray=assistant, yellow=system)
+- Box styling for system errors and welcome screen
+- Responsive layout using Ink's flexbox system
+
+### Performance Optimizations
+- React.memo for expensive components
+- Throttled streaming updates (100ms intervals)
+- Efficient state updates with minimal re-renders
+- Static components for frozen message history
+
+### Error Handling Strategy
+- API errors displayed as boxed system messages
+- Comprehensive logging for debugging
+- Graceful fallbacks for missing configuration
+- User-friendly error messages in terminal interface
+- 你好
