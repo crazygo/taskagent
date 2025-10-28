@@ -1,0 +1,1 @@
+{"type":"fact","content":"Driver tabs now resolve via a shared registry that maps tab labels and slash commands to handlers; tabs auto-dispatch to the registry and the command menu pulls its entries from the same source.","metadata":{"confidence":0.9,"tags":["driver","routing"],"source":"code-update"},"timestamp":"2025-10-28T16:12:15Z"}

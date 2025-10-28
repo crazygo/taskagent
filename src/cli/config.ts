@@ -19,7 +19,7 @@ export const loadCliConfig = (): CliConfig => {
   if (!workspacePath || workspacePath.trim().length === 0) {
     const home = process.env.HOME || process.env.USERPROFILE || '';
     if (home) {
-      workspacePath = join(home, '.askman', 'tests');
+      workspacePath = join(home, '.askman', 'default_workspace');
     } else {
       workspacePath = process.cwd();
     }
