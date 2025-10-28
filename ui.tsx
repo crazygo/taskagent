@@ -633,7 +633,7 @@ const App = () => {
     }, [selectedTab, agentSessionId, bootstrapConfig?.workspacePath, appendSystemMessage]);
 
     useInput((input, key) => {
-        // 当命令菜单显示时，不响应 Tab 键（让 InputBar 处理）
+        // When command menu is shown, don't respond to Tab key (let InputBar handle it)
         if (agentPermissionPrompt) {
             return;
         }
