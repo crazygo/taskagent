@@ -30,7 +30,7 @@
   "scripts": {
     "start": "tsx ui.tsx --",
     "start:test": "concurrently --raw --kill-others --success first \"yarn start\" \"sleep 5\"",
-    "e2e:experiment": "scripts/e2e-experiment.expect",
+    "e2e:experiment": "expect scripts/e2e-experiment.expect --",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "type": "module",
