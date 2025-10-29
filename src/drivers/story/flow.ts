@@ -115,28 +115,29 @@ export async function runStoryFlow(task: string, hooks: StoryFlowHooks): Promise
             hooks.finalizeMessageById(messageId);
         };
 
-        const emitToolUse = ({ id, description }: ToolUseEvent) => {
+        const emitToolUse = ({ id, name, description }: ToolUseEvent) => {
             const messageId = hooks.nextMessageId();
+            const namePart = ` name=${name}`;
             const descriptionSuffix = description ? ` · ${description}` : '';
             hooks.setActiveMessages(prev => [
                 ...prev,
                 {
                     id: messageId,
                     role: 'system',
-                    content: `[Story:${stage}] tool_use id=${id}${descriptionSuffix}`,
+                    content: `[Story:${stage}] tool_use id=${id},${namePart}${descriptionSuffix}`,
                 },
             ]);
             hooks.finalizeMessageById(messageId);
         };
 
-        const emitToolResult = ({ id }: ToolResultEvent) => {
+        const emitToolResult = ({ id, name }: ToolResultEvent) => {
             const messageId = hooks.nextMessageId();
             hooks.setActiveMessages(prev => [
                 ...prev,
                 {
                     id: messageId,
                     role: 'system',
-                    content: `[Story:${stage}] tool_result tool_use_id=${id}`,
+                    content: `[Story:${stage}] tool_result tool_use_id=${id}, name=${name}`,
                 },
             ]);
             hooks.finalizeMessageById(messageId);

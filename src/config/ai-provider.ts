@@ -21,14 +21,40 @@ export function ensureAiProvider(): CachedProvider {
   }
 
   try {
-    const primaryKey =
-      process.env.OPENROUTER_API_KEY ?? process.env.OPENAI_API_KEY;
-    const baseURL =
-      process.env.OPENROUTER_BASE_URL ??
-      process.env.OPENAI_API_BASE_URL ??
-      'https://openrouter.ai/api/v1';
-    const modelName =
-      process.env.OPENROUTER_MODEL_NAME ?? process.env.OPENAI_MODEL_NAME;
+    // Provider selection: AI_PROVIDER = 'openrouter' | 'openai' | 'auto'
+    const providerPref = (process.env.AI_PROVIDER || 'auto').toLowerCase();
+
+    const selectOpenRouter = () => ({
+      providerName: 'openrouter' as const,
+      apiKey: process.env.OPENROUTER_API_KEY,
+      baseURL:
+        process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1',
+      modelName: process.env.OPENROUTER_MODEL_NAME,
+    });
+
+    const selectOpenAI = () => ({
+      providerName: 'openai' as const,
+      apiKey: process.env.OPENAI_API_KEY,
+      baseURL: process.env.OPENAI_API_BASE_URL,
+      modelName: process.env.OPENAI_MODEL_NAME,
+    });
+
+    let chosen = null as null | ReturnType<typeof selectOpenRouter> | ReturnType<typeof selectOpenAI>;
+
+    if (providerPref === 'openrouter') {
+      chosen = selectOpenRouter();
+    } else if (providerPref === 'openai') {
+      chosen = selectOpenAI();
+    } else {
+      // auto: prefer OpenRouter when configured, otherwise OpenAI
+      const orCfg = selectOpenRouter();
+      const oaCfg = selectOpenAI();
+      chosen = orCfg.apiKey ? orCfg : oaCfg;
+    }
+
+    const primaryKey = chosen?.apiKey;
+    const baseURL = chosen?.baseURL || 'https://openrouter.ai/api/v1';
+    const modelName = chosen?.modelName;
 
     if (!primaryKey) {
       throw new Error('Neither OPENROUTER_API_KEY nor OPENAI_API_KEY is set');
@@ -40,7 +66,7 @@ export function ensureAiProvider(): CachedProvider {
       );
     }
 
-    addLog(`Using OpenRouter provider with baseURL ${baseURL}`);
+    addLog(`Using ${chosen?.providerName ?? 'openrouter'} provider with baseURL ${baseURL}`);
     const client = createOpenRouter({
       apiKey: primaryKey,
       baseURL,

@@ -47,6 +47,7 @@ type AgentPromptJob = {
     rawInput: string;
     prompt: string;
     pendingMessageIds?: number[];
+    systemPrompt?: string;
 };
 
 type AgentPermissionRequest = {
@@ -742,6 +743,16 @@ const App = () => {
                 };
             }
 
+            // If this driver opts in to Agent pipeline, reuse Agent flow for identical UX
+            if (entry.useAgentPipeline) {
+                if (!agentSessionId) {
+                    appendSystemMessage('[Agent] Session not ready yet. Switch to the Agent tab again to initialize.', true);
+                    return false;
+                }
+                const systemPrompt = entry.systemPromptFactory ? entry.systemPromptFactory() : undefined;
+                return await startAgentPrompt({ rawInput: prompt, prompt, systemPrompt });
+            }
+
             const userMessage: Types.Message = {
                 id: nextMessageId(),
                 role: 'user',
@@ -783,7 +794,7 @@ const App = () => {
     );
 
     const startAgentPrompt = useCallback(async (job: AgentPromptJob): Promise<boolean> => {
-        const { rawInput, prompt, pendingMessageIds } = job;
+        const { rawInput, prompt, pendingMessageIds, systemPrompt } = job;
 
         const userMessageId = nextMessageId();
         const userMessage: Types.Message = {
@@ -812,6 +823,7 @@ const App = () => {
                 prompt,
                 agentSessionId: agentSessionId!,
                 sessionInitialized: agentSessionInitializedRef.current,
+                systemPrompt,
             });
 
             agentSessionInitializedRef.current = true;

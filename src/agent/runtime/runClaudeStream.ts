@@ -38,6 +38,10 @@ export type RunClaudeStreamParams = {
         cwd?: string;
         canUseTool: (toolName: string, input: Record<string, unknown>, options: { signal: AbortSignal; suggestions?: PermissionUpdate[] }) => Promise<unknown>;
         agents?: Record<string, unknown>;
+        systemPrompt?: string | { type: 'preset'; preset: 'claude_code'; append?: string };
+        allowedTools?: string[];
+        disallowedTools?: string[];
+        permissionMode?: string;
     };
     log?: (message: string) => void;
     callbacks?: RunClaudeStreamCallbacks;
@@ -76,6 +80,19 @@ export const runClaudeStream = async ({
 
     if (queryOptions.agents) {
         (options as Record<string, unknown>).agents = queryOptions.agents;
+    }
+
+    if (queryOptions.systemPrompt) {
+        (options as Record<string, unknown>).systemPrompt = queryOptions.systemPrompt;
+    }
+    if (queryOptions.allowedTools) {
+        (options as Record<string, unknown>).allowedTools = queryOptions.allowedTools;
+    }
+    if (queryOptions.disallowedTools) {
+        (options as Record<string, unknown>).disallowedTools = queryOptions.disallowedTools;
+    }
+    if (queryOptions.permissionMode) {
+        (options as Record<string, unknown>).permissionMode = queryOptions.permissionMode;
     }
 
     const result = query({

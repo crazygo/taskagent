@@ -7,6 +7,8 @@ import type { Task } from '../../task-manager.ts';
 import { Driver } from './types.ts';
 import { handlePlanReviewDo } from './plan-review-do/index.ts';
 import { handleStoryDriver } from './story/index.ts';
+import { handleUiReview } from './ui-review/index.ts';
+import { buildUiReviewSystemPrompt } from './ui-review/prompt.ts';
 
 export interface DriverSessionContext {
     id: string;
@@ -36,6 +38,10 @@ export interface DriverManifestEntry {
     handler: DriverHandler;
     requiresSession: boolean;
     isPlaceholder?: boolean;
+    // If true, use Agent pipeline (queue, placeholders, tool events) and ignore handler
+    useAgentPipeline?: boolean;
+    // Optional system prompt factory for agent pipeline
+    systemPromptFactory?: () => string;
 }
 
 const createPlaceholderHandler = (label: string): DriverHandler => {
@@ -90,31 +96,42 @@ export const DRIVER_MANIFEST: readonly DriverManifestEntry[] = [
         },
     },
     {
-        id: Driver.UX,
-        label: Driver.UX,
-        slash: 'ux',
-        description: 'UX driver · 敬请期待',
-        requiresSession: false,
-        isPlaceholder: true,
-        handler: createPlaceholderHandler(Driver.UX),
+        id: Driver.UI_REVIEW,
+        label: Driver.UI_REVIEW,
+        slash: 'ui-review',
+        description: 'UI Review · 输出 ASCII 线框 + 注释',
+        requiresSession: true,
+        // Prefer to use agent pipeline for UI Review to match visuals/queue/permissions
+        useAgentPipeline: true,
+        systemPromptFactory: () => buildUiReviewSystemPrompt(),
+        handler: createPlaceholderHandler(Driver.UI_REVIEW),
     },
     {
-        id: Driver.ARCHITECTURE,
-        label: Driver.ARCHITECTURE,
-        slash: 'architecture',
-        description: 'Architecture driver · 敬请期待',
+        id: Driver.USER_FLOW_REVIEW,
+        label: Driver.USER_FLOW_REVIEW,
+        slash: 'user-flow-review',
+        description: 'User Flow Review · 敬请期待',
         requiresSession: false,
         isPlaceholder: true,
-        handler: createPlaceholderHandler(Driver.ARCHITECTURE),
+        handler: createPlaceholderHandler(Driver.USER_FLOW_REVIEW),
     },
     {
-        id: Driver.TECH_PLAN,
-        label: Driver.TECH_PLAN,
-        slash: 'tech-plan',
-        description: 'Tech Plan driver · 敬请期待',
+        id: Driver.LOGIC_REVIEW,
+        label: Driver.LOGIC_REVIEW,
+        slash: 'logic-review',
+        description: 'Logic Review · 敬请期待',
         requiresSession: false,
         isPlaceholder: true,
-        handler: createPlaceholderHandler(Driver.TECH_PLAN),
+        handler: createPlaceholderHandler(Driver.LOGIC_REVIEW),
+    },
+    {
+        id: Driver.DATA_REVIEW,
+        label: Driver.DATA_REVIEW,
+        slash: 'data-review',
+        description: 'Data Review · 敬请期待',
+        requiresSession: false,
+        isPlaceholder: true,
+        handler: createPlaceholderHandler(Driver.DATA_REVIEW),
     },
 ] as const;
 
