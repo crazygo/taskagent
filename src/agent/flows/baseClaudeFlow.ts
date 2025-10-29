@@ -18,6 +18,9 @@ export interface BaseClaudeFlowRunArgs {
     agentSessionId: string;
     sessionInitialized: boolean;
     systemPrompt?: string;
+    allowedTools?: string[];
+    disallowedTools?: string[];
+    permissionMode?: string;
 }
 
 export interface BaseClaudeFlow {
@@ -33,7 +36,7 @@ export const createBaseClaudeFlow = ({
     canUseTool,
     workspacePath,
 }: BaseClaudeFlowDependencies): BaseClaudeFlow => {
-    const handleUserInput = async ({ prompt, agentSessionId, sessionInitialized, systemPrompt }: BaseClaudeFlowRunArgs): Promise<boolean> => {
+    const handleUserInput = async ({ prompt, agentSessionId, sessionInitialized, systemPrompt, allowedTools, disallowedTools, permissionMode }: BaseClaudeFlowRunArgs): Promise<boolean> => {
         const emitAssistantText = (text: string) => {
             if (!text) {
                 return;
@@ -101,6 +104,9 @@ export const createBaseClaudeFlow = ({
                 cwd: workspacePath,
                 canUseTool,
                 systemPrompt,
+                allowedTools,
+                disallowedTools,
+                permissionMode,
             },
             callbacks: {
                 onTextDelta: emitAssistantText,

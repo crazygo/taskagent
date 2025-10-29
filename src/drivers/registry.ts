@@ -7,7 +7,6 @@ import type { Task } from '../../task-manager.ts';
 import { Driver } from './types.ts';
 import { handlePlanReviewDo } from './plan-review-do/index.ts';
 import { handleStoryDriver } from './story/index.ts';
-import { handleUiReview } from './ui-review/index.ts';
 import { buildUiReviewSystemPrompt } from './ui-review/prompt.ts';
 
 export interface DriverSessionContext {
@@ -40,8 +39,12 @@ export interface DriverManifestEntry {
     isPlaceholder?: boolean;
     // If true, use Agent pipeline (queue, placeholders, tool events) and ignore handler
     useAgentPipeline?: boolean;
-    // Optional system prompt factory for agent pipeline
-    systemPromptFactory?: () => string;
+    pipelineOptions?: {
+        systemPromptFactory?: () => string;
+        allowedTools?: string[];
+        disallowedTools?: string[];
+        permissionMode?: string;
+    };
 }
 
 const createPlaceholderHandler = (label: string): DriverHandler => {
@@ -103,7 +106,11 @@ export const DRIVER_MANIFEST: readonly DriverManifestEntry[] = [
         requiresSession: true,
         // Prefer to use agent pipeline for UI Review to match visuals/queue/permissions
         useAgentPipeline: true,
-        systemPromptFactory: () => buildUiReviewSystemPrompt(),
+        pipelineOptions: {
+            systemPromptFactory: () => buildUiReviewSystemPrompt(),
+            allowedTools: ['Read', 'Grep', 'Glob'],
+            disallowedTools: ['Write', 'Edit', 'Bash', 'NotebookEdit', 'FileWrite', 'FileEdit', 'TodoWrite'],
+        },
         handler: createPlaceholderHandler(Driver.UI_REVIEW),
     },
     {

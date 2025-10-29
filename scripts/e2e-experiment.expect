@@ -1,0 +1,60 @@
+#!/usr/bin/env expect -f
+
+# Simple E2E experiment powered by in-app automation steps.
+# Steps are executed inside the app via the E2E_AUTOMATION_STEPS env variable:
+#   1) wait for startup
+#   2) simulate Ctrl+N to switch to Agent tab
+#   3) submit "list my files" and wait for the stream to finish
+#   4) exit automatically
+
+set timeout 60
+log_user 1
+match_max 100000
+exp_internal 0
+
+proc ts {} {
+  return [clock format [clock seconds] -format {%Y-%m-%d %H:%M:%S}]
+}
+
+set log_path [file join [pwd] e2e-experiment.log]
+log_file -a $log_path
+
+set default_workspace "/Users/admin/Codespaces/aminer/z-work"
+if {[llength $argv] >= 1} {
+  set workspace [lindex $argv 0]
+} elseif {[info exists env(E2E_WORKSPACE)]} {
+  set workspace $env(E2E_WORKSPACE)
+} else {
+  set workspace $default_workspace
+}
+
+set automation_steps {[
+  {"action":"wait","ms":500},
+  {"action":"press","key":"ctrl+n","delayMs":300},
+  {"action":"submit","text":"list my files","waitForStream":true,"timeoutMs":30000,"postDelayMs":200},
+  {"action":"exit","code":0,"delayMs":300}
+]}
+
+puts "\[E2E] [ts] Using workspace: $workspace"
+puts "\[E2E] [ts] Working dir: [pwd]"
+puts "\[E2E] [ts] Automation steps: $automation_steps"
+
+set env(E2E_SENTINEL) "1"
+set env(E2E_AUTOMATION_STEPS) $automation_steps
+
+spawn yarn start -- --workspace $workspace
+puts "\[E2E] [ts] Spawned 'yarn start -- --workspace $workspace' with automation"
+
+expect {
+  eof {
+    puts "\n\[E2E] [ts] Process exited (automation complete)."
+  }
+  timeout {
+    puts "\n\[E2E] [ts] Timeout waiting for process exit"
+    exit 1
+  }
+}
+
+puts "\[E2E] [ts] Transcript saved to: $log_path"
+
+

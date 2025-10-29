@@ -9,6 +9,7 @@ import { addLog } from './src/logger.ts';
 import { createBaseClaudeFlow } from './src/agent/flows/baseClaudeFlow.ts';
 import { loadCliConfig } from './src/cli/config.ts';
 import type { Task } from './task-manager.ts';
+import { handlePlanReviewDo } from './src/drivers/plan-review-do/index.ts';
 import { ensureAiProvider, type AiChatProvider } from './src/config/ai-provider.ts';
 import * as Types from './src/types.ts';
 import { ChatPanel } from './src/components/ChatPanel.tsx';
@@ -43,11 +44,19 @@ const BASE_COMMANDS: readonly { name: string; description: string }[] = [
     { name: 'newsession', description: 'Start a fresh Claude agent session' },
 ];
 
+type AgentTurnOverrides = {
+    systemPrompt?: string;
+    allowedTools?: string[];
+    disallowedTools?: string[];
+    permissionMode?: string;
+};
+
 type AgentPromptJob = {
     rawInput: string;
     prompt: string;
+    sessionId: string;
     pendingMessageIds?: number[];
-    systemPrompt?: string;
+    overrides?: AgentTurnOverrides;
 };
 
 type AgentPermissionRequest = {
@@ -60,6 +69,13 @@ type AgentPermissionRequest = {
     cancel: () => void;
     placeholderMessageId?: number;
 };
+
+type E2EAutomationStep =
+    | { action: 'wait'; ms?: number }
+    | { action: 'press'; key: 'ctrl+n'; delayMs?: number; repeat?: number }
+    | { action: 'switchTab'; tab: string; delayMs?: number }
+    | { action: 'submit'; text: string; waitForStream?: boolean; timeoutMs?: number; preDelayMs?: number; postDelayMs?: number }
+    | { action: 'exit'; code?: number; delayMs?: number };
 
 type AgentPermissionDecision =
     | { kind: 'allow'; always?: boolean }
@@ -189,6 +205,23 @@ const App = () => {
     }
 
     const nonInteractiveInput = bootstrapConfig.prompt;
+    const e2eSteps = useMemo<E2EAutomationStep[] | null>(() => {
+        const raw = process.env.E2E_AUTOMATION_STEPS;
+        if (!raw) {
+            return null;
+        }
+        try {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+                return parsed.filter(step => step && typeof step === 'object') as E2EAutomationStep[];
+            }
+            addLog('[E2E] E2E_AUTOMATION_STEPS must be a JSON array.');
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            addLog(`[E2E] Failed to parse E2E_AUTOMATION_STEPS: ${message}`);
+        }
+        return null;
+    }, []);
 
     // --- STATE ---
     const [frozenMessages, setFrozenMessages] = useState<Types.Message[]>([]);
@@ -202,6 +235,13 @@ const App = () => {
     const [, setWorkspaceSettings] = useState<WorkspaceSettings | null>(null);
     const [isAgentStreaming, setIsAgentStreaming] = useState(false);
     const { tasks, createTask, waitTask } = useTaskStore();
+
+    const automationRanRef = useRef(false);
+    const handleSubmitRef = useRef<((input: string) => Promise<boolean>) | null>(null);
+    const tasksRef = useRef(tasks);
+    useEffect(() => {
+        tasksRef.current = tasks;
+    }, [tasks]);
 
     // 从 CLI 参数初始化 Driver（在 bootstrapConfig 确定后）
     useEffect(() => {
@@ -228,6 +268,16 @@ const App = () => {
         onActiveMessagesChange: setActiveMessages,
         onFrozenMessagesChange: setFrozenMessages,
     });
+
+    const selectedTabRef = useRef(selectedTab);
+    useEffect(() => {
+        selectedTabRef.current = selectedTab;
+    }, [selectedTab]);
+
+    const isStreamingRef = useRef(isStreaming);
+    useEffect(() => {
+        isStreamingRef.current = isStreaming;
+    }, [isStreaming]);
 
     const prevTasksLengthRef = useRef(tasks.length);
     const agentWorkspaceStatusRef = useRef<{ missingNotified: boolean; errorNotified: boolean }>({
@@ -669,8 +719,15 @@ const App = () => {
 
     // 顶层仅做记录：Ctrl+N 何时被捕获（不改变行为，便于与 InputBar 日志对照）
     useInput((input, key) => {
+        // Debug: log ALL input at top level to diagnose Expect
+        if (process.env.E2E_SENTINEL && (input || key.ctrl || key.shift || key.meta || key.return || key.tab)) {
+            const inputCode = input ? input.charCodeAt(0) : null;
+            addLog(`[App] RAW INPUT: input="${input}" charCode=${inputCode} ctrl=${key.ctrl} shift=${key.shift} meta=${key.meta} tab=${key.tab} return=${key.return}`);
+        }
         if (key.ctrl && (input === 'n' || input === 'N')) {
-            addLog(`[App] Ctrl+N detected (focusedControl=${focusedControl}, isCommandMenuShown=${isCommandMenuShown})`);
+            if (process.env.E2E_SENTINEL) {
+                addLog(`[App] Ctrl+N detected (focusedControl=${focusedControl}, isCommandMenuShown=${isCommandMenuShown})`);
+            }
         }
     });
 
@@ -722,6 +779,132 @@ const App = () => {
         return await createNewAgentSession();
     }, [agentSessionId, createNewAgentSession]);
 
+    const startAgentPrompt = useCallback(async (job: AgentPromptJob): Promise<boolean> => {
+        const { rawInput, prompt, pendingMessageIds, overrides, sessionId } = job;
+
+        const userMessageId = nextMessageId();
+        const userMessage: Types.Message = {
+            id: userMessageId,
+            role: 'user',
+            content: rawInput,
+        };
+
+        setActiveMessages(prev => {
+            const retainedPending = prev.filter(msg =>
+                msg.isPending && !(pendingMessageIds?.includes(msg.id))
+            );
+            return [...retainedPending, userMessage];
+        });
+
+        // Finalize the user message so it's added to the history
+        finalizeMessageById(userMessageId);
+
+        setIsAgentStreaming(true);
+        addLog(`[Agent] Sending prompt with session ${sessionId}: ${prompt.replace(/\s+/g, ' ').slice(0, 120)}`);
+
+        try {
+            const activeAgentFlow = agentFlowRegistry.default;
+
+            await activeAgentFlow.handleUserInput({
+                prompt,
+                agentSessionId: sessionId,
+                sessionInitialized: agentSessionInitializedRef.current,
+                systemPrompt: overrides?.systemPrompt,
+                allowedTools: overrides?.allowedTools,
+                disallowedTools: overrides?.disallowedTools,
+                permissionMode: overrides?.permissionMode,
+            });
+
+            agentSessionInitializedRef.current = true;
+            return true;
+
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            const details = formatErrorForDisplay(error);
+            const combinedMessage = details ? `${message}\n${details}` : message;
+            addLog(`[Agent] Error: ${combinedMessage}`);
+            // Finalize the user message on error as well
+            finalizeMessageById(userMessageId);
+            appendSystemMessage(`[Agent] Error: ${combinedMessage}`, true);
+            return false;
+        } finally {
+            setIsAgentStreaming(false);
+            if (agentPendingQueueRef.current.length > 0) {
+                const nextJob = agentPendingQueueRef.current.shift();
+                if (nextJob) {
+                    void startAgentPrompt(nextJob);
+                }
+            }
+        }
+    }, [
+        agentSessionId,
+        agentFlowRegistry,
+        appendSystemMessage,
+        nextMessageId,
+        setActiveMessages,
+        finalizeMessageById,
+    ]);
+
+    const runAgentTurn = useCallback(async (rawInput: string, overrides?: AgentTurnOverrides, sessionIdHint?: string): Promise<boolean> => {
+        const prompt = rawInput.trim();
+        if (prompt.length === 0) {
+            return false;
+        }
+
+        const activeSessionId = agentSessionId ?? sessionIdHint ?? null;
+
+        if (!activeSessionId) {
+            appendSystemMessage('[Agent] Session not ready yet. Switch to the Agent tab again to initialize.', true);
+            return false;
+        }
+
+        const isBusy = isAgentStreaming || agentPendingQueueRef.current.length > 0;
+
+        if (isBusy) {
+            const pendingUserMessageId = nextMessageId();
+            const pendingAssistantMessageId = nextMessageId();
+
+            const pendingUserMessage: Types.Message = {
+                id: pendingUserMessageId,
+                role: 'user',
+                content: rawInput,
+                isPending: true,
+            };
+
+            const pendingAssistantMessage: Types.Message = {
+                id: pendingAssistantMessageId,
+                role: 'assistant',
+                content: '',
+                reasoning: '',
+                isPending: true,
+            };
+
+            setActiveMessages(prev => [...prev.filter(msg => msg.isPending), pendingUserMessage, pendingAssistantMessage]);
+
+            agentPendingQueueRef.current.push({
+                rawInput,
+                prompt,
+                pendingMessageIds: [pendingUserMessageId, pendingAssistantMessageId],
+                sessionId: activeSessionId,
+                overrides,
+            });
+
+            appendSystemMessage(
+                `[Agent] Still processing previous request. Your message has been queued (${agentPendingQueueRef.current.length} pending).`
+            );
+            return true;
+        }
+
+        return await startAgentPrompt({ rawInput, prompt, overrides, sessionId: activeSessionId });
+    }, [
+        agentSessionId,
+        appendSystemMessage,
+        isAgentStreaming,
+        nextMessageId,
+        setActiveMessages,
+        startAgentPrompt,
+    ]);
+
     const runDriverEntry = useCallback(
         async (entry: DriverManifestEntry, prompt: string): Promise<boolean> => {
             let sessionContext = undefined as { id: string; initialized: boolean; markInitialized: () => void } | undefined;
@@ -743,14 +926,18 @@ const App = () => {
                 };
             }
 
-            // If this driver opts in to Agent pipeline, reuse Agent flow for identical UX
             if (entry.useAgentPipeline) {
-                if (!agentSessionId) {
-                    appendSystemMessage('[Agent] Session not ready yet. Switch to the Agent tab again to initialize.', true);
-                    return false;
-                }
-                const systemPrompt = entry.systemPromptFactory ? entry.systemPromptFactory() : undefined;
-                return await startAgentPrompt({ rawInput: prompt, prompt, systemPrompt });
+                const overrides: AgentTurnOverrides | undefined = entry.pipelineOptions
+                    ? {
+                          systemPrompt: entry.pipelineOptions.systemPromptFactory?.(),
+                          allowedTools: entry.pipelineOptions.allowedTools,
+                          disallowedTools: entry.pipelineOptions.disallowedTools,
+                          permissionMode: entry.pipelineOptions.permissionMode,
+                      }
+                    : undefined;
+
+                addLog(`[Driver] Dispatching to ${entry.label} via agent pipeline`);
+                return await runAgentTurn(prompt, overrides, sessionContext?.id ?? agentSessionId ?? undefined);
             }
 
             const userMessage: Types.Message = {
@@ -786,131 +973,14 @@ const App = () => {
             ensureAgentSession,
             finalizeMessageById,
             handleAgentPermissionRequest,
+            runAgentTurn,
+            agentSessionId,
             nextMessageId,
             setActiveMessages,
             setFrozenMessages,
             waitTask,
         ]
     );
-
-    const startAgentPrompt = useCallback(async (job: AgentPromptJob): Promise<boolean> => {
-        const { rawInput, prompt, pendingMessageIds, systemPrompt } = job;
-
-        const userMessageId = nextMessageId();
-        const userMessage: Types.Message = {
-            id: userMessageId,
-            role: 'user',
-            content: rawInput,
-        };
-
-        setActiveMessages(prev => {
-            const retainedPending = prev.filter(msg =>
-                msg.isPending && !(pendingMessageIds?.includes(msg.id))
-            );
-            return [...retainedPending, userMessage];
-        });
-
-        // Finalize the user message so it's added to the history
-        finalizeMessageById(userMessageId);
-
-        setIsAgentStreaming(true);
-        addLog(`[Agent] Sending prompt with session ${agentSessionId}: ${prompt.replace(/\s+/g, ' ').slice(0, 120)}`);
-
-        try {
-            const activeAgentFlow = agentFlowRegistry.default;
-
-            await activeAgentFlow.handleUserInput({
-                prompt,
-                agentSessionId: agentSessionId!,
-                sessionInitialized: agentSessionInitializedRef.current,
-                systemPrompt,
-            });
-
-            agentSessionInitializedRef.current = true;
-            return true;
-
-        } catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
-            const details = formatErrorForDisplay(error);
-            const combinedMessage = details ? `${message}\n${details}` : message;
-            addLog(`[Agent] Error: ${combinedMessage}`);
-            // Finalize the user message on error as well
-            finalizeMessageById(userMessageId);
-            appendSystemMessage(`[Agent] Error: ${combinedMessage}`, true);
-            return false;
-        } finally {
-            setIsAgentStreaming(false);
-            if (agentPendingQueueRef.current.length > 0) {
-                const nextJob = agentPendingQueueRef.current.shift();
-                if (nextJob) {
-                    void startAgentPrompt(nextJob);
-                }
-            }
-        }
-    }, [
-        agentSessionId,
-        agentFlowRegistry,
-        appendSystemMessage,
-        nextMessageId,
-        setActiveMessages,
-        finalizeMessageById,
-    ]);
-
-    const runAgentTurn = useCallback(async (rawInput: string): Promise<boolean> => {
-        const prompt = rawInput.trim();
-        if (prompt.length === 0) {
-            return false;
-        }
-
-        if (!agentSessionId) {
-            appendSystemMessage('[Agent] Session not ready yet. Switch to the Agent tab again to initialize.', true);
-            return false;
-        }
-
-        const isBusy = isAgentStreaming || agentPendingQueueRef.current.length > 0;
-
-        if (isBusy) {
-            const pendingUserMessageId = nextMessageId();
-            const pendingAssistantMessageId = nextMessageId();
-
-            const pendingUserMessage: Types.Message = {
-                id: pendingUserMessageId,
-                role: 'user',
-                content: rawInput,
-                isPending: true,
-            };
-
-            const pendingAssistantMessage: Types.Message = {
-                id: pendingAssistantMessageId,
-                role: 'assistant',
-                content: '',
-                reasoning: '',
-                isPending: true,
-            };
-
-            setActiveMessages(prev => [...prev.filter(msg => msg.isPending), pendingUserMessage, pendingAssistantMessage]);
-
-            agentPendingQueueRef.current.push({
-                rawInput,
-                prompt,
-                pendingMessageIds: [pendingUserMessageId, pendingAssistantMessageId],
-            });
-
-            appendSystemMessage(
-                `[Agent] Still processing previous request. Your message has been queued (${agentPendingQueueRef.current.length} pending).`
-            );
-            return true;
-        }
-
-        return await startAgentPrompt({ rawInput, prompt });
-    }, [
-        agentSessionId,
-        appendSystemMessage,
-        isAgentStreaming,
-        nextMessageId,
-        setActiveMessages,
-        startAgentPrompt,
-    ]);
 
     const handleSubmit = useCallback(async (userInput: string): Promise<boolean> => {
         addLog('--- New Submission ---');
@@ -927,10 +997,6 @@ const App = () => {
 
         if (trimmedInput === '/newsession') {
             setInputValue('');
-            if (selectedTab !== Driver.AGENT) {
-                appendSystemMessage('The /newsession command is only available in the Agent tab.', true);
-                return false;
-            }
             return (await createNewAgentSession()) !== null;
         }
 
@@ -1062,6 +1128,10 @@ const App = () => {
     ]);
 
     useEffect(() => {
+        handleSubmitRef.current = handleSubmit;
+    }, [handleSubmit]);
+
+    useEffect(() => {
         if (!nonInteractiveInput || hasProcessedNonInteractiveRef.current || __nonInteractiveSubmittedOnce) {
             return;
         }
@@ -1087,6 +1157,156 @@ const App = () => {
                 }, 100);
             });
     }, [handleSubmit, nonInteractiveInput, selectedTab, bootstrapConfig?.driver]);
+
+    useEffect(() => {
+        if (!e2eSteps || e2eSteps.length === 0) {
+            return;
+        }
+        if (nonInteractiveInput) {
+            addLog('[E2E] Automation skipped: nonInteractiveInput already provided.');
+            return;
+        }
+        if (automationRanRef.current) {
+            return;
+        }
+        automationRanRef.current = true;
+
+        let cancelled = false;
+
+        const sleep = (ms = 0) =>
+            new Promise<void>(resolve => {
+                const duration = Math.max(0, ms);
+                setTimeout(() => {
+                    if (!cancelled) {
+                        resolve();
+                    }
+                }, duration);
+            });
+
+        const waitForStreamIdle = async (timeoutMs = 30000) => {
+            const started = Date.now();
+            while (!cancelled) {
+                if (!isStreamingRef.current && !isProcessingQueueRef.current) {
+                    return true;
+                }
+                if (Date.now() - started > timeoutMs) {
+                    addLog(`[E2E] waitForStreamIdle timed out after ${timeoutMs}ms`);
+                    return false;
+                }
+                await sleep(100);
+            }
+            return false;
+        };
+
+        const getAllTabs = () => {
+            const taskList = tasksRef.current ?? [];
+            return [
+                ...STATIC_TABS,
+                ...taskList.map((_task, index: number) => `Task ${index + 1}`),
+            ];
+        };
+
+        (async () => {
+            addLog(`[E2E] Automation starting with ${e2eSteps.length} steps.`);
+            for (const step of e2eSteps) {
+                if (cancelled) {
+                    break;
+                }
+
+                switch (step.action) {
+                    case 'wait': {
+                        const ms = Math.max(0, step.ms ?? 0);
+                        addLog(`[E2E] wait ${ms}ms`);
+                        await sleep(ms);
+                        break;
+                    }
+                    case 'press': {
+                        const key = step.key.toLowerCase();
+                        if (key === 'ctrl+n') {
+                            const repeat = Math.max(1, step.repeat ?? 1);
+                            for (let count = 0; count < repeat && !cancelled; count++) {
+                                const tabs = getAllTabs();
+                                if (tabs.length === 0) {
+                                    addLog('[E2E] press ctrl+n skipped (no tabs available)');
+                                    break;
+                                }
+                                const current = selectedTabRef.current ?? tabs[0];
+                                const currentIndex = tabs.indexOf(current);
+                                const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % tabs.length : 0;
+                                const nextTab = tabs[nextIndex]!;
+                                addLog(`[E2E] press ctrl+n -> ${nextTab}`);
+                                setSelectedTab(nextTab);
+                                await sleep(step.delayMs ?? 200);
+                            }
+                        } else {
+                            addLog(`[E2E] Unsupported press key: ${step.key}`);
+                        }
+                        break;
+                    }
+                    case 'switchTab': {
+                        const target = step.tab?.toLowerCase?.();
+                        const tabs = getAllTabs();
+                        if (!target) {
+                            addLog('[E2E] switchTab step missing tab value');
+                            break;
+                        }
+                        const found = tabs.find(tab => tab.toLowerCase() === target);
+                        if (found) {
+                            addLog(`[E2E] switchTab -> ${found}`);
+                            setSelectedTab(found);
+                            await sleep(step.delayMs ?? 200);
+                        } else {
+                            addLog(`[E2E] switchTab: tab "${step.tab}" not found in [${tabs.join(', ')}]`);
+                        }
+                        break;
+                    }
+                    case 'submit': {
+                        const message = step.text ?? '';
+                        addLog(`[E2E] submit -> ${JSON.stringify(message)}`);
+                        setInputValue(message);
+                        await sleep(step.preDelayMs ?? 50);
+                        const submitFn = handleSubmitRef.current;
+                        if (!submitFn) {
+                            addLog('[E2E] submit skipped: handleSubmit not available');
+                            break;
+                        }
+                        const success = await submitFn(message);
+                        addLog(`[E2E] submit result=${success}`);
+                        if (!cancelled && step.waitForStream !== false) {
+                            const ok = await waitForStreamIdle(step.timeoutMs ?? 30000);
+                            addLog(`[E2E] waitForStream result=${ok}`);
+                        }
+                        if (step.postDelayMs && step.postDelayMs > 0) {
+                            await sleep(step.postDelayMs);
+                        }
+                        break;
+                    }
+                    case 'exit': {
+                        const delay = Math.max(0, step.delayMs ?? 500);
+                        const code = step.code ?? 0;
+                        addLog(`[E2E] exit scheduled in ${delay}ms with code ${code}`);
+                        setTimeout(() => {
+                            addLog(`[E2E] exit now with code ${code}`);
+                            process.exit(code);
+                        }, delay);
+                        cancelled = true;
+                        break;
+                    }
+                    default: {
+                        addLog(`[E2E] Unknown automation step: ${JSON.stringify(step)}`);
+                        break;
+                    }
+                }
+            }
+        })().catch(error => {
+            const message = error instanceof Error ? error.stack ?? error.message : String(error);
+            addLog(`[E2E] Automation crashed: ${message}`);
+        });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [e2eSteps, nonInteractiveInput]);
 
     // --- RENDER ---
     const staticTabs = STATIC_TABS;
@@ -1157,7 +1377,34 @@ const App = () => {
         </Box>
     );
 };// --- Render ---
-render(<App />);
+// Force stdin to be enabled even under Expect/PTY for E2E testing
+const { stdin, stdout, stderr } = process;
+
+// Log stdin state for debugging
+addLog(`[Render] stdin.isTTY=${stdin.isTTY}, stdin.isRaw=${stdin.isRaw}`);
+
+// Ensure stdin is in raw mode for Ink (required for useInput to work)
+if (stdin.isTTY && !stdin.isRaw) {
+    addLog('[Render] Setting stdin to raw mode');
+    stdin.setRawMode(true);
+}
+
+// For E2E testing: disable stdout buffering for real-time display
+if (process.env.E2E_SENTINEL) {
+    addLog('[Render] E2E mode: disabling stdout buffering');
+    if (stdout.isTTY && typeof (stdout as any).setNoDelay === 'function') {
+        (stdout as any).setNoDelay(true);
+    }
+}
+
+render(<App />, {
+    stdin,
+    stdout,
+    stderr,
+    debug: false,
+    exitOnCtrlC: true,
+    patchConsole: false,
+});
 
 // --- Cleanup on exit ---
 process.on('exit', () => {

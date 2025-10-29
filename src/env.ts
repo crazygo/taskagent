@@ -1,6 +1,16 @@
 import dotenv from 'dotenv';
 
+// Load local .env.local if present
 dotenv.config({ path: '.env.local' });
+
+// Fallback: load from ~/.askman/.env.local without overriding any variables already set
+try {
+  const homeDir = process.env.HOME || process.env.USERPROFILE;
+  if (homeDir) {
+    const fallbackPath = `${homeDir}/.askman/.env.local`;
+    dotenv.config({ path: fallbackPath, override: false });
+  }
+} catch {}
 
 export const loadEnv = () => {
   const missingEnvVars: string[] = [];
