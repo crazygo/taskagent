@@ -34,10 +34,11 @@ Your primary role is to act as an interactive CLI agent for software engineering
 - **[Memory Systems Analyst](memory/AGENTS.md)**: Use for tasks involving the analysis of conversations or documents to extract and store structured memories (events, facts, skills).
 - **[Source Code Conventions](src/AGENTS.md)**: Implementation-level guidance for TUI streaming, message/state management, error boundaries, performance, and Ink UI.
 
-## Document Placement
+## Document & Memory Placement
 
-Analysis documents, temporary documents, and plan documents generated during conversations should be placed in the `memory/docs` directory.
-- Filenames should use a timestamp prefix in the format `yyyy-mm-dd-hh-mm-{document-name}.md`
+- **Chat Memory Store (`memory/chat/`)**: See [memory/chat/AGENTS.md](memory/chat/AGENTS.md) for details.
+- **Docs Memory Store (`memory/docs/`)**: See [memory/docs/AGENTS.md](memory/docs/AGENTS.md) for details.
+- **Serena MCP Named Memories**: Managed via MCP tools (`write_memory`, `read_memory`, `list_memories`, `delete_memory`). Follow each tool's definition for proper usage.
 
 ## C4 definition
 - C4 Level 1: System Context and User Interactions
