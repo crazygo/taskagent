@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { render, Box, Text, useInput } from 'ink';
 import { randomUUID } from 'crypto';
 import { inspect } from 'util';
-import { type PermissionUpdate, type PermissionResult } from '@anthropic-ai/claude-agent-sdk';
+import { type AgentDefinition, type PermissionUpdate, type PermissionResult } from '@anthropic-ai/claude-agent-sdk';
 
 import { addLog } from './src/logger.ts';
 import { createBaseClaudeFlow } from './src/agent/flows/baseClaudeFlow.ts';
@@ -28,6 +28,8 @@ import {
     getDriverCommandEntries,
     type DriverManifestEntry,
 } from './src/drivers/registry.ts';
+import { buildStorySystemPrompt, buildStoryAgentsConfig } from './src/drivers/story/prompt.ts';
+import { prepareStoryInput } from './src/drivers/story/utils.ts';
 import { closeTaskLogger } from './src/task-logger.ts';
 import { loadWorkspaceSettings, writeWorkspaceSettings, type WorkspaceSettings } from './src/workspace/settings.ts';
 // Guard to prevent double submission in dev double-mount scenarios
@@ -49,6 +51,7 @@ type AgentTurnOverrides = {
     allowedTools?: string[];
     disallowedTools?: string[];
     permissionMode?: string;
+    agents?: Record<string, AgentDefinition>;
 };
 
 type AgentPromptJob = {
@@ -57,6 +60,7 @@ type AgentPromptJob = {
     sessionId: string;
     pendingMessageIds?: number[];
     overrides?: AgentTurnOverrides;
+    flowId?: string;
 };
 
 type AgentPermissionRequest = {
@@ -585,6 +589,7 @@ const App = () => {
     const agentFlowRegistry = useMemo(
         () => ({
             default: baseClaudeFlow,
+            story: baseClaudeFlow,
         }),
         [baseClaudeFlow]
     );
@@ -780,7 +785,7 @@ const App = () => {
     }, [agentSessionId, createNewAgentSession]);
 
     const startAgentPrompt = useCallback(async (job: AgentPromptJob): Promise<boolean> => {
-        const { rawInput, prompt, pendingMessageIds, overrides, sessionId } = job;
+        const { rawInput, prompt, pendingMessageIds, overrides, sessionId, flowId } = job;
 
         const userMessageId = nextMessageId();
         const userMessage: Types.Message = {
@@ -803,7 +808,8 @@ const App = () => {
         addLog(`[Agent] Sending prompt with session ${sessionId}: ${prompt.replace(/\s+/g, ' ').slice(0, 120)}`);
 
         try {
-            const activeAgentFlow = agentFlowRegistry.default;
+            const activeAgentFlow =
+                (flowId && agentFlowRegistry[flowId]) ?? agentFlowRegistry.default;
 
             await activeAgentFlow.handleUserInput({
                 prompt,
@@ -813,6 +819,7 @@ const App = () => {
                 allowedTools: overrides?.allowedTools,
                 disallowedTools: overrides?.disallowedTools,
                 permissionMode: overrides?.permissionMode,
+                agents: overrides?.agents,
             });
 
             agentSessionInitializedRef.current = true;
@@ -836,16 +843,9 @@ const App = () => {
                 }
             }
         }
-    }, [
-        agentSessionId,
-        agentFlowRegistry,
-        appendSystemMessage,
-        nextMessageId,
-        setActiveMessages,
-        finalizeMessageById,
-    ]);
+    }, [agentFlowRegistry, appendSystemMessage, nextMessageId, setActiveMessages, finalizeMessageById]);
 
-    const runAgentTurn = useCallback(async (rawInput: string, overrides?: AgentTurnOverrides, sessionIdHint?: string): Promise<boolean> => {
+    const runAgentTurn = useCallback(async (rawInput: string, overrides?: AgentTurnOverrides, sessionIdHint?: string, flowId?: string): Promise<boolean> => {
         const prompt = rawInput.trim();
         if (prompt.length === 0) {
             return false;
@@ -887,6 +887,7 @@ const App = () => {
                 pendingMessageIds: [pendingUserMessageId, pendingAssistantMessageId],
                 sessionId: activeSessionId,
                 overrides,
+                flowId,
             });
 
             appendSystemMessage(
@@ -895,15 +896,8 @@ const App = () => {
             return true;
         }
 
-        return await startAgentPrompt({ rawInput, prompt, overrides, sessionId: activeSessionId });
-    }, [
-        agentSessionId,
-        appendSystemMessage,
-        isAgentStreaming,
-        nextMessageId,
-        setActiveMessages,
-        startAgentPrompt,
-    ]);
+        return await startAgentPrompt({ rawInput, prompt, overrides, sessionId: activeSessionId, flowId });
+    }, [agentSessionId, appendSystemMessage, isAgentStreaming, nextMessageId, setActiveMessages, startAgentPrompt]);
 
     const runDriverEntry = useCallback(
         async (entry: DriverManifestEntry, prompt: string): Promise<boolean> => {
@@ -927,17 +921,51 @@ const App = () => {
             }
 
             if (entry.useAgentPipeline) {
-                const overrides: AgentTurnOverrides | undefined = entry.pipelineOptions
-                    ? {
-                          systemPrompt: entry.pipelineOptions.systemPromptFactory?.(),
-                          allowedTools: entry.pipelineOptions.allowedTools,
-                          disallowedTools: entry.pipelineOptions.disallowedTools,
-                          permissionMode: entry.pipelineOptions.permissionMode,
-                      }
-                    : undefined;
+                let processedPrompt = prompt;
+                const baseOverrides: AgentTurnOverrides = {
+                    systemPrompt: entry.pipelineOptions?.systemPromptFactory?.(),
+                    allowedTools: entry.pipelineOptions?.allowedTools,
+                    disallowedTools: entry.pipelineOptions?.disallowedTools,
+                    permissionMode: entry.pipelineOptions?.permissionMode,
+                    agents: entry.pipelineOptions?.agents as Record<string, AgentDefinition> | undefined,
+                };
+                let flowId = entry.pipelineFlowId;
 
-                addLog(`[Driver] Dispatching to ${entry.label} via agent pipeline`);
-                return await runAgentTurn(prompt, overrides, sessionContext?.id ?? agentSessionId ?? undefined);
+                if (entry.id === Driver.STORY) {
+                    try {
+                        const storyInput = await prepareStoryInput(prompt, bootstrapConfig?.workspacePath);
+                        processedPrompt = storyInput.userPrompt;
+                        baseOverrides.systemPrompt = buildStorySystemPrompt({
+                            featureSlug: storyInput.featureSlug,
+                            storyFilePath: storyInput.absolutePath,
+                            relativePath: storyInput.relativePath,
+                        });
+                        baseOverrides.agents = buildStoryAgentsConfig({
+                            featureSlug: storyInput.featureSlug,
+                            storyFilePath: storyInput.absolutePath,
+                            relativePath: storyInput.relativePath,
+                        });
+                        flowId = flowId ?? 'story';
+                        addLog(
+                            `[StoryDriver] Prepared feature="${storyInput.featureSlug ?? '(pending)'}" path=${storyInput.relativePath ?? '(pending)'}`
+                        );
+                    } catch (error) {
+                        const message = error instanceof Error ? error.message : String(error);
+                        addLog(`[StoryDriver] Failed to prepare story input: ${message}`);
+                        appendSystemMessage(`[Story] Failed to prepare story document: ${message}`, true);
+                        return false;
+                    }
+                }
+
+                addLog(
+                    `[Driver] Dispatching to ${entry.label} via agent pipeline${flowId ? ` (flow=${flowId})` : ''}`
+                );
+                return await runAgentTurn(
+                    processedPrompt,
+                    baseOverrides,
+                    sessionContext?.id ?? agentSessionId ?? undefined,
+                    flowId
+                );
             }
 
             const userMessage: Types.Message = {

@@ -1,12 +1,11 @@
 import type { Dispatch, SetStateAction } from 'react';
 
-import type { PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
+import type { AgentDefinition, PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
 
 import type { Message } from '../types.ts';
 import type { Task } from '../../task-manager.ts';
 import { Driver } from './types.ts';
 import { handlePlanReviewDo } from './plan-review-do/index.ts';
-import { handleStoryDriver } from './story/index.ts';
 import { buildUiReviewSystemPrompt } from './ui-review/prompt.ts';
 
 export interface DriverSessionContext {
@@ -34,7 +33,6 @@ export interface DriverManifestEntry {
     label: string;
     slash: string;
     description: string;
-    handler: DriverHandler;
     requiresSession: boolean;
     isPlaceholder?: boolean;
     // If true, use Agent pipeline (queue, placeholders, tool events) and ignore handler
@@ -44,7 +42,10 @@ export interface DriverManifestEntry {
         allowedTools?: string[];
         disallowedTools?: string[];
         permissionMode?: string;
+        agents?: Record<string, AgentDefinition>;
     };
+    pipelineFlowId?: string;
+    handler: DriverHandler;
 }
 
 const createPlaceholderHandler = (label: string): DriverHandler => {
@@ -81,22 +82,15 @@ export const DRIVER_MANIFEST: readonly DriverManifestEntry[] = [
         id: Driver.STORY,
         label: Driver.STORY,
         slash: 'story',
-        description: 'Generate structured Stories document',
+        description: 'Story Orchestration · 整理、审阅并沉淀到 Markdown',
         requiresSession: true,
-        handler: async (message, context) => {
-            if (!context.session) {
-                throw new Error('Story driver requires a Claude session context.');
-            }
-            return await handleStoryDriver(message, {
-                nextMessageId: context.nextMessageId,
-                setActiveMessages: context.setActiveMessages,
-                setFrozenMessages: context.setFrozenMessages,
-                finalizeMessageById: context.finalizeMessageById,
-                canUseTool: context.canUseTool,
-                workspacePath: context.workspacePath,
-                session: context.session,
-            });
+        useAgentPipeline: true,
+        pipelineFlowId: 'story',
+        pipelineOptions: {
+            allowedTools: ['Read', 'Write', 'Edit', 'Glob', 'Grep'],
+            disallowedTools: ['Bash', 'NotebookEdit', 'TodoWrite'],
         },
+        handler: createPlaceholderHandler(Driver.STORY),
     },
     {
         id: Driver.UI_REVIEW,

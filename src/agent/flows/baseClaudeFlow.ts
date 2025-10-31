@@ -1,6 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react';
 
-import type { PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
+import type { AgentDefinition, PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
 
 import type * as Types from '../../types.ts';
 import { runClaudeStream, type ToolResultEvent, type ToolUseEvent } from '../runtime/runClaudeStream.ts';
@@ -21,6 +21,7 @@ export interface BaseClaudeFlowRunArgs {
     allowedTools?: string[];
     disallowedTools?: string[];
     permissionMode?: string;
+    agents?: Record<string, AgentDefinition>;
 }
 
 export interface BaseClaudeFlow {
@@ -36,7 +37,7 @@ export const createBaseClaudeFlow = ({
     canUseTool,
     workspacePath,
 }: BaseClaudeFlowDependencies): BaseClaudeFlow => {
-    const handleUserInput = async ({ prompt, agentSessionId, sessionInitialized, systemPrompt, allowedTools, disallowedTools, permissionMode }: BaseClaudeFlowRunArgs): Promise<boolean> => {
+    const handleUserInput = async ({ prompt, agentSessionId, sessionInitialized, systemPrompt, allowedTools, disallowedTools, permissionMode, agents }: BaseClaudeFlowRunArgs): Promise<boolean> => {
         const emitAssistantText = (text: string) => {
             if (!text) {
                 return;
@@ -107,6 +108,7 @@ export const createBaseClaudeFlow = ({
                 allowedTools,
                 disallowedTools,
                 permissionMode,
+                agents,
             },
             callbacks: {
                 onTextDelta: emitAssistantText,
