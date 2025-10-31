@@ -6,6 +6,8 @@ interface CliArgs {
   prompt?: string;
   driver?: DriverName;
   workspace?: string;
+  newSession?: boolean;
+  help?: boolean;
 }
 
 export const parseCliArgs = (): CliArgs => {
@@ -51,6 +53,25 @@ export const parseCliArgs = (): CliArgs => {
 
   const rawDriverInput = argv.d ?? argv.driver;
   const rawDriver = rawDriverInput ?? detectDriverFlag();
+
+  const coerceBoolean = (value: unknown): boolean | undefined => {
+    if (typeof value === 'boolean') {
+      return value;
+    }
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase();
+      if (['1', 'true', 'yes', 'y'].includes(normalized)) {
+        return true;
+      }
+      if (['0', 'false', 'no', 'n'].includes(normalized)) {
+        return false;
+      }
+    }
+    return undefined;
+  };
+
+  const rawNewSession = coerceBoolean(argv.newsession ?? argv['new-session']);
+  const rawHelp = coerceBoolean(argv.help ?? argv.h);
   
   const coercePrompt = () => {
     if (typeof rawPrompt === 'string') return rawPrompt;
@@ -93,11 +114,13 @@ export const parseCliArgs = (): CliArgs => {
     prompt: coercePrompt(),
     driver: coerceDriver(),
     workspace: coerceWorkspace(),
+    newSession: rawNewSession,
+    help: rawHelp,
   };
 
   try {
     addLog(
-      `[CLI] Parsed args -> driver: ${result.driver ?? 'undefined'}, prompt: ${result.prompt ?? 'undefined'}, workspace: ${result.workspace ?? 'undefined'}`
+      `[CLI] Parsed args -> driver: ${result.driver ?? 'undefined'}, prompt: ${result.prompt ?? 'undefined'}, workspace: ${result.workspace ?? 'undefined'}, newSession: ${result.newSession ?? 'undefined'}, help: ${result.help ?? 'undefined'}`
     );
   } catch {}
 

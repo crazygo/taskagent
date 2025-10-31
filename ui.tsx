@@ -291,6 +291,9 @@ const App = () => {
     const lastAnnouncedAgentSessionRef = useRef<string | null>(null);
     const agentSessionInitializedRef = useRef<boolean>(false);
     const agentPendingQueueRef = useRef<AgentPromptJob[]>([]);
+    const forcedSessionPromiseRef = useRef<Promise<string | null> | null>(null);
+    const shouldForceNewSessionRef = useRef<boolean>(bootstrapConfig?.newSession ?? false);
+    const bootstrapNewSessionAppliedRef = useRef<boolean>(false);
     const agentPermissionRequestsRef = useRef<Map<number, AgentPermissionRequest>>(new Map());
     const nextAgentPermissionIdRef = useRef<number>(1);
     const agentPermissionQueueRef = useRef<number[]>([]);
@@ -691,6 +694,9 @@ const App = () => {
         if (!agentSessionId) {
             return;
         }
+        if (shouldForceNewSessionRef.current || forcedSessionPromiseRef.current) {
+            return;
+        }
         if (lastAnnouncedAgentSessionRef.current === agentSessionId) {
             return;
         }
@@ -777,7 +783,57 @@ const App = () => {
         }
     }, [bootstrapConfig?.workspacePath, appendSystemMessage, isAgentStreaming]);
 
+    useEffect(() => {
+        if (!bootstrapConfig?.newSession) {
+            return;
+        }
+        if (bootstrapNewSessionAppliedRef.current) {
+            return;
+        }
+        if (!shouldForceNewSessionRef.current) {
+            return;
+        }
+        bootstrapNewSessionAppliedRef.current = true;
+        shouldForceNewSessionRef.current = false;
+        const promise = createNewAgentSession();
+        forcedSessionPromiseRef.current = promise;
+        promise
+            .then(sessionId => {
+                if (sessionId) {
+                    addLog(`[CLI] Started fresh Claude session ${formatSessionId(sessionId)} via --newsession flag.`);
+                } else {
+                    shouldForceNewSessionRef.current = true;
+                }
+            })
+            .catch(error => {
+                const message = error instanceof Error ? error.message : String(error);
+                addLog(`[CLI] Failed to start new session from --newsession flag: ${message}`);
+                shouldForceNewSessionRef.current = true;
+            })
+            .finally(() => {
+                if (forcedSessionPromiseRef.current === promise) {
+                    forcedSessionPromiseRef.current = null;
+                }
+            });
+    }, [bootstrapConfig?.newSession, createNewAgentSession]);
+
     const ensureAgentSession = useCallback(async (): Promise<string | null> => {
+        if (forcedSessionPromiseRef.current) {
+            const pending = await forcedSessionPromiseRef.current;
+            if (pending) {
+                return pending;
+            }
+        }
+
+        if (shouldForceNewSessionRef.current) {
+            shouldForceNewSessionRef.current = false;
+            const fresh = await createNewAgentSession();
+            if (!fresh) {
+                shouldForceNewSessionRef.current = true;
+            }
+            return fresh;
+        }
+
         if (agentSessionId) {
             return agentSessionId;
         }
