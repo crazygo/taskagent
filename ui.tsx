@@ -21,7 +21,7 @@ import type { AgentPermissionPromptState, AgentPermissionOption } from './src/co
 import { AgentPermissionPromptComponent } from './src/components/AgentPermissionPrompt.js';
 import { useTaskStore } from './src/domain/taskStore.js';
 import { useConversationStore } from './src/domain/conversationStore.js';
-import { Driver, getDriverEnum, getDriverName } from './src/drivers/types.js';
+import { Driver, getDriverEnum } from './src/drivers/types.js';
 import {
     DRIVER_TABS,
     getDriverBySlash,
