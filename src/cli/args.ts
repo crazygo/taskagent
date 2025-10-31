@@ -91,6 +91,7 @@ export const parseCliArgs = (): CliArgs => {
     }
     if (typeof rawDriver === 'boolean' && rawDriver) {
       // When minimist produces a boolean (e.g. `--story`), detectDriverFlag has already resolved it.
+      addLog('[CLI] Warning: --driver flag was passed (e.g. --story), but no driver was detected. This may indicate a bug in driver detection logic.');
       return undefined;
     }
     return undefined;
