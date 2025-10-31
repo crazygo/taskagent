@@ -11,7 +11,7 @@ const RAW_RUNTIME_STATE =
   ],\
   "dependencyTreeRoots": [\
     {\
-      "name": "taskagent",\
+      "name": "@askman-dev/task",\
       "reference": "workspace:."\
     }\
   ],\
@@ -19,7 +19,7 @@ const RAW_RUNTIME_STATE =
   "ignorePatternData": "(^(?:\\\\.yarn\\\\/sdks(?:\\\\/(?!\\\\.{1,2}(?:\\\\/|$))(?:(?:(?!(?:^|\\\\/)\\\\.{1,2}(?:\\\\/|$)).)*?)|$))$)",\
   "pnpZipBackend": "libzip",\
   "fallbackExclusionList": [\
-    ["taskagent", ["workspace:."]]\
+    ["@askman-dev/task", ["workspace:."]]\
   ],\
   "fallbackPool": [\
   ],\
@@ -28,24 +28,24 @@ const RAW_RUNTIME_STATE =
       [null, {\
         "packageLocation": "./",\
         "packageDependencies": [\
-          ["@ai-sdk/openai", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:2.0.58"],\
-          ["@anthropic-ai/claude-agent-sdk", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:0.1.30"],\
+          ["@ai-sdk/openai", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:2.0.58"],\
+          ["@anthropic-ai/claude-agent-sdk", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:0.1.30"],\
+          ["@askman-dev/task", "workspace:."],\
           ["@langchain/core", "npm:1.0.2"],\
-          ["@langchain/langgraph", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:1.0.1"],\
-          ["@openrouter/ai-sdk-provider", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#https://github.com/crazygo/ai-sdk-provider/releases/download/1.2.1/openrouter-ai-sdk-provider-1.2.1.tgz"],\
+          ["@langchain/langgraph", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:1.0.1"],\
+          ["@openrouter/ai-sdk-provider", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#https://github.com/crazygo/ai-sdk-provider/releases/download/1.2.1/openrouter-ai-sdk-provider-1.2.1.tgz"],\
           ["@types/ink", "npm:2.0.3"],\
           ["@types/ink-text-input", "npm:2.0.5"],\
           ["@types/minimist", "npm:1.2.5"],\
           ["@types/node", "npm:24.9.2"],\
           ["@types/react", "npm:19.2.2"],\
-          ["ai", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:5.0.83"],\
+          ["ai", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:5.0.83"],\
           ["concurrently", "npm:9.2.1"],\
           ["dotenv", "npm:17.2.3"],\
-          ["ink", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:6.4.0"],\
-          ["ink-text-input", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:6.0.0"],\
+          ["ink", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:6.4.0"],\
+          ["ink-text-input", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:6.0.0"],\
           ["minimist", "npm:1.2.8"],\
           ["react", "npm:19.2.0"],\
-          ["taskagent", "workspace:."],\
           ["tsx", "npm:4.20.6"],\
           ["typescript", "patch:typescript@npm%3A5.9.3#optional!builtin<compat/typescript>::version=5.9.3&hash=5786d5"],\
           ["zod", "npm:3.25.76"]\
@@ -61,12 +61,12 @@ const RAW_RUNTIME_STATE =
         ],\
         "linkType": "SOFT"\
       }],\
-      ["virtual:3aafe3028768d50f3f669a1de53f9b45ce2693119a133af13cb708e65334af86750da7ccb2397b4834ccf221b02bf9d45f294a694ae57996c7f685eeaa25d709#npm:2.0.4", {\
-        "packageLocation": "./.yarn/__virtual__/@ai-sdk-gateway-virtual-17c3b8f8a1/4/.yarn/berry/cache/@ai-sdk-gateway-npm-2.0.4-4f6f0d0336-10c0.zip/node_modules/@ai-sdk/gateway/",\
+      ["virtual:231c541d98c68e838dd5687bd592929f67cde0a0c22a487e9243063058d7ec50e266d45a668d54fca28aa9fce4273957278501b12c28b0140c2a8950d6c85b68#npm:2.0.4", {\
+        "packageLocation": "./.yarn/__virtual__/@ai-sdk-gateway-virtual-aebfd1a3f9/4/.yarn/berry/cache/@ai-sdk-gateway-npm-2.0.4-4f6f0d0336-10c0.zip/node_modules/@ai-sdk/gateway/",\
         "packageDependencies": [\
-          ["@ai-sdk/gateway", "virtual:3aafe3028768d50f3f669a1de53f9b45ce2693119a133af13cb708e65334af86750da7ccb2397b4834ccf221b02bf9d45f294a694ae57996c7f685eeaa25d709#npm:2.0.4"],\
+          ["@ai-sdk/gateway", "virtual:231c541d98c68e838dd5687bd592929f67cde0a0c22a487e9243063058d7ec50e266d45a668d54fca28aa9fce4273957278501b12c28b0140c2a8950d6c85b68#npm:2.0.4"],\
           ["@ai-sdk/provider", "npm:2.0.0"],\
-          ["@ai-sdk/provider-utils", "virtual:06ccb8951033cda38bdd1efa7e2e40dbc203f45459724e2365cd15a8577743edab85d442e658b6a0a9f23ab249a625e3a52ed02c1fcba9e490ff81bf941a87c3#npm:3.0.14"],\
+          ["@ai-sdk/provider-utils", "virtual:eaae9a1543e4383593c1a94706cfebb2bfb4aec089a4396bd19e8d2f2fb09f8a52485622b76efed2c037b80514076fd9b38278e55547f0e5c079dc853c8c5740#npm:3.0.14"],\
           ["@types/zod", null],\
           ["@vercel/oidc", "npm:3.0.3"],\
           ["zod", "npm:3.25.76"]\
@@ -86,12 +86,12 @@ const RAW_RUNTIME_STATE =
         ],\
         "linkType": "SOFT"\
       }],\
-      ["virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:2.0.58", {\
-        "packageLocation": "./.yarn/__virtual__/@ai-sdk-openai-virtual-06ccb89510/4/.yarn/berry/cache/@ai-sdk-openai-npm-2.0.58-2c0c2552a5-10c0.zip/node_modules/@ai-sdk/openai/",\
+      ["virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:2.0.58", {\
+        "packageLocation": "./.yarn/__virtual__/@ai-sdk-openai-virtual-eaae9a1543/4/.yarn/berry/cache/@ai-sdk-openai-npm-2.0.58-2c0c2552a5-10c0.zip/node_modules/@ai-sdk/openai/",\
         "packageDependencies": [\
-          ["@ai-sdk/openai", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:2.0.58"],\
+          ["@ai-sdk/openai", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:2.0.58"],\
           ["@ai-sdk/provider", "npm:2.0.0"],\
-          ["@ai-sdk/provider-utils", "virtual:06ccb8951033cda38bdd1efa7e2e40dbc203f45459724e2365cd15a8577743edab85d442e658b6a0a9f23ab249a625e3a52ed02c1fcba9e490ff81bf941a87c3#npm:3.0.14"],\
+          ["@ai-sdk/provider-utils", "virtual:eaae9a1543e4383593c1a94706cfebb2bfb4aec089a4396bd19e8d2f2fb09f8a52485622b76efed2c037b80514076fd9b38278e55547f0e5c079dc853c8c5740#npm:3.0.14"],\
           ["@types/zod", null],\
           ["zod", "npm:3.25.76"]\
         ],\
@@ -120,11 +120,11 @@ const RAW_RUNTIME_STATE =
         ],\
         "linkType": "SOFT"\
       }],\
-      ["virtual:06ccb8951033cda38bdd1efa7e2e40dbc203f45459724e2365cd15a8577743edab85d442e658b6a0a9f23ab249a625e3a52ed02c1fcba9e490ff81bf941a87c3#npm:3.0.14", {\
-        "packageLocation": "./.yarn/__virtual__/@ai-sdk-provider-utils-virtual-0816a612fe/4/.yarn/berry/cache/@ai-sdk-provider-utils-npm-3.0.14-94ac8e2464-10c0.zip/node_modules/@ai-sdk/provider-utils/",\
+      ["virtual:eaae9a1543e4383593c1a94706cfebb2bfb4aec089a4396bd19e8d2f2fb09f8a52485622b76efed2c037b80514076fd9b38278e55547f0e5c079dc853c8c5740#npm:3.0.14", {\
+        "packageLocation": "./.yarn/__virtual__/@ai-sdk-provider-utils-virtual-f3b5d003b9/4/.yarn/berry/cache/@ai-sdk-provider-utils-npm-3.0.14-94ac8e2464-10c0.zip/node_modules/@ai-sdk/provider-utils/",\
         "packageDependencies": [\
           ["@ai-sdk/provider", "npm:2.0.0"],\
-          ["@ai-sdk/provider-utils", "virtual:06ccb8951033cda38bdd1efa7e2e40dbc203f45459724e2365cd15a8577743edab85d442e658b6a0a9f23ab249a625e3a52ed02c1fcba9e490ff81bf941a87c3#npm:3.0.14"],\
+          ["@ai-sdk/provider-utils", "virtual:eaae9a1543e4383593c1a94706cfebb2bfb4aec089a4396bd19e8d2f2fb09f8a52485622b76efed2c037b80514076fd9b38278e55547f0e5c079dc853c8c5740#npm:3.0.14"],\
           ["@standard-schema/spec", "npm:1.0.0"],\
           ["@types/zod", null],\
           ["eventsource-parser", "npm:3.0.6"],\
@@ -150,16 +150,16 @@ const RAW_RUNTIME_STATE =
     ]],\
     ["@anthropic-ai/claude-agent-sdk", [\
       ["npm:0.1.30", {\
-        "packageLocation": "./.yarn/unplugged/@anthropic-ai-claude-agent-sdk-virtual-304c0846dd/node_modules/@anthropic-ai/claude-agent-sdk/",\
+        "packageLocation": "./.yarn/unplugged/@anthropic-ai-claude-agent-sdk-virtual-6545b8f377/node_modules/@anthropic-ai/claude-agent-sdk/",\
         "packageDependencies": [\
           ["@anthropic-ai/claude-agent-sdk", "npm:0.1.30"]\
         ],\
         "linkType": "SOFT"\
       }],\
-      ["virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:0.1.30", {\
-        "packageLocation": "./.yarn/unplugged/@anthropic-ai-claude-agent-sdk-virtual-304c0846dd/node_modules/@anthropic-ai/claude-agent-sdk/",\
+      ["virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:0.1.30", {\
+        "packageLocation": "./.yarn/unplugged/@anthropic-ai-claude-agent-sdk-virtual-6545b8f377/node_modules/@anthropic-ai/claude-agent-sdk/",\
         "packageDependencies": [\
-          ["@anthropic-ai/claude-agent-sdk", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:0.1.30"],\
+          ["@anthropic-ai/claude-agent-sdk", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:0.1.30"],\
           ["@img/sharp-darwin-arm64", "npm:0.33.5"],\
           ["@img/sharp-darwin-x64", "npm:0.33.5"],\
           ["@img/sharp-linux-arm", "npm:0.33.5"],\
@@ -174,6 +174,35 @@ const RAW_RUNTIME_STATE =
           "zod"\
         ],\
         "linkType": "HARD"\
+      }]\
+    ]],\
+    ["@askman-dev/task", [\
+      ["workspace:.", {\
+        "packageLocation": "./",\
+        "packageDependencies": [\
+          ["@ai-sdk/openai", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:2.0.58"],\
+          ["@anthropic-ai/claude-agent-sdk", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:0.1.30"],\
+          ["@askman-dev/task", "workspace:."],\
+          ["@langchain/core", "npm:1.0.2"],\
+          ["@langchain/langgraph", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:1.0.1"],\
+          ["@openrouter/ai-sdk-provider", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#https://github.com/crazygo/ai-sdk-provider/releases/download/1.2.1/openrouter-ai-sdk-provider-1.2.1.tgz"],\
+          ["@types/ink", "npm:2.0.3"],\
+          ["@types/ink-text-input", "npm:2.0.5"],\
+          ["@types/minimist", "npm:1.2.5"],\
+          ["@types/node", "npm:24.9.2"],\
+          ["@types/react", "npm:19.2.2"],\
+          ["ai", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:5.0.83"],\
+          ["concurrently", "npm:9.2.1"],\
+          ["dotenv", "npm:17.2.3"],\
+          ["ink", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:6.4.0"],\
+          ["ink-text-input", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:6.0.0"],\
+          ["minimist", "npm:1.2.8"],\
+          ["react", "npm:19.2.0"],\
+          ["tsx", "npm:4.20.6"],\
+          ["typescript", "patch:typescript@npm%3A5.9.3#optional!builtin<compat/typescript>::version=5.9.3&hash=5786d5"],\
+          ["zod", "npm:3.25.76"]\
+        ],\
+        "linkType": "SOFT"\
       }]\
     ]],\
     ["@cfworker/json-schema", [\
@@ -585,13 +614,13 @@ const RAW_RUNTIME_STATE =
         ],\
         "linkType": "SOFT"\
       }],\
-      ["virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:1.0.1", {\
-        "packageLocation": "./.yarn/__virtual__/@langchain-langgraph-virtual-b0abadc265/4/.yarn/berry/cache/@langchain-langgraph-npm-1.0.1-da4a2382d7-10c0.zip/node_modules/@langchain/langgraph/",\
+      ["virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:1.0.1", {\
+        "packageLocation": "./.yarn/__virtual__/@langchain-langgraph-virtual-90c2b6249e/4/.yarn/berry/cache/@langchain-langgraph-npm-1.0.1-da4a2382d7-10c0.zip/node_modules/@langchain/langgraph/",\
         "packageDependencies": [\
           ["@langchain/core", "npm:1.0.2"],\
-          ["@langchain/langgraph", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:1.0.1"],\
-          ["@langchain/langgraph-checkpoint", "virtual:b0abadc2650282c932800f5917ad1d001b47dd621c2d6fb604d2976fb03be4ecc7444c1c4d906c63f1d53f7756098e99a7691647d9bfa102f1e59af76b42c186#npm:1.0.0"],\
-          ["@langchain/langgraph-sdk", "virtual:b0abadc2650282c932800f5917ad1d001b47dd621c2d6fb604d2976fb03be4ecc7444c1c4d906c63f1d53f7756098e99a7691647d9bfa102f1e59af76b42c186#npm:1.0.0"],\
+          ["@langchain/langgraph", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:1.0.1"],\
+          ["@langchain/langgraph-checkpoint", "virtual:90c2b6249e5d6def5704b9e1a188adf472eaca7b3fe12550dd6117587cdaeac83949963e213b9b3d94472f06092605ee6d0895a2223b18fb202067aec64bc666#npm:1.0.0"],\
+          ["@langchain/langgraph-sdk", "virtual:90c2b6249e5d6def5704b9e1a188adf472eaca7b3fe12550dd6117587cdaeac83949963e213b9b3d94472f06092605ee6d0895a2223b18fb202067aec64bc666#npm:1.0.0"],\
           ["@types/langchain__core", null],\
           ["@types/zod", null],\
           ["@types/zod-to-json-schema", null],\
@@ -618,11 +647,11 @@ const RAW_RUNTIME_STATE =
         ],\
         "linkType": "SOFT"\
       }],\
-      ["virtual:b0abadc2650282c932800f5917ad1d001b47dd621c2d6fb604d2976fb03be4ecc7444c1c4d906c63f1d53f7756098e99a7691647d9bfa102f1e59af76b42c186#npm:1.0.0", {\
-        "packageLocation": "./.yarn/__virtual__/@langchain-langgraph-checkpoint-virtual-b1bc48b9b5/4/.yarn/berry/cache/@langchain-langgraph-checkpoint-npm-1.0.0-dbc155d41b-10c0.zip/node_modules/@langchain/langgraph-checkpoint/",\
+      ["virtual:90c2b6249e5d6def5704b9e1a188adf472eaca7b3fe12550dd6117587cdaeac83949963e213b9b3d94472f06092605ee6d0895a2223b18fb202067aec64bc666#npm:1.0.0", {\
+        "packageLocation": "./.yarn/__virtual__/@langchain-langgraph-checkpoint-virtual-1cbde746eb/4/.yarn/berry/cache/@langchain-langgraph-checkpoint-npm-1.0.0-dbc155d41b-10c0.zip/node_modules/@langchain/langgraph-checkpoint/",\
         "packageDependencies": [\
           ["@langchain/core", "npm:1.0.2"],\
-          ["@langchain/langgraph-checkpoint", "virtual:b0abadc2650282c932800f5917ad1d001b47dd621c2d6fb604d2976fb03be4ecc7444c1c4d906c63f1d53f7756098e99a7691647d9bfa102f1e59af76b42c186#npm:1.0.0"],\
+          ["@langchain/langgraph-checkpoint", "virtual:90c2b6249e5d6def5704b9e1a188adf472eaca7b3fe12550dd6117587cdaeac83949963e213b9b3d94472f06092605ee6d0895a2223b18fb202067aec64bc666#npm:1.0.0"],\
           ["@types/langchain__core", null],\
           ["uuid", "npm:10.0.0"]\
         ],\
@@ -641,11 +670,11 @@ const RAW_RUNTIME_STATE =
         ],\
         "linkType": "SOFT"\
       }],\
-      ["virtual:b0abadc2650282c932800f5917ad1d001b47dd621c2d6fb604d2976fb03be4ecc7444c1c4d906c63f1d53f7756098e99a7691647d9bfa102f1e59af76b42c186#npm:1.0.0", {\
-        "packageLocation": "./.yarn/__virtual__/@langchain-langgraph-sdk-virtual-ef8cf75d93/4/.yarn/berry/cache/@langchain-langgraph-sdk-npm-1.0.0-282eb45452-10c0.zip/node_modules/@langchain/langgraph-sdk/",\
+      ["virtual:90c2b6249e5d6def5704b9e1a188adf472eaca7b3fe12550dd6117587cdaeac83949963e213b9b3d94472f06092605ee6d0895a2223b18fb202067aec64bc666#npm:1.0.0", {\
+        "packageLocation": "./.yarn/__virtual__/@langchain-langgraph-sdk-virtual-7fd99b41f5/4/.yarn/berry/cache/@langchain-langgraph-sdk-npm-1.0.0-282eb45452-10c0.zip/node_modules/@langchain/langgraph-sdk/",\
         "packageDependencies": [\
           ["@langchain/core", "npm:1.0.2"],\
-          ["@langchain/langgraph-sdk", "virtual:b0abadc2650282c932800f5917ad1d001b47dd621c2d6fb604d2976fb03be4ecc7444c1c4d906c63f1d53f7756098e99a7691647d9bfa102f1e59af76b42c186#npm:1.0.0"],\
+          ["@langchain/langgraph-sdk", "virtual:90c2b6249e5d6def5704b9e1a188adf472eaca7b3fe12550dd6117587cdaeac83949963e213b9b3d94472f06092605ee6d0895a2223b18fb202067aec64bc666#npm:1.0.0"],\
           ["@types/langchain__core", null],\
           ["@types/react", null],\
           ["@types/react-dom", null],\
@@ -698,13 +727,13 @@ const RAW_RUNTIME_STATE =
         ],\
         "linkType": "SOFT"\
       }],\
-      ["virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#https://github.com/crazygo/ai-sdk-provider/releases/download/1.2.1/openrouter-ai-sdk-provider-1.2.1.tgz", {\
-        "packageLocation": "./.yarn/__virtual__/@openrouter-ai-sdk-provider-virtual-d9d1ff61f1/4/.yarn/berry/cache/@openrouter-ai-sdk-provider-https-6f9292d99a-10c0.zip/node_modules/@openrouter/ai-sdk-provider/",\
+      ["virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#https://github.com/crazygo/ai-sdk-provider/releases/download/1.2.1/openrouter-ai-sdk-provider-1.2.1.tgz", {\
+        "packageLocation": "./.yarn/__virtual__/@openrouter-ai-sdk-provider-virtual-80c9044829/4/.yarn/berry/cache/@openrouter-ai-sdk-provider-https-6f9292d99a-10c0.zip/node_modules/@openrouter/ai-sdk-provider/",\
         "packageDependencies": [\
-          ["@openrouter/ai-sdk-provider", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#https://github.com/crazygo/ai-sdk-provider/releases/download/1.2.1/openrouter-ai-sdk-provider-1.2.1.tgz"],\
+          ["@openrouter/ai-sdk-provider", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#https://github.com/crazygo/ai-sdk-provider/releases/download/1.2.1/openrouter-ai-sdk-provider-1.2.1.tgz"],\
           ["@types/ai", null],\
           ["@types/zod", null],\
-          ["ai", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:5.0.83"],\
+          ["ai", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:5.0.83"],\
           ["zod", "npm:3.25.76"]\
         ],\
         "packagePeers": [\
@@ -863,15 +892,15 @@ const RAW_RUNTIME_STATE =
         ],\
         "linkType": "SOFT"\
       }],\
-      ["virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:5.0.83", {\
-        "packageLocation": "./.yarn/__virtual__/ai-virtual-3aafe30287/4/.yarn/berry/cache/ai-npm-5.0.83-8f323be648-10c0.zip/node_modules/ai/",\
+      ["virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:5.0.83", {\
+        "packageLocation": "./.yarn/__virtual__/ai-virtual-231c541d98/4/.yarn/berry/cache/ai-npm-5.0.83-8f323be648-10c0.zip/node_modules/ai/",\
         "packageDependencies": [\
-          ["@ai-sdk/gateway", "virtual:3aafe3028768d50f3f669a1de53f9b45ce2693119a133af13cb708e65334af86750da7ccb2397b4834ccf221b02bf9d45f294a694ae57996c7f685eeaa25d709#npm:2.0.4"],\
+          ["@ai-sdk/gateway", "virtual:231c541d98c68e838dd5687bd592929f67cde0a0c22a487e9243063058d7ec50e266d45a668d54fca28aa9fce4273957278501b12c28b0140c2a8950d6c85b68#npm:2.0.4"],\
           ["@ai-sdk/provider", "npm:2.0.0"],\
-          ["@ai-sdk/provider-utils", "virtual:06ccb8951033cda38bdd1efa7e2e40dbc203f45459724e2365cd15a8577743edab85d442e658b6a0a9f23ab249a625e3a52ed02c1fcba9e490ff81bf941a87c3#npm:3.0.14"],\
+          ["@ai-sdk/provider-utils", "virtual:eaae9a1543e4383593c1a94706cfebb2bfb4aec089a4396bd19e8d2f2fb09f8a52485622b76efed2c037b80514076fd9b38278e55547f0e5c079dc853c8c5740#npm:3.0.14"],\
           ["@opentelemetry/api", "npm:1.9.0"],\
           ["@types/zod", null],\
-          ["ai", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:5.0.83"],\
+          ["ai", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:5.0.83"],\
           ["zod", "npm:3.25.76"]\
         ],\
         "packagePeers": [\
@@ -1571,8 +1600,8 @@ const RAW_RUNTIME_STATE =
         ],\
         "linkType": "HARD"\
       }],\
-      ["virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:6.4.0", {\
-        "packageLocation": "./.yarn/__virtual__/ink-virtual-d3e9525ad2/4/.yarn/berry/cache/ink-npm-6.4.0-132c207d5d-10c0.zip/node_modules/ink/",\
+      ["virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:6.4.0", {\
+        "packageLocation": "./.yarn/__virtual__/ink-virtual-61885fe87a/4/.yarn/berry/cache/ink-npm-6.4.0-132c207d5d-10c0.zip/node_modules/ink/",\
         "packageDependencies": [\
           ["@alcalzone/ansi-tokenize", "npm:0.2.2"],\
           ["@types/react", "npm:19.2.2"],\
@@ -1587,12 +1616,12 @@ const RAW_RUNTIME_STATE =
           ["code-excerpt", "npm:4.0.0"],\
           ["es-toolkit", "npm:1.41.0"],\
           ["indent-string", "npm:5.0.0"],\
-          ["ink", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:6.4.0"],\
+          ["ink", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:6.4.0"],\
           ["is-in-ci", "npm:2.0.0"],\
           ["patch-console", "npm:2.0.0"],\
           ["react", "npm:19.2.0"],\
           ["react-devtools-core", null],\
-          ["react-reconciler", "virtual:d3e9525ad27dc4fd6b9440661e4a3a90dc6536c91b4fdf92a5aed525d6c4af8cfa852162f69d57146726aebed2a794e9cd36b5f6e283596d7a4b0340b2ef8f5e#npm:0.32.0"],\
+          ["react-reconciler", "virtual:61885fe87a677c33e832126eaef487909b012929f434df5c56d36f754dd6a28bb81d35ddeda27b93d65338e99772e2bca5d935a7d3a3e69e92827bf0d03af1eb#npm:0.32.0"],\
           ["signal-exit", "npm:3.0.7"],\
           ["slice-ansi", "npm:7.1.2"],\
           ["stack-utils", "npm:2.0.6"],\
@@ -1620,14 +1649,14 @@ const RAW_RUNTIME_STATE =
         ],\
         "linkType": "SOFT"\
       }],\
-      ["virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:6.0.0", {\
-        "packageLocation": "./.yarn/__virtual__/ink-text-input-virtual-d4ac2305b5/4/.yarn/berry/cache/ink-text-input-npm-6.0.0-0389e6c848-10c0.zip/node_modules/ink-text-input/",\
+      ["virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:6.0.0", {\
+        "packageLocation": "./.yarn/__virtual__/ink-text-input-virtual-cd7de46461/4/.yarn/berry/cache/ink-text-input-npm-6.0.0-0389e6c848-10c0.zip/node_modules/ink-text-input/",\
         "packageDependencies": [\
           ["@types/ink", "npm:2.0.3"],\
           ["@types/react", "npm:19.2.2"],\
           ["chalk", "npm:5.6.2"],\
-          ["ink", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:6.4.0"],\
-          ["ink-text-input", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:6.0.0"],\
+          ["ink", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:6.4.0"],\
+          ["ink-text-input", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:6.0.0"],\
           ["react", "npm:19.2.0"],\
           ["type-fest", "npm:4.41.0"]\
         ],\
@@ -2106,12 +2135,12 @@ const RAW_RUNTIME_STATE =
         ],\
         "linkType": "SOFT"\
       }],\
-      ["virtual:d3e9525ad27dc4fd6b9440661e4a3a90dc6536c91b4fdf92a5aed525d6c4af8cfa852162f69d57146726aebed2a794e9cd36b5f6e283596d7a4b0340b2ef8f5e#npm:0.32.0", {\
-        "packageLocation": "./.yarn/__virtual__/react-reconciler-virtual-5e8f2046ef/4/.yarn/berry/cache/react-reconciler-npm-0.32.0-9d60959fd4-10c0.zip/node_modules/react-reconciler/",\
+      ["virtual:61885fe87a677c33e832126eaef487909b012929f434df5c56d36f754dd6a28bb81d35ddeda27b93d65338e99772e2bca5d935a7d3a3e69e92827bf0d03af1eb#npm:0.32.0", {\
+        "packageLocation": "./.yarn/__virtual__/react-reconciler-virtual-24098d9ecc/4/.yarn/berry/cache/react-reconciler-npm-0.32.0-9d60959fd4-10c0.zip/node_modules/react-reconciler/",\
         "packageDependencies": [\
           ["@types/react", "npm:19.2.2"],\
           ["react", "npm:19.2.0"],\
-          ["react-reconciler", "virtual:d3e9525ad27dc4fd6b9440661e4a3a90dc6536c91b4fdf92a5aed525d6c4af8cfa852162f69d57146726aebed2a794e9cd36b5f6e283596d7a4b0340b2ef8f5e#npm:0.32.0"],\
+          ["react-reconciler", "virtual:61885fe87a677c33e832126eaef487909b012929f434df5c56d36f754dd6a28bb81d35ddeda27b93d65338e99772e2bca5d935a7d3a3e69e92827bf0d03af1eb#npm:0.32.0"],\
           ["scheduler", "npm:0.26.0"]\
         ],\
         "packagePeers": [\
@@ -2422,35 +2451,6 @@ const RAW_RUNTIME_STATE =
           ["yallist", "npm:5.0.0"]\
         ],\
         "linkType": "HARD"\
-      }]\
-    ]],\
-    ["taskagent", [\
-      ["workspace:.", {\
-        "packageLocation": "./",\
-        "packageDependencies": [\
-          ["@ai-sdk/openai", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:2.0.58"],\
-          ["@anthropic-ai/claude-agent-sdk", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:0.1.30"],\
-          ["@langchain/core", "npm:1.0.2"],\
-          ["@langchain/langgraph", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:1.0.1"],\
-          ["@openrouter/ai-sdk-provider", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#https://github.com/crazygo/ai-sdk-provider/releases/download/1.2.1/openrouter-ai-sdk-provider-1.2.1.tgz"],\
-          ["@types/ink", "npm:2.0.3"],\
-          ["@types/ink-text-input", "npm:2.0.5"],\
-          ["@types/minimist", "npm:1.2.5"],\
-          ["@types/node", "npm:24.9.2"],\
-          ["@types/react", "npm:19.2.2"],\
-          ["ai", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:5.0.83"],\
-          ["concurrently", "npm:9.2.1"],\
-          ["dotenv", "npm:17.2.3"],\
-          ["ink", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:6.4.0"],\
-          ["ink-text-input", "virtual:ed6f8df81cba360c14f85bea3e758ad00ae5b3d338a72dec2a162a85f28c860fb986b21d15f7503509e9b047590b925db66c9706c77da70523697d1ad0bc5f06#npm:6.0.0"],\
-          ["minimist", "npm:1.2.8"],\
-          ["react", "npm:19.2.0"],\
-          ["taskagent", "workspace:."],\
-          ["tsx", "npm:4.20.6"],\
-          ["typescript", "patch:typescript@npm%3A5.9.3#optional!builtin<compat/typescript>::version=5.9.3&hash=5786d5"],\
-          ["zod", "npm:3.25.76"]\
-        ],\
-        "linkType": "SOFT"\
       }]\
     ]],\
     ["tinyglobby", [\
