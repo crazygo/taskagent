@@ -1,4 +1,4 @@
-import { DRIVER_MANIFEST } from '../drivers/registry.ts';
+import { DRIVER_MANIFEST } from '../drivers/registry.js';
 
 const pad = (label: string, width: number) => label.padEnd(width, ' ');
 

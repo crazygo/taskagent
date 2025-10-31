@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
-import { CommandMenu } from './CommandMenu.tsx';
-import { addLog } from '../logger.ts';
+import { CommandMenu } from './CommandMenu.js';
+import { addLog } from '../logger.js';
 
 export interface Command {
   name: string;

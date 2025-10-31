@@ -2,11 +2,11 @@ import type { Dispatch, SetStateAction } from 'react';
 
 import type { AgentDefinition, PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
 
-import type { Message } from '../types.ts';
-import type { Task } from '../../task-manager.ts';
-import { Driver } from './types.ts';
-import { handlePlanReviewDo } from './plan-review-do/index.ts';
-import { buildUiReviewSystemPrompt } from './ui-review/prompt.ts';
+import type { Message } from '../types.js';
+import type { Task } from '../../task-manager.js';
+import { Driver } from './types.js';
+import { handlePlanReviewDo } from './plan-review-do/index.js';
+import { buildUiReviewSystemPrompt } from './ui-review/prompt.js';
 
 export interface DriverSessionContext {
     id: string;

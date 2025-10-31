@@ -1,9 +1,9 @@
 import { join } from 'node:path';
-import { loadEnv } from '../env.ts';
-import { parseCliArgs } from './args.ts';
-import { printCliUsage } from './help.ts';
-import { addLog } from '../logger.ts';
-import type { DriverName } from '../drivers/types.ts';
+import { loadEnv } from '../env.js';
+import { parseCliArgs } from './args.js';
+import { printCliUsage } from './help.js';
+import { addLog } from '../logger.js';
+import type { DriverName } from '../drivers/types.js';
 
 export interface CliConfig {
   prompt?: string;

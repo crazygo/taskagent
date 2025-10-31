@@ -16,6 +16,8 @@
   },
   "description": "",
   "devDependencies": {
+    "@types/ink": "^2.0.3",
+    "@types/ink-text-input": "^2.0.2",
     "@types/minimist": "^1.2.0",
     "@types/node": "^24.7.1",
     "@types/react": "^19.2.2",
@@ -25,10 +27,19 @@
   },
   "keywords": [],
   "license": "ISC",
-  "main": "ui.js",
+  "main": "dist/ui.js",
+  "types": "dist/ui.d.ts",
+  "bin": "dist/ui.js",
+  "files": [
+    "dist",
+    "package.json",
+    "README.md"
+  ],
   "name": "taskagent",
   "scripts": {
     "start": "tsx ui.tsx --",
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
     "start:test": "concurrently --raw --kill-others --success first \"yarn start\" \"sleep 5\"",
     "e2e:experiment": "expect scripts/e2e-experiment.expect --",
     "test": "echo \"Error: no test specified\" && exit 1"

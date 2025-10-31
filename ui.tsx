@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { render, Box, Text, useInput } from 'ink';
@@ -5,33 +6,33 @@ import { randomUUID } from 'crypto';
 import { inspect } from 'util';
 import { type AgentDefinition, type PermissionUpdate, type PermissionResult } from '@anthropic-ai/claude-agent-sdk';
 
-import { addLog } from './src/logger.ts';
-import { createBaseClaudeFlow } from './src/agent/flows/baseClaudeFlow.ts';
-import { loadCliConfig } from './src/cli/config.ts';
-import type { Task } from './task-manager.ts';
-import { handlePlanReviewDo } from './src/drivers/plan-review-do/index.ts';
-import { ensureAiProvider, type AiChatProvider } from './src/config/ai-provider.ts';
-import * as Types from './src/types.ts';
-import { ChatPanel } from './src/components/ChatPanel.tsx';
-import { TabView } from './src/components/StatusControls.tsx';
-import { TaskSpecificView } from './src/components/TaskSpecificView.tsx';
-import { InputBar } from './src/components/InputBar.tsx';
-import type { AgentPermissionPromptState, AgentPermissionOption } from './src/components/AgentPermissionPrompt.types.ts';
-import { AgentPermissionPromptComponent } from './src/components/AgentPermissionPrompt.tsx';
-import { useTaskStore } from './src/domain/taskStore.ts';
-import { useConversationStore } from './src/domain/conversationStore.ts';
-import { Driver, getDriverEnum, getDriverName } from './src/drivers/types.ts';
+import { addLog } from './src/logger.js';
+import { createBaseClaudeFlow } from './src/agent/flows/baseClaudeFlow.js';
+import { loadCliConfig } from './src/cli/config.js';
+import type { Task } from './task-manager.js';
+import { handlePlanReviewDo } from './src/drivers/plan-review-do/index.js';
+import { ensureAiProvider, type AiChatProvider } from './src/config/ai-provider.js';
+import * as Types from './src/types.js';
+import { ChatPanel } from './src/components/ChatPanel.js';
+import { TabView } from './src/components/StatusControls.js';
+import { TaskSpecificView } from './src/components/TaskSpecificView.js';
+import { InputBar } from './src/components/InputBar.js';
+import type { AgentPermissionPromptState, AgentPermissionOption } from './src/components/AgentPermissionPrompt.types.js';
+import { AgentPermissionPromptComponent } from './src/components/AgentPermissionPrompt.js';
+import { useTaskStore } from './src/domain/taskStore.js';
+import { useConversationStore } from './src/domain/conversationStore.js';
+import { Driver, getDriverEnum, getDriverName } from './src/drivers/types.js';
 import {
     DRIVER_TABS,
     getDriverBySlash,
     getDriverByLabel,
     getDriverCommandEntries,
     type DriverManifestEntry,
-} from './src/drivers/registry.ts';
-import { buildStorySystemPrompt, buildStoryAgentsConfig } from './src/drivers/story/prompt.ts';
-import { prepareStoryInput } from './src/drivers/story/utils.ts';
-import { closeTaskLogger } from './src/task-logger.ts';
-import { loadWorkspaceSettings, writeWorkspaceSettings, type WorkspaceSettings } from './src/workspace/settings.ts';
+} from './src/drivers/registry.js';
+import { buildStorySystemPrompt, buildStoryAgentsConfig } from './src/drivers/story/prompt.js';
+import { prepareStoryInput } from './src/drivers/story/utils.js';
+import { closeTaskLogger } from './src/task-logger.js';
+import { loadWorkspaceSettings, writeWorkspaceSettings, type WorkspaceSettings } from './src/workspace/settings.js';
 // Guard to prevent double submission in dev double-mount scenarios
 let __nonInteractiveSubmittedOnce = false;
 
@@ -589,7 +590,7 @@ const App = () => {
         ]
     );
 
-    const agentFlowRegistry = useMemo(
+    const agentFlowRegistry: { [key: string]: any } = useMemo(
         () => ({
             default: baseClaudeFlow,
             story: baseClaudeFlow,

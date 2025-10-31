@@ -2,8 +2,8 @@ import type { Dispatch, SetStateAction } from 'react';
 
 import type { AgentDefinition, PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
 
-import type * as Types from '../../types.ts';
-import { runClaudeStream, type ToolResultEvent, type ToolUseEvent } from '../runtime/runClaudeStream.ts';
+import type * as Types from '../../types.js';
+import { runClaudeStream, type ToolResultEvent, type ToolUseEvent } from '../runtime/runClaudeStream.js';
 
 export interface BaseClaudeFlowDependencies {
     nextMessageId: () => number;
