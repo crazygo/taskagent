@@ -7,7 +7,7 @@ import { inspect } from 'util';
 import { type AgentDefinition, type PermissionUpdate, type PermissionResult } from '@anthropic-ai/claude-agent-sdk';
 
 import { addLog } from './src/logger.js';
-import { createBaseClaudeFlow } from './src/agent/flows/baseClaudeFlow.js';
+import { createBaseClaudeFlow, type BaseClaudeFlow } from './src/agent/flows/baseClaudeFlow.js';
 import { loadCliConfig } from './src/cli/config.js';
 import type { Task } from './task-manager.js';
 import { handlePlanReviewDo } from './src/drivers/plan-review-do/index.js';
@@ -590,7 +590,7 @@ const App = () => {
         ]
     );
 
-    const agentFlowRegistry: { [key: string]: any } = useMemo(
+    const agentFlowRegistry: Record<string, BaseClaudeFlow> = useMemo(
         () => ({
             default: baseClaudeFlow,
             story: baseClaudeFlow,
