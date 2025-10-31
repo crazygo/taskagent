@@ -1,18 +1,29 @@
+import { join } from 'node:path';
 import dotenv from 'dotenv';
 
-// Load local .env.local if present
-dotenv.config({ path: '.env.local' });
+const loadEnvFile = (filePath: string, options?: { override?: boolean }) => {
+  dotenv.config({
+    path: filePath,
+    override: options?.override ?? false,
+  });
+};
 
-// Fallback: load from ~/.askman/.env.local without overriding any variables already set
-try {
-  const homeDir = process.env.HOME || process.env.USERPROFILE;
-  if (homeDir) {
-    const fallbackPath = `${homeDir}/.askman/.env.local`;
-    dotenv.config({ path: fallbackPath, override: false });
+export const loadEnv = (workspacePath?: string) => {
+  if (workspacePath && workspacePath.trim().length > 0) {
+    const workspaceEnvPath = join(workspacePath, '.askman', '.env.local');
+    loadEnvFile(workspaceEnvPath);
   }
-} catch {}
 
-export const loadEnv = () => {
+  try {
+    const homeDir = process.env.HOME || process.env.USERPROFILE;
+    if (homeDir) {
+      const fallbackPath = join(homeDir, '.askman', '.env.local');
+      loadEnvFile(fallbackPath);
+    }
+  } catch {}
+
+  loadEnvFile('.env.local');
+
   const missingEnvVars: string[] = [];
 
   const hasOpenRouter = !!process.env.OPENROUTER_API_KEY;

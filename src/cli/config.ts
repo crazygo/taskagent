@@ -11,7 +11,6 @@ export interface CliConfig {
 }
 
 export const loadCliConfig = (): CliConfig => {
-  loadEnv(); // Load environment variables and perform checks
   const cliArgs = parseCliArgs(); // Parse CLI arguments
 
   let workspacePath = cliArgs.workspace;
@@ -24,6 +23,10 @@ export const loadCliConfig = (): CliConfig => {
       workspacePath = process.cwd();
     }
   }
+
+  workspacePath = workspacePath.trim();
+
+  loadEnv(workspacePath); // Load environment variables using resolved workspace path
 
   const cfg: CliConfig = {
     prompt: cliArgs.prompt,

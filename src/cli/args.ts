@@ -20,7 +20,37 @@ export const parseCliArgs = (): CliArgs => {
   }
   const argv = minimist(toParse);
   const rawPrompt = argv.p ?? argv.prompt;
-  const rawDriver = argv.d ?? argv.driver;
+
+  const validDrivers: DriverName[] = [
+    'chat',
+    'agent',
+    'manual',
+    'plan-review-do',
+    'story',
+    'ui-review',
+    'user-flow-review',
+    'logic-review',
+    'data-review',
+  ];
+
+  const detectDriverFlag = (): DriverName | undefined => {
+    for (const candidate of validDrivers) {
+      if (argv[candidate] === true) {
+        return candidate;
+      }
+      const value = argv[candidate];
+      if (typeof value === 'string' && value.trim().length > 0) {
+        const normalized = value.trim().toLowerCase();
+        if (normalized === candidate) {
+          return candidate;
+        }
+      }
+    }
+    return undefined;
+  };
+
+  const rawDriverInput = argv.d ?? argv.driver;
+  const rawDriver = rawDriverInput ?? detectDriverFlag();
   
   const coercePrompt = () => {
     if (typeof rawPrompt === 'string') return rawPrompt;
@@ -30,14 +60,17 @@ export const parseCliArgs = (): CliArgs => {
     }
     return undefined;
   };
-  
+
   const coerceDriver = (): DriverName | undefined => {
-    const validDrivers: DriverName[] = ['chat', 'agent', 'manual', 'plan-review-do'];
     if (typeof rawDriver === 'string') {
       const normalized = rawDriver.toLowerCase();
       if (validDrivers.includes(normalized as DriverName)) {
         return normalized as DriverName;
       }
+    }
+    if (typeof rawDriver === 'boolean' && rawDriver) {
+      // When minimist produces a boolean (e.g. `--story`), detectDriverFlag has already resolved it.
+      return undefined;
     }
     return undefined;
   };
@@ -56,11 +89,11 @@ export const parseCliArgs = (): CliArgs => {
     return undefined;
   };
   
-  const result = {
+  const result: CliArgs = {
     prompt: coercePrompt(),
     driver: coerceDriver(),
     workspace: coerceWorkspace(),
-  } as CliArgs;
+  };
 
   try {
     addLog(
