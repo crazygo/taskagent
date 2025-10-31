@@ -1,6 +1,5 @@
 {
   "compilerOptions": {
-    /* Base Options */
     "esModuleInterop": true,
     "skipLibCheck": true,
     "target": "ES2022",
@@ -8,20 +7,13 @@
     "resolveJsonModule": true,
     "moduleDetection": "force",
     "isolatedModules": true,
-    "verbatimModuleSyntax": true,
-  "allowImportingTsExtensions": true,
-
-    /* Strictness */
+    "declaration": true,
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "noImplicitAny": true,
-
-    /* Bundler mode */
     "moduleResolution": "NodeNext",
     "module": "NodeNext",
-    "noEmit": true,
-
-    /* JSX */
+    "outDir": "./dist",
     "jsx": "react-jsx",
     "types": ["node"]
   },

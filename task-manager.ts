@@ -5,8 +5,8 @@ import type {
   Options,
   SDKAssistantMessage,
 } from '@anthropic-ai/claude-agent-sdk';
-import { getTaskLogger } from './src/task-logger.ts';
-import { addLog } from './src/logger.ts';
+import { getTaskLogger } from './src/task-logger.js';
+import { addLog } from './src/logger.js';
 
 export interface Task {
   id: string;

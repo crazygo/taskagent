@@ -14,9 +14,10 @@ export type DriverName =
   | 'manual'
   | 'plan-review-do'
   | 'story'
-  | 'ux'
-  | 'architecture'
-  | 'tech-plan';
+  | 'ui-review'
+  | 'user-flow-review'
+  | 'logic-review'
+  | 'data-review';
 
 /**
  * Driver 枚举（用于 UI 显示）
@@ -26,9 +27,10 @@ export enum Driver {
   AGENT = 'Agent',
   PLAN_REVIEW_DO = 'Plan-Review-DO',
   STORY = 'Story',
-  UX = 'UX',
-  ARCHITECTURE = 'Architecture',
-  TECH_PLAN = 'Tech Plan',
+  UI_REVIEW = 'UI Review',
+  USER_FLOW_REVIEW = 'User Flow Review',
+  LOGIC_REVIEW = 'Logic Review',
+  DATA_REVIEW = 'Data Review',
 }
 
 /**
@@ -41,9 +43,10 @@ export function getDriverEnum(name: DriverName): Driver {
     'agent': Driver.AGENT,
     'plan-review-do': Driver.PLAN_REVIEW_DO,
     'story': Driver.STORY,
-    'ux': Driver.UX,
-    'architecture': Driver.ARCHITECTURE,
-    'tech-plan': Driver.TECH_PLAN,
+    'ui-review': Driver.UI_REVIEW,
+    'user-flow-review': Driver.USER_FLOW_REVIEW,
+    'logic-review': Driver.LOGIC_REVIEW,
+    'data-review': Driver.DATA_REVIEW,
   };
   return map[name];
 }
@@ -57,9 +60,10 @@ export function getDriverName(driver: Driver): DriverName {
     [Driver.AGENT]: 'agent',
     [Driver.PLAN_REVIEW_DO]: 'plan-review-do',
     [Driver.STORY]: 'story',
-    [Driver.UX]: 'ux',
-    [Driver.ARCHITECTURE]: 'architecture',
-    [Driver.TECH_PLAN]: 'tech-plan',
+    [Driver.UI_REVIEW]: 'ui-review',
+    [Driver.USER_FLOW_REVIEW]: 'user-flow-review',
+    [Driver.LOGIC_REVIEW]: 'logic-review',
+    [Driver.DATA_REVIEW]: 'data-review',
   };
   return map[driver];
 }

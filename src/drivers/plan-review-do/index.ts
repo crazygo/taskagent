@@ -4,9 +4,9 @@
  * V3: Simplified 2-node workflow (planWithReview + execute)
  */
 
-import type { Message } from '../../types.ts';
-import { addLog } from '../../logger.ts';
-import { runTask, type TaskRunState } from './flow.ts';
+import type { Message } from '../../types.js';
+import { addLog } from '../../logger.js';
+import { runTask, type TaskRunState } from './flow.js';
 
 /**
  * 处理用户消息（Task Flow 模式）

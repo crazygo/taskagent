@@ -1,8 +1,32 @@
+import { join } from 'node:path';
 import dotenv from 'dotenv';
+import { addLog } from './logger.js';
 
-dotenv.config({ path: '.env.local' });
+const loadEnvFile = (filePath: string, options?: { override?: boolean }) => {
+  dotenv.config({
+    path: filePath,
+    override: options?.override ?? false,
+  });
+};
 
-export const loadEnv = () => {
+export const loadEnv = (workspacePath?: string) => {
+  if (workspacePath && workspacePath.trim().length > 0) {
+    const workspaceEnvPath = join(workspacePath, '.askman', '.env.local');
+    loadEnvFile(workspaceEnvPath);
+  }
+
+  try {
+    const homeDir = process.env.HOME || process.env.USERPROFILE;
+    if (homeDir) {
+      const fallbackPath = join(homeDir, '.askman', '.env.local');
+      loadEnvFile(fallbackPath);
+    }
+  } catch (error) {
+    addLog(`Failed to load home directory env file: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  loadEnvFile('.env.local');
+
   const missingEnvVars: string[] = [];
 
   const hasOpenRouter = !!process.env.OPENROUTER_API_KEY;

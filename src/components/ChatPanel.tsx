@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Newline, Static, Text, useStdout } from 'ink';
-import * as Types from '../types.ts';
+import * as Types from '../types.js';
 
 interface MessageProps {
   message: Types.Message;

@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
-import { CommandMenu } from './CommandMenu.tsx';
-import { addLog } from '../logger.ts';
+import { CommandMenu } from './CommandMenu.js';
+import { addLog } from '../logger.js';
 
 export interface Command {
   name: string;
@@ -75,6 +75,9 @@ export const InputBar: React.FC<InputBarProps> = ({
 
   // 当下拉命令菜单显示时，阻止 TextInput 的回车提交
   const handleTextInputSubmit = (text: string) => {
+    if (process.env.E2E_SENTINEL) {
+      addLog(`[InputBar] TextInput onSubmit triggered with text="${text}" (showCommandMenu=${showCommandMenu})`);
+    }
     if (showCommandMenu) {
       // 命令菜单场景下，Enter 只用于上屏（在 useInput 中处理），此处不提交
       return;

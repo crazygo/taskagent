@@ -1,12 +1,12 @@
 import type { Dispatch, SetStateAction } from 'react';
 
-import type { PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
+import type { AgentDefinition, PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
 
-import type { Message } from '../types.ts';
-import type { Task } from '../../task-manager.ts';
-import { Driver } from './types.ts';
-import { handlePlanReviewDo } from './plan-review-do/index.ts';
-import { handleStoryDriver } from './story/index.ts';
+import type { Message } from '../types.js';
+import type { Task } from '../../task-manager.js';
+import { Driver } from './types.js';
+import { handlePlanReviewDo } from './plan-review-do/index.js';
+import { buildUiReviewSystemPrompt } from './ui-review/prompt.js';
 
 export interface DriverSessionContext {
     id: string;
@@ -28,15 +28,89 @@ export interface DriverRuntimeContext {
 
 export type DriverHandler = (message: Message, context: DriverRuntimeContext) => Promise<boolean>;
 
-export interface DriverManifestEntry {
+interface BaseDriverManifestEntry {
     id: Driver;
     label: string;
     slash: string;
     description: string;
-    handler: DriverHandler;
     requiresSession: boolean;
     isPlaceholder?: boolean;
 }
+
+/**
+ * Driver that uses the agent pipeline for execution.
+ * 
+ * Use this type when:
+ * - The driver needs to leverage Claude's agent capabilities (tool use, permission management, etc.)
+ * - The driver requires structured conversation flow with tool events and placeholders
+ * - You want to customize system prompts, allowed/disallowed tools, or permission modes
+ * 
+ * When useAgentPipeline is true, the handler field is optional and will be ignored at runtime.
+ * The agent pipeline handles message processing through the Claude SDK instead.
+ * 
+ * @example
+ * {
+ *   id: Driver.STORY,
+ *   label: Driver.STORY,
+ *   slash: 'story',
+ *   description: 'Story Orchestration',
+ *   requiresSession: true,
+ *   useAgentPipeline: true,
+ *   pipelineOptions: {
+ *     allowedTools: ['Read', 'Write', 'Edit'],
+ *   }
+ * }
+ */
+interface AgentPipelineDriverEntry extends BaseDriverManifestEntry {
+    useAgentPipeline: true;
+    pipelineOptions?: {
+        systemPromptFactory?: () => string;
+        allowedTools?: string[];
+        disallowedTools?: string[];
+        permissionMode?: string;
+        agents?: Record<string, AgentDefinition>;
+    };
+    pipelineFlowId?: string;
+    handler?: DriverHandler;
+}
+
+/**
+ * Driver that uses a custom handler function for execution.
+ * 
+ * Use this type when:
+ * - The driver implements custom message processing logic
+ * - You need direct control over message handling and state management
+ * - The driver doesn't require agent pipeline features
+ * 
+ * When useAgentPipeline is false or undefined, the handler field is required.
+ * The handler receives user messages and has full access to the runtime context.
+ * 
+ * @example
+ * {
+ *   id: Driver.PLAN_REVIEW_DO,
+ *   label: Driver.PLAN_REVIEW_DO,
+ *   slash: 'plan-review-do',
+ *   description: 'Execute Plan-Review-Do workflow',
+ *   requiresSession: false,
+ *   handler: async (message, context) => {
+ *     // Custom processing logic
+ *     return true;
+ *   }
+ * }
+ */
+interface HandlerDriverEntry extends BaseDriverManifestEntry {
+    useAgentPipeline?: false;
+    handler: DriverHandler;
+}
+
+/**
+ * Discriminated union type for driver manifest entries.
+ * 
+ * This union enforces at the type level that drivers either use the agent pipeline
+ * (AgentPipelineDriverEntry) or a custom handler (HandlerDriverEntry), preventing
+ * confusion where both might be specified but only one is used at runtime.
+ */
+export type DriverManifestEntry = AgentPipelineDriverEntry | HandlerDriverEntry;
 
 const createPlaceholderHandler = (label: string): DriverHandler => {
     return async (_message, context) => {
@@ -72,49 +146,55 @@ export const DRIVER_MANIFEST: readonly DriverManifestEntry[] = [
         id: Driver.STORY,
         label: Driver.STORY,
         slash: 'story',
-        description: 'Generate structured Stories document',
+        description: 'Story Orchestration · 整理、审阅并沉淀到 Markdown',
         requiresSession: true,
-        handler: async (message, context) => {
-            if (!context.session) {
-                throw new Error('Story driver requires a Claude session context.');
-            }
-            return await handleStoryDriver(message, {
-                nextMessageId: context.nextMessageId,
-                setActiveMessages: context.setActiveMessages,
-                setFrozenMessages: context.setFrozenMessages,
-                finalizeMessageById: context.finalizeMessageById,
-                canUseTool: context.canUseTool,
-                workspacePath: context.workspacePath,
-                session: context.session,
-            });
+        useAgentPipeline: true,
+        pipelineFlowId: 'story',
+        pipelineOptions: {
+            allowedTools: ['Read', 'Write', 'Edit', 'Glob', 'Grep'],
+            disallowedTools: ['Bash', 'NotebookEdit', 'TodoWrite'],
         },
     },
     {
-        id: Driver.UX,
-        label: Driver.UX,
-        slash: 'ux',
-        description: 'UX driver · 敬请期待',
-        requiresSession: false,
-        isPlaceholder: true,
-        handler: createPlaceholderHandler(Driver.UX),
+        id: Driver.UI_REVIEW,
+        label: Driver.UI_REVIEW,
+        slash: 'ui-review',
+        description: 'UI Review · 输出 ASCII 线框 + 注释',
+        requiresSession: true,
+        // Prefer to use agent pipeline for UI Review to match visuals/queue/permissions
+        useAgentPipeline: true,
+        pipelineOptions: {
+            systemPromptFactory: () => buildUiReviewSystemPrompt(),
+            allowedTools: ['Read', 'Grep', 'Glob'],
+            disallowedTools: ['Write', 'Edit', 'Bash', 'NotebookEdit', 'FileWrite', 'FileEdit', 'TodoWrite'],
+        },
     },
     {
-        id: Driver.ARCHITECTURE,
-        label: Driver.ARCHITECTURE,
-        slash: 'architecture',
-        description: 'Architecture driver · 敬请期待',
+        id: Driver.USER_FLOW_REVIEW,
+        label: Driver.USER_FLOW_REVIEW,
+        slash: 'user-flow-review',
+        description: 'User Flow Review · 敬请期待',
         requiresSession: false,
         isPlaceholder: true,
-        handler: createPlaceholderHandler(Driver.ARCHITECTURE),
+        handler: createPlaceholderHandler(Driver.USER_FLOW_REVIEW),
     },
     {
-        id: Driver.TECH_PLAN,
-        label: Driver.TECH_PLAN,
-        slash: 'tech-plan',
-        description: 'Tech Plan driver · 敬请期待',
+        id: Driver.LOGIC_REVIEW,
+        label: Driver.LOGIC_REVIEW,
+        slash: 'logic-review',
+        description: 'Logic Review · 敬请期待',
         requiresSession: false,
         isPlaceholder: true,
-        handler: createPlaceholderHandler(Driver.TECH_PLAN),
+        handler: createPlaceholderHandler(Driver.LOGIC_REVIEW),
+    },
+    {
+        id: Driver.DATA_REVIEW,
+        label: Driver.DATA_REVIEW,
+        slash: 'data-review',
+        description: 'Data Review · 敬请期待',
+        requiresSession: false,
+        isPlaceholder: true,
+        handler: createPlaceholderHandler(Driver.DATA_REVIEW),
     },
 ] as const;
 

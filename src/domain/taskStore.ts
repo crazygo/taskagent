@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { TaskManager, type Task } from '../../task-manager.ts';
+import { TaskManager, type Task } from '../../task-manager.js';
 
 interface UseTaskStoreOptions {
   pollIntervalMs?: number;
