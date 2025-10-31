@@ -19,7 +19,7 @@ proc ts {} {
 set log_path [file join [pwd] e2e-experiment.log]
 log_file -a $log_path
 
-set default_workspace "/Users/admin/Codespaces/aminer/z-work"
+set default_workspace [file join [pwd] ".tmp-e2e-workspace"]
 if {[llength $argv] >= 1} {
   set workspace [lindex $argv 0]
 } elseif {[info exists env(E2E_WORKSPACE)]} {
@@ -27,6 +27,9 @@ if {[llength $argv] >= 1} {
 } else {
   set workspace $default_workspace
 }
+
+# Ensure the workspace directory exists for the run
+file mkdir $workspace
 
 set automation_steps {[
   {"action":"wait","ms":500},
@@ -56,5 +59,4 @@ expect {
 }
 
 puts "\[E2E] [ts] Transcript saved to: $log_path"
-
 
