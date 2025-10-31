@@ -167,6 +167,11 @@ const formatToolInputSummary = (input: Record<string, unknown>, maxLength = 600)
     }
 };
 
+// Agent flow registry type with required default key
+type AgentFlowRegistry = Record<string, BaseClaudeFlow> & {
+    default: BaseClaudeFlow;
+};
+
 // --- Components ---
 
 const App = () => {
@@ -590,7 +595,7 @@ const App = () => {
         ]
     );
 
-    const agentFlowRegistry: Record<string, BaseClaudeFlow> = useMemo(
+    const agentFlowRegistry: AgentFlowRegistry = useMemo(
         () => ({
             default: baseClaudeFlow,
             story: baseClaudeFlow,
@@ -865,8 +870,8 @@ const App = () => {
         addLog(`[Agent] Sending prompt with session ${sessionId}: ${prompt.replace(/\s+/g, ' ').slice(0, 120)}`);
 
         try {
-            const activeAgentFlow =
-                (flowId && agentFlowRegistry[flowId]) ?? agentFlowRegistry.default;
+            const activeAgentFlow: BaseClaudeFlow =
+                (flowId ? agentFlowRegistry[flowId] : undefined) ?? agentFlowRegistry.default;
 
             await activeAgentFlow.handleUserInput({
                 prompt,
