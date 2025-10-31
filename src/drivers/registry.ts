@@ -28,15 +28,17 @@ export interface DriverRuntimeContext {
 
 export type DriverHandler = (message: Message, context: DriverRuntimeContext) => Promise<boolean>;
 
-export interface DriverManifestEntry {
+interface BaseDriverManifestEntry {
     id: Driver;
     label: string;
     slash: string;
     description: string;
     requiresSession: boolean;
     isPlaceholder?: boolean;
-    // If true, use Agent pipeline (queue, placeholders, tool events) and ignore handler
-    useAgentPipeline?: boolean;
+}
+
+interface AgentPipelineDriverEntry extends BaseDriverManifestEntry {
+    useAgentPipeline: true;
     pipelineOptions?: {
         systemPromptFactory?: () => string;
         allowedTools?: string[];
@@ -45,8 +47,15 @@ export interface DriverManifestEntry {
         agents?: Record<string, AgentDefinition>;
     };
     pipelineFlowId?: string;
+    handler?: DriverHandler;
+}
+
+interface HandlerDriverEntry extends BaseDriverManifestEntry {
+    useAgentPipeline?: false;
     handler: DriverHandler;
 }
+
+export type DriverManifestEntry = AgentPipelineDriverEntry | HandlerDriverEntry;
 
 const createPlaceholderHandler = (label: string): DriverHandler => {
     return async (_message, context) => {
@@ -90,7 +99,6 @@ export const DRIVER_MANIFEST: readonly DriverManifestEntry[] = [
             allowedTools: ['Read', 'Write', 'Edit', 'Glob', 'Grep'],
             disallowedTools: ['Bash', 'NotebookEdit', 'TodoWrite'],
         },
-        handler: createPlaceholderHandler(Driver.STORY),
     },
     {
         id: Driver.UI_REVIEW,
@@ -105,7 +113,6 @@ export const DRIVER_MANIFEST: readonly DriverManifestEntry[] = [
             allowedTools: ['Read', 'Grep', 'Glob'],
             disallowedTools: ['Write', 'Edit', 'Bash', 'NotebookEdit', 'FileWrite', 'FileEdit', 'TodoWrite'],
         },
-        handler: createPlaceholderHandler(Driver.UI_REVIEW),
     },
     {
         id: Driver.USER_FLOW_REVIEW,
