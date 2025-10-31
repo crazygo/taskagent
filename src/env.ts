@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import dotenv from 'dotenv';
+import { addLog } from './logger.js';
 
 const loadEnvFile = (filePath: string, options?: { override?: boolean }) => {
   dotenv.config({
@@ -20,7 +21,9 @@ export const loadEnv = (workspacePath?: string) => {
       const fallbackPath = join(homeDir, '.askman', '.env.local');
       loadEnvFile(fallbackPath);
     }
-  } catch {}
+  } catch (error) {
+    addLog(`Failed to load home directory env file: ${error instanceof Error ? error.message : String(error)}`);
+  }
 
   loadEnvFile('.env.local');
 
