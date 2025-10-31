@@ -82,3 +82,9 @@ opencodetmp/
 
 # Qoder configuration
 .qoder/
+
+# Publish artifacts
+.npm-cache/
+*.tgz
+package/
+unpack/

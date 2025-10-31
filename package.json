@@ -28,7 +28,7 @@
   "keywords": [],
   "license": "ISC",
   "name": "@askman-dev/task",
-  "version": "1.0.1",
+  "version": "1.0.3",
   "type": "module",
   "scripts": {
     "start": "tsx ui.tsx --",
@@ -37,14 +37,16 @@
     "start:test": "concurrently --raw --kill-others --success first \"yarn start\" \"sleep 5\"",
     "e2e:experiment": "expect scripts/e2e-experiment.expect --",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "publish": "npm publish --access public"
+    "publish": "echo \"Use yarn npm publish --access public\""
   },
   "files": [
     "dist",
     "package.json",
     "README.md"
   ],
-  "bin": "dist/ui.js",
+  "bin": {
+    "task": "dist/ui.js"
+  },
   "main": "dist/ui.js",
   "types": "dist/ui.d.ts"
 }
