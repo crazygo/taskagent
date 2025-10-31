@@ -39,19 +39,17 @@ export function ensureAiProvider(): CachedProvider {
       modelName: process.env.OPENAI_MODEL_NAME,
     });
 
-    let chosen = null as null | ReturnType<typeof selectOpenRouter> | ReturnType<typeof selectOpenAI>;
-
-    if (providerPref === 'openrouter') {
-      chosen = selectOpenRouter();
-    } else if (providerPref === 'openai') {
-      chosen = selectOpenAI();
-    } else {
-      // auto: prefer OpenRouter when configured, otherwise OpenAI
-      const orCfg = selectOpenRouter();
-      const oaCfg = selectOpenAI();
-      chosen = orCfg.apiKey ? orCfg : oaCfg;
-    }
-
+    const chosen =
+      providerPref === 'openrouter'
+        ? selectOpenRouter()
+        : providerPref === 'openai'
+        ? selectOpenAI()
+        : (() => {
+            // auto: prefer OpenRouter when configured, otherwise OpenAI
+            const orCfg = selectOpenRouter();
+            const oaCfg = selectOpenAI();
+            return orCfg.apiKey ? orCfg : oaCfg;
+          })();
     const primaryKey = chosen?.apiKey;
     const baseURL = chosen?.baseURL || 'https://openrouter.ai/api/v1';
     const modelName = chosen?.modelName;
