@@ -7,7 +7,7 @@ import { inspect } from 'util';
 import { type AgentDefinition, type PermissionUpdate, type PermissionResult } from '@anthropic-ai/claude-agent-sdk';
 
 import { addLog } from './src/logger.js';
-import { createBaseClaudeFlow } from './src/agent/flows/baseClaudeFlow.js';
+import { createBaseClaudeFlow, type BaseClaudeFlow } from './src/agent/flows/baseClaudeFlow.js';
 import { loadCliConfig } from './src/cli/config.js';
 import type { Task } from './task-manager.js';
 import { handlePlanReviewDo } from './src/drivers/plan-review-do/index.js';
@@ -165,6 +165,11 @@ const formatToolInputSummary = (input: Record<string, unknown>, maxLength = 600)
     } catch {
         return '(unable to display tool input)';
     }
+};
+
+// Agent flow registry type with required default key
+type AgentFlowRegistry = Record<string, BaseClaudeFlow> & {
+    default: BaseClaudeFlow;
 };
 
 // --- Components ---
@@ -590,7 +595,7 @@ const App = () => {
         ]
     );
 
-    const agentFlowRegistry: { [key: string]: any } = useMemo(
+    const agentFlowRegistry: AgentFlowRegistry = useMemo(
         () => ({
             default: baseClaudeFlow,
             story: baseClaudeFlow,
@@ -865,8 +870,8 @@ const App = () => {
         addLog(`[Agent] Sending prompt with session ${sessionId}: ${prompt.replace(/\s+/g, ' ').slice(0, 120)}`);
 
         try {
-            const activeAgentFlow =
-                (flowId && agentFlowRegistry[flowId]) ?? agentFlowRegistry.default;
+            const activeAgentFlow: BaseClaudeFlow =
+                (flowId ? agentFlowRegistry[flowId] : undefined) ?? agentFlowRegistry.default;
 
             await activeAgentFlow.handleUserInput({
                 prompt,
