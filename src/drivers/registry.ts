@@ -28,15 +28,41 @@ export interface DriverRuntimeContext {
 
 export type DriverHandler = (message: Message, context: DriverRuntimeContext) => Promise<boolean>;
 
-export interface DriverManifestEntry {
+interface BaseDriverManifestEntry {
     id: Driver;
     label: string;
     slash: string;
     description: string;
     requiresSession: boolean;
     isPlaceholder?: boolean;
-    // If true, use Agent pipeline (queue, placeholders, tool events) and ignore handler
-    useAgentPipeline?: boolean;
+}
+
+/**
+ * Driver that uses the agent pipeline for execution.
+ * 
+ * Use this type when:
+ * - The driver needs to leverage Claude's agent capabilities (tool use, permission management, etc.)
+ * - The driver requires structured conversation flow with tool events and placeholders
+ * - You want to customize system prompts, allowed/disallowed tools, or permission modes
+ * 
+ * When useAgentPipeline is true, the handler field is optional and will be ignored at runtime.
+ * The agent pipeline handles message processing through the Claude SDK instead.
+ * 
+ * @example
+ * {
+ *   id: Driver.STORY,
+ *   label: Driver.STORY,
+ *   slash: 'story',
+ *   description: 'Story Orchestration',
+ *   requiresSession: true,
+ *   useAgentPipeline: true,
+ *   pipelineOptions: {
+ *     allowedTools: ['Read', 'Write', 'Edit'],
+ *   }
+ * }
+ */
+interface AgentPipelineDriverEntry extends BaseDriverManifestEntry {
+    useAgentPipeline: true;
     pipelineOptions?: {
         systemPromptFactory?: () => string;
         allowedTools?: string[];
@@ -45,8 +71,46 @@ export interface DriverManifestEntry {
         agents?: Record<string, AgentDefinition>;
     };
     pipelineFlowId?: string;
+    handler?: DriverHandler;
+}
+
+/**
+ * Driver that uses a custom handler function for execution.
+ * 
+ * Use this type when:
+ * - The driver implements custom message processing logic
+ * - You need direct control over message handling and state management
+ * - The driver doesn't require agent pipeline features
+ * 
+ * When useAgentPipeline is false or undefined, the handler field is required.
+ * The handler receives user messages and has full access to the runtime context.
+ * 
+ * @example
+ * {
+ *   id: Driver.PLAN_REVIEW_DO,
+ *   label: Driver.PLAN_REVIEW_DO,
+ *   slash: 'plan-review-do',
+ *   description: 'Execute Plan-Review-Do workflow',
+ *   requiresSession: false,
+ *   handler: async (message, context) => {
+ *     // Custom processing logic
+ *     return true;
+ *   }
+ * }
+ */
+interface HandlerDriverEntry extends BaseDriverManifestEntry {
+    useAgentPipeline?: false;
     handler: DriverHandler;
 }
+
+/**
+ * Discriminated union type for driver manifest entries.
+ * 
+ * This union enforces at the type level that drivers either use the agent pipeline
+ * (AgentPipelineDriverEntry) or a custom handler (HandlerDriverEntry), preventing
+ * confusion where both might be specified but only one is used at runtime.
+ */
+export type DriverManifestEntry = AgentPipelineDriverEntry | HandlerDriverEntry;
 
 const createPlaceholderHandler = (label: string): DriverHandler => {
     return async (_message, context) => {
@@ -90,7 +154,6 @@ export const DRIVER_MANIFEST: readonly DriverManifestEntry[] = [
             allowedTools: ['Read', 'Write', 'Edit', 'Glob', 'Grep'],
             disallowedTools: ['Bash', 'NotebookEdit', 'TodoWrite'],
         },
-        handler: createPlaceholderHandler(Driver.STORY),
     },
     {
         id: Driver.UI_REVIEW,
@@ -105,7 +168,6 @@ export const DRIVER_MANIFEST: readonly DriverManifestEntry[] = [
             allowedTools: ['Read', 'Grep', 'Glob'],
             disallowedTools: ['Write', 'Edit', 'Bash', 'NotebookEdit', 'FileWrite', 'FileEdit', 'TodoWrite'],
         },
-        handler: createPlaceholderHandler(Driver.UI_REVIEW),
     },
     {
         id: Driver.USER_FLOW_REVIEW,
