@@ -27,15 +27,9 @@
   },
   "keywords": [],
   "license": "ISC",
-  "main": "dist/ui.js",
-  "types": "dist/ui.d.ts",
-  "bin": "dist/ui.js",
-  "files": [
-    "dist",
-    "package.json",
-    "README.md"
-  ],
-  "name": "taskagent",
+  "name": "@askman-dev/task",
+  "version": "1.0.0",
+  "type": "module",
   "scripts": {
     "start": "tsx ui.tsx --",
     "build": "tsc",
@@ -44,6 +38,14 @@
     "e2e:experiment": "expect scripts/e2e-experiment.expect --",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "type": "module",
-  "version": "1.0.0"
+  "files": [
+    "dist",
+    "package.json",
+    "README.md"
+  ],
+  "bin": {
+    "task": "dist/ui.js"
+  },
+  "main": "dist/ui.js",
+  "types": "dist/ui.d.ts",
 }
