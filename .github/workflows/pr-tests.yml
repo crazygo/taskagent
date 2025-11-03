@@ -23,6 +23,9 @@ jobs:
           node-version: 22
           cache: yarn
 
+      - name: Install Claude Code CLI
+        run: npm install -g @anthropic-ai/claude-code
+
       - name: Install dependencies
         run: yarn install --immutable
 
