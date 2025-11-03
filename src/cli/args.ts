@@ -1,7 +1,7 @@
 import minimist from 'minimist';
 
 import { addLog } from '../logger.js';
-import { type DriverName } from '../drivers/types.js';
+import { DRIVER_NAMES, type DriverName } from '../drivers/types.js';
 
 interface CliArgs {
   prompt?: string;
@@ -23,24 +23,13 @@ export const parseCliArgs = (): CliArgs => {
   const argv = minimist(toParse);
   const rawPrompt = argv.p ?? argv.prompt;
 
-  const validDrivers: DriverName[] = [
-    'chat',
-    'agent',
-    'plan-review-do',
-    'glossary',
-    'story',
-    'ui-review',
-    'logic-review',
-    'data-review',
-  ];
-
   const normalizeDriverSlug = (value: string): DriverName | undefined => {
     const normalized = value.trim().toLowerCase().replace(/\s+/g, '-');
-    return validDrivers.find(candidate => candidate === normalized);
+    return DRIVER_NAMES.find(candidate => candidate === normalized);
   };
 
   const detectDriverFlag = (): DriverName | undefined => {
-    for (const candidate of validDrivers) {
+    for (const candidate of DRIVER_NAMES) {
       if (argv[candidate] === true) {
         return candidate;
       }
@@ -88,7 +77,7 @@ export const parseCliArgs = (): CliArgs => {
     if (typeof detectedDriver === 'string') {
       return normalizeDriverSlug(detectedDriver);
     }
-    if (typeof detectedDriver === 'boolean' && detectedDriver) {
+    if (detectedDriver === true) {
       // This case should ideally be handled by detectDriverFlag, but as a fallback
       addLog('[CLI] Warning: --driver flag was passed (e.g. --story), but no driver was detected. This may indicate a bug in driver detection logic.');
       return undefined;

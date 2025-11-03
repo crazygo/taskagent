@@ -8,10 +8,19 @@ import type { AgentDefinition } from '@anthropic-ai/claude-agent-sdk';
 const AgentMdFrontMatterSchema = z.object({
     name: z.string().min(1, 'Agent name is required.'),
     description: z.string().min(1, 'Agent description is required.'),
-    tools: z.union([
-        z.array(z.string()),
-        z.string().transform(s => s.split(',').map(t => t.trim()).filter(Boolean))
-    ]).optional(),
+    tools: z
+        .union([
+            z.array(z.string()),
+            z.string().transform(s => s.split(',').map(t => t.trim()).filter(Boolean)),
+            z.null(),
+        ])
+        .optional()
+        .transform(value => {
+            if (value == null) {
+                return [];
+            }
+            return value;
+        }),
     model: z.string().optional(),
     sub_agents: z.string().optional(),
 });

@@ -16,15 +16,18 @@ export enum Driver {
     DATA_REVIEW = 'Data Review',
 }
 
-export type DriverName =
-    | 'chat'
-    | 'agent'
-    | 'plan-review-do'
-    | 'glossary'
-    | 'story'
-    | 'ui-review'
-    | 'logic-review'
-    | 'data-review';
+export const DRIVER_NAMES = [
+    'chat',
+    'agent',
+    'plan-review-do',
+    'glossary',
+    'story',
+    'ui-review',
+    'logic-review',
+    'data-review',
+] as const;
+
+export type DriverName = (typeof DRIVER_NAMES)[number];
 
 export interface ViewDriverProps {
     isActive: boolean;

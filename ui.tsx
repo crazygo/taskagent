@@ -304,8 +304,9 @@ const App = () => {
     const bootstrapNewSessionAppliedRef = useRef<boolean>(false);
     const agentPermissionRequestsRef = useRef<Map<number, AgentPermissionRequest>>(new Map());
     const nextAgentPermissionIdRef = useRef<number>(1);
-    const agentPermissionQueueRef = useRef<number[]>([]);
-    const [agentPermissionPrompt, setAgentPermissionPrompt] = useState<AgentPermissionPromptState | null>(null);
+const agentPermissionQueueRef = useRef<number[]>([]);
+const [agentPermissionPrompt, setAgentPermissionPrompt] = useState<AgentPermissionPromptState | null>(null);
+const lastAnnouncedDriverRef = useRef<string | null>(null);
 
     const finalizeActiveMessages = useCallback(() => {
         setActiveMessages(prev => {
@@ -346,6 +347,24 @@ const App = () => {
             setActiveMessages(prev => [...prev, systemMessage]);
         }
     }, [finalizeActiveMessages, nextMessageId, setFrozenMessages, setActiveMessages]);
+
+    useEffect(() => {
+        if (!STATIC_TABS.includes(selectedTab) || selectedTab === Driver.CHAT || selectedTab === Driver.AGENT) {
+            lastAnnouncedDriverRef.current = null;
+            return;
+        }
+
+        const driverEntry = getDriverByLabel(selectedTab);
+        if (!driverEntry) {
+            lastAnnouncedDriverRef.current = null;
+            return;
+        }
+
+        if (lastAnnouncedDriverRef.current !== driverEntry.label) {
+            appendSystemMessage(`[${driverEntry.label}] view is active.`);
+            lastAnnouncedDriverRef.current = driverEntry.label;
+        }
+    }, [appendSystemMessage, selectedTab]);
 
     useEffect(() => {
         if (!bootstrapConfig.ignoredPositionalPrompt) {
