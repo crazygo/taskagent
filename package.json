@@ -28,6 +28,7 @@
   "keywords": [],
   "license": "ISC",
   "name": "@askman-dev/task",
+  "packageManager": "yarn@4.9.1",
   "version": "1.0.4",
   "type": "module",
   "scripts": {
