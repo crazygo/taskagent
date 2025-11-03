@@ -221,7 +221,8 @@ export const getDriverByLabel = (label: string): DriverManifestEntry | undefined
 };
 
 export const getDriverCommandEntries = (): { name: string; description: string }[] => {
-    return DRIVER_MANIFEST.map(entry => ({
+    const tabIds = new Set(DRIVER_TABS);
+    return DRIVER_MANIFEST.filter(entry => !tabIds.has(entry.id)).map(entry => ({
         name: entry.slash,
         description: entry.description,
     }));
