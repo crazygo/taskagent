@@ -31,8 +31,25 @@ export async function runCommand(
   childProcess.stdout?.pipe(logStream);
   childProcess.stderr?.pipe(logStream);
 
+  // Also mirror output to the current process so CI logs show the UI/errors live
+  childProcess.stdout?.pipe(process.stdout);
+  childProcess.stderr?.pipe(process.stderr);
+
   // Await the process to get the complete result
   const result = await childProcess;
+
+  // Explicitly close the log stream after the child finishes
+  await new Promise(resolve => logStream.end(resolve));
+
+  if (result.exitCode !== 0) {
+    console.error(`\n[${testName}] command failed (exit ${result.exitCode})`);
+    if (result.stdout) {
+      console.error(`[${testName}] stdout:\n${result.stdout}`);
+    }
+    if (result.stderr) {
+      console.error(`[${testName}] stderr:\n${result.stderr}`);
+    }
+  }
 
   // Return stdout/stderr from the final result object for reliable assertions
   return {
