@@ -25,7 +25,7 @@ import { Driver, getDriverEnum } from './src/drivers/types.js';
 import {
     DRIVER_TABS,
     getDriverBySlash,
-    getDriverByLabel,
+   getDriverByLabel,
     getDriverCommandEntries,
     type DriverManifestEntry,
     type DriverRuntimeContext,
@@ -47,6 +47,7 @@ const BASE_COMMANDS: readonly { name: string; description: string }[] = [
     { name: 'newsession', description: 'Start a fresh Claude agent session' },
 ];
 
+type AgentTurnOverrides = AgentPipelineOverrides;
 type AgentTurnOverrides = AgentPipelineOverrides;
 
 type AgentPromptJob = {

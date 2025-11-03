@@ -3,7 +3,6 @@ import { promises as fs } from 'fs';
 
 import { buildStoryAgentsConfig, buildStorySystemPrompt } from './prompt.js';
 import type { DriverPrepareResult } from '../pipeline.js';
-
 const FEATURE_DIRECTIVE_REGEX = /^(?:feature|slug)\s*[:=]\s*([A-Za-z0-9][A-Za-z0-9_-]*)\s*(.*)$/i;
 
 export interface StoryInputPreparation {
