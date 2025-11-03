@@ -9,9 +9,9 @@
  * 5. Conditional routing: plan exists → execute, no plan → END
  */
 
-import { addLog } from '../../logger.ts';
-import type { Message } from '../../types.ts';
-import { agentsConfig } from './agents-config.ts';
+import { addLog } from '../../logger.js';
+import type { Message } from '../../types.js';
+import { agentsConfig } from './agents-config.js';
 
 // ------------- Types -------------
 

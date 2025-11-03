@@ -1,6 +1,6 @@
 import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
-import { addLog } from '../logger.ts';
+import { addLog } from '../logger.js';
 
 const SETTINGS_DIR = '.askman';
 const SETTINGS_FILE = 'settings.json';

@@ -1,9 +1,9 @@
 import type { Dispatch, SetStateAction } from 'react';
 
-import type { PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
+import type { AgentDefinition, PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
 
-import type * as Types from '../../types.ts';
-import { runClaudeStream, type ToolResultEvent, type ToolUseEvent } from '../runtime/runClaudeStream.ts';
+import type * as Types from '../../types.js';
+import { runClaudeStream, type ToolResultEvent, type ToolUseEvent } from '../runtime/runClaudeStream.js';
 
 export interface BaseClaudeFlowDependencies {
     nextMessageId: () => number;
@@ -17,6 +17,11 @@ export interface BaseClaudeFlowRunArgs {
     prompt: string;
     agentSessionId: string;
     sessionInitialized: boolean;
+    systemPrompt?: string;
+    allowedTools?: string[];
+    disallowedTools?: string[];
+    permissionMode?: string;
+    agents?: Record<string, AgentDefinition>;
 }
 
 export interface BaseClaudeFlow {
@@ -32,7 +37,7 @@ export const createBaseClaudeFlow = ({
     canUseTool,
     workspacePath,
 }: BaseClaudeFlowDependencies): BaseClaudeFlow => {
-    const handleUserInput = async ({ prompt, agentSessionId, sessionInitialized }: BaseClaudeFlowRunArgs): Promise<boolean> => {
+    const handleUserInput = async ({ prompt, agentSessionId, sessionInitialized, systemPrompt, allowedTools, disallowedTools, permissionMode, agents }: BaseClaudeFlowRunArgs): Promise<boolean> => {
         const emitAssistantText = (text: string) => {
             if (!text) {
                 return;
@@ -67,10 +72,11 @@ export const createBaseClaudeFlow = ({
             finalizeMessageById(reasoningMessageId);
         };
 
-        const emitToolUse = ({ id, description }: ToolUseEvent) => {
+        const emitToolUse = ({ id, name, description }: ToolUseEvent) => {
+            const base = `event: tool_use, id=${id}, name=${name}`;
             const line = description
-                ? `event: tool_use, id=${id}, description: ${description}`
-                : `event: tool_use, id=${id}`;
+                ? `${base}, description: ${description}`
+                : base;
             const toolUseMessageId = nextMessageId();
             setActiveMessages(prev => [
                 ...prev,
@@ -79,11 +85,11 @@ export const createBaseClaudeFlow = ({
             finalizeMessageById(toolUseMessageId);
         };
 
-        const emitToolResult = ({ id }: ToolResultEvent) => {
+        const emitToolResult = ({ id, name }: ToolResultEvent) => {
             const toolResultMessageId = nextMessageId();
             setActiveMessages(prev => [
                 ...prev,
-                { id: toolResultMessageId, role: 'system', content: `event: tool_result, tool_use_id: ${id}` },
+                { id: toolResultMessageId, role: 'system', content: `event: tool_result, tool_use_id: ${id}, name=${name}` },
             ]);
             finalizeMessageById(toolResultMessageId);
         };
@@ -98,6 +104,11 @@ export const createBaseClaudeFlow = ({
                 model: process.env.ANTHROPIC_MODEL,
                 cwd: workspacePath,
                 canUseTool,
+                systemPrompt,
+                allowedTools,
+                disallowedTools,
+                permissionMode,
+                agents,
             },
             callbacks: {
                 onTextDelta: emitAssistantText,

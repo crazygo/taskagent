@@ -19,7 +19,6 @@ pids
 
 # Node / TypeScript
 node_modules/
-dist/
 build/
 lib/
 out/
@@ -82,9 +81,3 @@ opencodetmp/
 
 # Qoder configuration
 .qoder/
-
-# Publish artifacts
-.npm-cache/
-*.tgz
-package/
-unpack/

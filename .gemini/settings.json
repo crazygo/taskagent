@@ -1,23 +1,32 @@
 {
-	"contextFileName": "AGENTS.md",
-    "mcpServers": {
-        "serena": {
-            "command": "uvx",
-            "args": ["--from", "git+https://github.com/oraios/serena", "serena", "start-mcp-server", "--context", "ide-assistant"],
-            "env": {
-                "API_KEY": "$MY_API_TOKEN"
-            },
-            "cwd": "./",
-            "timeout": 30000,
-            "trust": true
-        },
-        "sequential-thinking": {
-            "command": "npx",
-            "args": [
-                "-y",
-                "@modelcontextprotocol/server-sequential-thinking"
-            ],
-            "trust": true
-        }
+  "context": {
+    "fileName": "AGENTS.md"
+  },
+  "mcpServers": {
+    "serena": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/oraios/serena",
+        "serena",
+        "start-mcp-server",
+        "--context",
+        "ide-assistant"
+      ],
+      "env": {
+        "API_KEY": "$MY_API_TOKEN"
+      },
+      "cwd": "./",
+      "timeout": 30000,
+      "trust": true
+    },
+    "sequential-thinking": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ],
+      "trust": true
+    }
   }
 }

@@ -1,8 +1,8 @@
 import { useCallback, useRef } from 'react';
-import { useMessageQueue } from '../hooks/useMessageQueue.ts';
-import { useStreamSession } from '../hooks/useStreamSession.ts';
-import type { Message, LogMessage } from '../types.ts';
-import type { AiChatProvider } from '../config/ai-provider.ts';
+import { useMessageQueue } from '../hooks/useMessageQueue.js';
+import { useStreamSession } from '../hooks/useStreamSession.js';
+import type { Message, LogMessage } from '../types.js';
+import type { AiChatProvider } from '../config/ai-provider.js';
 
 interface UseConversationStoreOptions {
   aiProvider: AiChatProvider;
