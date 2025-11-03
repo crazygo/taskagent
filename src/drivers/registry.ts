@@ -209,7 +209,7 @@ export const DRIVER_MANIFEST: readonly DriverManifestEntry[] = [
     },
 ] as const;
 
-export const DRIVER_TABS: readonly Driver[] = DRIVER_MANIFEST.map(entry => entry.label as Driver);
+export const DRIVER_TABS: readonly Driver[] = DRIVER_MANIFEST.filter(entry => entry.id !== Driver.PLAN_REVIEW_DO).map(entry => entry.label as Driver);
 
 export const getDriverBySlash = (slashName: string): DriverManifestEntry | undefined => {
     const normalized = slashName.toLowerCase();
