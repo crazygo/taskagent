@@ -244,7 +244,7 @@ const App = () => {
     const [agentSessionId, setAgentSessionId] = useState<string | null>(null);
     const [, setWorkspaceSettings] = useState<WorkspaceSettings | null>(null);
     const [isAgentStreaming, setIsAgentStreaming] = useState(false);
-    const { tasks, createTask, waitTask } = useTaskStore();
+    const { tasks, createTask, createTaskWithAgent, waitTask, cancelTask } = useTaskStore();
     const [positionalPromptWarning, setPositionalPromptWarning] = useState<string | null>(null);
 
     const automationRanRef = useRef(false);
@@ -820,7 +820,9 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
             finalizeMessageById,
             canUseTool: handleAgentPermissionRequest,
             workspacePath: bootstrapConfig?.workspacePath,
+            sourceTabId: selectedTab,
             createTask,
+            createTaskWithAgent,
             waitTask,
             session: sessionContext,
         };

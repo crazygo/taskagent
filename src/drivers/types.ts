@@ -13,6 +13,7 @@ export enum Driver {
     STORY = 'Story',
     UI = 'UI',
     MONITOR = 'Monitor',
+    LOG_MONITOR = 'Log Monitor',
 }
 
 export const DRIVER_NAMES = [
@@ -23,6 +24,7 @@ export const DRIVER_NAMES = [
     'story',
     'ui',
     'monitor',
+    'log-monitor',
 ] as const;
 
 export type DriverName = (typeof DRIVER_NAMES)[number];
@@ -47,7 +49,9 @@ export interface DriverRuntimeContext {
     finalizeMessageById: (messageId: number) => void;
     canUseTool: (toolName: string, input: Record<string, unknown>, options: { signal: AbortSignal; suggestions?: PermissionUpdate[] }) => Promise<unknown>;
     workspacePath?: string;
+    sourceTabId?: string;
     createTask: (prompt: string, queryOptions?: { agents?: Record<string, any> }) => Task;
+    createTaskWithAgent?: (agent: any, userPrompt: string, context: any) => any;
     waitTask: (taskId: string) => Promise<Task>;
     session?: DriverSessionContext;
 }

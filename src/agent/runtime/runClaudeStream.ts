@@ -95,6 +95,12 @@ export const runClaudeStream = async ({
         (options as Record<string, unknown>).permissionMode = queryOptions.permissionMode;
     }
 
+    // Log full options and prompt similarly to TaskManager for Story/Agent runs
+    try {
+        log(`[Agent] Options: ${inspect(options, { depth: 2 })}`);
+        log(`[Agent] Prompt (len=${prompt.length}):\n${truncate(prompt, 5000)}`);
+    } catch {}
+
     const result = query({
         prompt,
         options,

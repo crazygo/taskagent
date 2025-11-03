@@ -18,6 +18,8 @@ import { uiReviewDriverEntry } from './ui-review/index.js';
 // import { buildUiReviewSystemPrompt } from './ui-review/prompt.js'; // No longer needed here
 import { storyDriverEntry } from './story/index.js';
 import { glossaryDriverEntry } from './glossary/index.js';
+import { createLogMonitor } from '../agents/log-monitor/index.js';
+import { addLog } from '../logger.js';
 
 import StackAgentView from '../components/StackAgentView.js';
 
@@ -43,7 +45,7 @@ const createPlaceholderHandler = (label: string): DriverHandler => {
 
 export function getDriverManifest(): readonly DriverManifestEntry[] {
     return [
-    // Background Task Driver
+    // Background Task Drivers
     {
         type: 'background_task',
         id: Driver.PLAN_REVIEW_DO,
@@ -59,6 +61,90 @@ export function getDriverManifest(): readonly DriverManifestEntry[] {
                 createTask: context.createTask,
                 waitTask: context.waitTask,
             });
+        },
+    },
+    {
+        type: 'background_task',
+        id: Driver.LOG_MONITOR,
+        label: Driver.LOG_MONITOR,
+        slash: 'bg:log-monitor',
+        description: '监控 debug.log 文件变化并推送摘要',
+        requiresSession: true,
+        handler: async (message: Message, context: DriverRuntimeContext) => {
+            addLog('[LogMonitor] Handler starting');
+            addLog(`[LogMonitor] Message: ${message.content}`);
+            addLog(`[LogMonitor] Workspace: ${context.workspacePath ?? '(none)'}`);
+            addLog(`[LogMonitor] SourceTab: ${String(context.sourceTabId)}`);
+            addLog(`[LogMonitor] createTaskWithAgent: ${typeof context.createTaskWithAgent}`);
+            
+            // Create LogMonitor agent instance
+            const logMonitor = createLogMonitor('debug.log', 100, 30);
+            addLog(`[LogMonitor] Agent created: ${logMonitor.id}`);
+            
+            // Create task with agent (using new API if available)
+            if ('createTaskWithAgent' in context && typeof context.createTaskWithAgent === 'function') {
+                addLog('[LogMonitor] Using createTaskWithAgent');
+                try {
+                    const result = (context as any).createTaskWithAgent(
+                        logMonitor,
+                        message.content,
+                        {
+                            sourceTabId: (context as any).sourceTabId || 'unknown',
+                            workspacePath: context.workspacePath,
+                            timeoutSec: 3600, // 1 hour default
+                            session: (context as any).session, // Pass session from runtime context
+                        }
+                    );
+                    addLog(`[LogMonitor] Task created: ${result.task.id}`);
+                    
+                    const { task, emitter } = result;
+                    
+                    // Subscribe to events and push to source tab
+                    const levelIcons = { info: 'ℹ️', warning: '⚠️', error: '❌' };
+                    emitter.on('event', (event: any) => {
+                        try { addLog(`[LogMonitor] Event: ${JSON.stringify(event)}`); } catch {}
+                        const icon = levelIcons[event.level as keyof typeof levelIcons] || '📝';
+                        const systemMsg: Message = {
+                            id: context.nextMessageId(),
+                            role: 'system',
+                            content: `${icon} [Log Monitor] ${event.message}`,
+                            isBoxed: event.level === 'error',
+                        };
+                        context.setFrozenMessages(prev => [...prev, systemMsg]);
+                    });
+                    
+                    emitter.on('completed', () => {
+                        addLog('[LogMonitor] Task completed');
+                        const systemMsg: Message = {
+                            id: context.nextMessageId(),
+                            role: 'system',
+                            content: `✅ [Log Monitor] 监控任务已完成`,
+                        };
+                        context.setFrozenMessages(prev => [...prev, systemMsg]);
+                    });
+                    
+                    emitter.on('failed', (error: string) => {
+                        addLog(`[LogMonitor] Task failed: ${error}`);
+                        const systemMsg: Message = {
+                            id: context.nextMessageId(),
+                            role: 'system',
+                            content: `❌ [Log Monitor] 监控任务失败: ${error}`,
+                            isBoxed: true,
+                        };
+                        context.setFrozenMessages(prev => [...prev, systemMsg]);
+                    });
+                } catch (error) {
+                    addLog(`[LogMonitor] Error creating task: ${error instanceof Error ? error.stack || error.message : String(error)}`);
+                    throw error;
+                }
+            } else {
+                addLog('[LogMonitor] Fallback to legacy createTask');
+                // Fallback to legacy createTask
+                context.createTask(message.content);
+            }
+            
+            addLog('[LogMonitor] Handler completed');
+            return true;
         },
     },
     // View Drivers
