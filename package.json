@@ -28,7 +28,7 @@
   "keywords": [],
   "license": "ISC",
   "name": "@askman-dev/task",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "type": "module",
   "scripts": {
     "start": "tsx ui.tsx --",
