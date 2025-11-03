@@ -17,6 +17,11 @@ jobs:
       - name: Enable Corepack
         run: corepack enable
 
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes expect
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:

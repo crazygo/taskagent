@@ -52,6 +52,24 @@ Your primary role is to act as an interactive CLI agent for software engineering
 - **[Memory Systems Analyst](memory/AGENTS.md)**: Use for tasks involving the analysis of conversations or documents to extract and store structured memories (events, facts, skills).
 - **[Source Code Conventions](src/AGENTS.md)**: Implementation-level guidance for TUI streaming, message/state management, error boundaries, performance, and Ink UI.
 
+## Agent Architecture Patterns
+
+### Atomic-Agent
+An agent that is fully defined by its configuration file and is called as a sub-agent by other agents.
+
+**Examples:**
+- `drivers/story/agents/story_builder.agent.md` - File operations for story documents
+- `drivers/glossary/agents/1_searcher.agent.md` - Search for term occurrences
+- `drivers/glossary/agents/2_edits_planner.agent.md` - Plan term replacements
+- `drivers/glossary/agents/3_editor.agent.md` - Execute file edits
+
+### Stack-Agent
+An agent composed of a coordinator and multiple sub-agents. The coordinator defines the workflow and orchestration strategy for calling atomic-agents.
+
+**Examples:**
+- `drivers/glossary/` - Coordinator orchestrates searcher → planner → editor workflow
+- `drivers/story/` - Coordinator manages single sub-agent (story_builder) with user dialogue
+
 ## Document & Memory Placement
 
 - **Chat Memory Store (`memory/chat/`)**: See [memory/chat/AGENTS.md](memory/chat/AGENTS.md) for details.
