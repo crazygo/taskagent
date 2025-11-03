@@ -15,7 +15,11 @@
     "module": "NodeNext",
     "outDir": "./dist",
     "jsx": "react-jsx",
-    "types": ["node"]
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@components/*": ["src/components/*"]
+    }
   },
   "include": [
     "ui.tsx",

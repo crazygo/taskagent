@@ -1,4 +1,4 @@
-import { DRIVER_MANIFEST } from '../drivers/registry.js';
+import { getDriverManifest } from '../drivers/registry.js';
 
 const pad = (label: string, width: number) => label.padEnd(width, ' ');
 
@@ -15,8 +15,11 @@ export const printCliUsage = (): void => {
   console.log(`  ${pad('--newsession', 18)}Force creation of a fresh Claude session`);
   console.log('');
   console.log('Available drivers:');
+  const DRIVER_MANIFEST = getDriverManifest();
   for (const entry of DRIVER_MANIFEST) {
-    console.log(`  ${pad(entry.slash, 18)}${entry.description}`);
+    if (entry.type === 'background_task') {
+      console.log(`  ${pad(entry.slash, 18)}${entry.description}`);
+    }
   }
   console.log('');
   console.log('Examples:');

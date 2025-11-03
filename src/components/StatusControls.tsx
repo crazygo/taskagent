@@ -61,15 +61,14 @@ export const TabView: React.FC<TabViewProps> = ({ staticOptions, tasks, selected
         const selected = selectedTab === tab;
         const backgroundColor = selected ? 'white' : 'gray';
         const color = selected ? 'black' : 'white';
-                        return (
-                          <Box key={tab} backgroundColor={backgroundColor as any} paddingX={1}>
-                            <Text color={color as any}>{` ${tab} `}</Text>
-                          </Box>
-                        );
-        
+        const indicator = selected ? '› ' : '  ';
+        return (
+          <Box key={tab} backgroundColor={backgroundColor as any} paddingX={1}>
+            <Text color={color as any}>{`${indicator}${tab} `}</Text>
+          </Box>
+        );
       })}
       <Box flexGrow={1} backgroundColor="gray"></Box>
     </Box>
   );
 };
-

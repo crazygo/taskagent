@@ -6,13 +6,16 @@
     "@langchain/core": "^1.0.1",
     "@langchain/langgraph": "^1.0.1",
     "@openrouter/ai-sdk-provider": "https://github.com/crazygo/ai-sdk-provider/releases/download/1.2.1/openrouter-ai-sdk-provider-1.2.1.tgz",
+    "@types/js-yaml": "^4.0.9",
     "ai": "^5.0.78",
     "dotenv": "^17.2.3",
+    "glob": "^11.0.3",
     "ink": "^6.3.1",
     "ink-text-input": "^6.0.0",
+    "js-yaml": "^4.1.0",
     "minimist": "^1.2.8",
     "react": "^19.2.0",
-    "zod": "^3.25.76"
+    "zod": "^4.1.12"
   },
   "description": "",
   "devDependencies": {
@@ -21,9 +24,12 @@
     "@types/minimist": "^1.2.0",
     "@types/node": "^24.7.1",
     "@types/react": "^19.2.2",
+    "@vitest/coverage-v8": "^4.0.6",
     "concurrently": "^9.2.1",
+    "execa": "^9.6.0",
     "tsx": "^4.20.6",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.6"
   },
   "keywords": [],
   "license": "ISC",
@@ -35,9 +41,13 @@
     "start": "tsx ui.tsx --",
     "build": "tsc",
     "prepublishOnly": "yarn build",
-    "start:test": "concurrently --raw --kill-others --success first \"yarn start\" \"sleep 5\"",
+    "start:test": "concurrently --raw --kill-others --success first \"yarn start\" \"sleep 10\"",
+    "test:story": "concurrently --raw --kill-others --success first \"yarn start -- --story -p \\\"Hi\\\"\" \"sleep 10\"",
+    "test:glossary": "concurrently --raw --kill-others --success first \"yarn start -- --glossary -p \\\"Hi\\\"\" \"sleep 10\"",
     "e2e:experiment": "expect scripts/e2e-experiment.expect --",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "vitest",
+    "test:ci": "vitest run",
+    "test:watch": "vitest watch",
     "publish": "echo \"Use yarn npm publish --access public\""
   },
   "files": [

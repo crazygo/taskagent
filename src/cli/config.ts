@@ -10,6 +10,7 @@ export interface CliConfig {
   driver?: DriverName;
   workspacePath: string;
   newSession: boolean;
+  ignoredPositionalPrompt?: string; // New field
 }
 
 export const loadCliConfig = (): CliConfig => {
@@ -42,11 +43,12 @@ export const loadCliConfig = (): CliConfig => {
     driver: cliArgs.driver,
     workspacePath,
     newSession,
+    ignoredPositionalPrompt: cliArgs.ignoredPositionalPrompt, // Pass through new field
   };
 
   try {
     addLog(
-      `[CLI] Config -> driver: ${cfg.driver ?? 'undefined'}, prompt: ${cfg.prompt ?? 'undefined'}, workspace: ${cfg.workspacePath ?? 'undefined'}, newSession: ${cfg.newSession}`
+      `[CLI] Config -> driver: ${cfg.driver ?? 'undefined'}, prompt: ${cfg.prompt ?? 'undefined'}, ignoredPositionalPrompt: ${cfg.ignoredPositionalPrompt ?? 'undefined'}, workspace: ${cfg.workspacePath ?? 'undefined'}, newSession: ${cfg.newSession}`
     );
   } catch {}
 

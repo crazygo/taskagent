@@ -11,8 +11,28 @@
     - `MessageComponent`：渲染消息（user/assistant/system），支持多行与 reasoning 段
     - `ActiveHistory`：活动区实时消息区域
     - `App`：核心容器，持有状态与 AI 交互逻辑
+    - `StackAgentView`：通用的占位符视图组件，用于不需要定制 UI 的驱动。
   - 重要模块与目录：
     - `src/components/*`、`src/hooks/*`、`src/domain/*`
+    - `src/agent/agentLoader.ts`: 共享的 Agent 加载工具，负责解析 `.agent.md` 文件和构建 Agent Pipeline 配置。
+
+## StackAgent Implementation Details
+
+### `StackAgentView` Component (`src/components/StackAgentView.tsx`)
+- **Purpose**: Provides a generic UI for drivers that primarily interact via the agent pipeline and do not require a custom visual interface.
+- **Props**: Accepts `label: string` (the driver's display name) and `isActive: boolean`.
+- **Usage**: Replaces individual placeholder view components (e.g., `StoryView`, `GlossaryView`) to reduce boilerplate.
+
+### Shared Agent Loader (`src/agent/agentLoader.ts`)
+- **`parseAgentMdFile(filePath: string)`**: A utility function to parse `.agent.md` files, extracting front matter (name, description, tools, model, sub_agents) and the prompt body.
+- **`loadAgentPipelineConfig(driverDir: string, options?: LoadAgentPipelineConfigOptions)`**: The core function for standardizing agent configuration loading. It supports:
+    - **Coordinator/Sub-Agent Pattern**: By providing `coordinatorFileName` (e.g., `coordinator.agent.md`), it loads the coordinator's prompt and dynamically discovers and loads sub-agents defined in `.agent.md` files within the `driverDir`.
+    - **Prompt-Only Pattern**: By providing `systemPrompt` or `systemPromptFactory`, it allows drivers to define their system prompt directly without `.agent.md` files, accommodating simpler agent configurations (e.g., UI Review).
+- **Output**: Returns an object containing `systemPrompt`, `agents` (if applicable), `allowedTools`, and `disallowedTools`, which can be directly used in `DriverPrepareResult.overrides`.
+
+### Integration with Drivers
+- Drivers (e.g., Story, Glossary, UI Review) now import `StackAgentView` for their `component` property.
+- Their `prepare` functions utilize `loadAgentPipelineConfig` to dynamically build their agent pipeline configuration, abstracting away the details of `.agent.md` parsing or system prompt generation.
 
 ## State & Streams
 - 双轨消息系统：

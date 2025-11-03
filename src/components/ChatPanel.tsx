@@ -120,12 +120,21 @@ interface ChatPanelProps {
   activeMessages: Types.Message[];
   modelName: string;
   workspacePath?: string | null;
+  positionalPromptWarning?: string | null;
 }
 
-export const ChatPanel: React.FC<ChatPanelProps> = ({ frozenMessages, activeMessages, modelName, workspacePath }) => {
+export const ChatPanel: React.FC<ChatPanelProps> = ({ frozenMessages, activeMessages, modelName, workspacePath, positionalPromptWarning }) => {
   const staticItems = [
     <Box key="welcome-screen-wrapper" flexDirection="column">
       <WelcomeScreen modelName={modelName} workspacePath={workspacePath} />
+      {positionalPromptWarning ? (
+        <>
+          <Newline />
+          <Box borderStyle="round" borderColor="yellow" paddingX={1} paddingY={0} flexDirection="column">
+            <Text color="yellow">{positionalPromptWarning}</Text>
+          </Box>
+        </>
+      ) : null}
       <Newline />
     </Box>,
     ...frozenMessages.map(msg => (
