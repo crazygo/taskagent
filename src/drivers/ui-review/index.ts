@@ -31,9 +31,9 @@ async function prepareUiReviewInvocation(
 
 export const uiReviewDriverEntry: ViewDriverEntry = {
     type: 'view',
-    id: Driver.UI_REVIEW,
-    label: Driver.UI_REVIEW,
-    description: 'UI Review · 输出 ASCII 线框 + 注释',
+    id: Driver.UI,
+    label: Driver.UI,
+    description: 'UI · 输出 ASCII 线框 + 注释',
     requiresSession: true,
     component: StackAgentView,
     useAgentPipeline: true,

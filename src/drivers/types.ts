@@ -11,9 +11,8 @@ export enum Driver {
     PLAN_REVIEW_DO = 'Plan-Review-DO',
     GLOSSARY = 'Glossary',
     STORY = 'Story',
-    UI_REVIEW = 'UI Review',
-    LOGIC_REVIEW = 'Logic Review',
-    DATA_REVIEW = 'Data Review',
+    UI = 'UI',
+    MONITOR = 'Monitor',
 }
 
 export const DRIVER_NAMES = [
@@ -22,9 +21,8 @@ export const DRIVER_NAMES = [
     'plan-review-do',
     'glossary',
     'story',
-    'ui-review',
-    'logic-review',
-    'data-review',
+    'ui',
+    'monitor',
 ] as const;
 
 export type DriverName = (typeof DRIVER_NAMES)[number];

@@ -88,3 +88,6 @@ opencodetmp/
 *.tgz
 package/
 unpack/
+
+# Test artifacts
+artifacts/

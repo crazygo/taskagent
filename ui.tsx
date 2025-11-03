@@ -668,7 +668,7 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
             const nextFocusIndex = (currentFocusIndex + 1) % newFocusOrder.length;
             setFocusedControl(newFocusOrder[nextFocusIndex]!);
         }
-    });
+    }, { isActive: !nonInteractiveInput });
 
     useInput((input, key) => {
         if (process.env.E2E_SENTINEL && (input || key.ctrl || key.shift || key.meta || key.return || key.tab)) {
@@ -680,7 +680,7 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
                 addLog(`[App] Ctrl+N detected (focusedControl=${focusedControl}, isCommandMenuShown=${isCommandMenuShown})`);
             }
         }
-    });
+    }, { isActive: !nonInteractiveInput });
 
     const handleEscStateChange = useCallback((isEscActive: boolean) => setIsEscActive(isEscActive), []);
 

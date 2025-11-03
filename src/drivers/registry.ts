@@ -67,23 +67,13 @@ export function getDriverManifest(): readonly DriverManifestEntry[] {
     glossaryDriverEntry,
     {
         type: 'view',
-        id: Driver.LOGIC_REVIEW,
-        label: Driver.LOGIC_REVIEW,
-        description: 'Logic Review · 敬请期待',
+        id: Driver.MONITOR,
+        label: Driver.MONITOR,
+        description: 'Monitor · 敬请期待',
         requiresSession: false,
         component: StackAgentView,
         isPlaceholder: true,
-        handler: createPlaceholderHandler(Driver.LOGIC_REVIEW),
-    },
-    {
-        type: 'view',
-        id: Driver.DATA_REVIEW,
-        label: Driver.DATA_REVIEW,
-        description: 'Data Review · 敬请期待',
-        requiresSession: false,
-        component: StackAgentView,
-        isPlaceholder: true,
-        handler: createPlaceholderHandler(Driver.DATA_REVIEW),
+        handler: createPlaceholderHandler(Driver.MONITOR),
     },
 ];
 }
