@@ -304,9 +304,11 @@ const App = () => {
     const bootstrapNewSessionAppliedRef = useRef<boolean>(false);
     const agentPermissionRequestsRef = useRef<Map<number, AgentPermissionRequest>>(new Map());
     const nextAgentPermissionIdRef = useRef<number>(1);
-const agentPermissionQueueRef = useRef<number[]>([]);
-const [agentPermissionPrompt, setAgentPermissionPrompt] = useState<AgentPermissionPromptState | null>(null);
-const lastAnnouncedDriverRef = useRef<string | null>(null);
+    const agentPermissionRequestsRef = useRef<Map<number, AgentPermissionRequest>>(new Map());
+    const nextAgentPermissionIdRef = useRef<number>(1);
+    const agentPermissionQueueRef = useRef<number[]>([]);
+    const [agentPermissionPrompt, setAgentPermissionPrompt] = useState<AgentPermissionPromptState | null>(null);
+    const lastAnnouncedDriverRef = useRef<string | null>(null);
 
     const finalizeActiveMessages = useCallback(() => {
         setActiveMessages(prev => {
@@ -813,7 +815,7 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
             };
         }
 
-        const runtimeContext: Omit<DriverRuntimeContext, 'session'> & { session?: typeof sessionContext } = {
+        const runtimeContext: DriverRuntimeContext = {
             nextMessageId,
             setActiveMessages,
             setFrozenMessages,

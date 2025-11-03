@@ -6,7 +6,6 @@ export default defineConfig({
     include: ['tests/**/*.test.ts'],
     environment: 'node',
     reporters: ['default', ['junit', { outputFile: 'artifacts/junit.xml' }]],
-    outputFile: 'artifacts/junit.json',
     testTimeout: 60_000,
     hookTimeout: 60_000,
     bail: false,

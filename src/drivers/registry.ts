@@ -114,8 +114,7 @@ export const getDriverByCliName = (cliName: string): ViewDriverEntry | undefined
     const normalizedCliName = cliName.toLowerCase();
     const entry = DRIVER_MANIFEST.find(entry => 
         entry.type === 'view' && 
-        (entry.id.toLowerCase() === normalizedCliName || 
-         entry.label.toLowerCase().replace(/\s/g, '-') === normalizedCliName)
+        (entry.label.toLowerCase().replace(/\s/g, '-') === normalizedCliName)
     );
     if (entry && entry.type === 'view') {
         return entry;
