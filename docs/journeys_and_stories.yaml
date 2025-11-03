@@ -1,0 +1,151 @@
+
+# ===========================================================================
+# Core Journeys & Detailed Stories
+# Version: 3.0
+# Description: This file serves as the central repository for user journeys
+#              and detailed stories, organized by user-centric flows.
+# ===========================================================================
+
+# ===========================================================================
+# I. 核心动线 (Core Journeys)
+#
+# The strategic map of the application, defining the high-level, end-to-end
+# user journeys and how they relate to specific stories.
+# ===========================================================================
+core_journeys:
+
+  - journey: 目标管理动线 (Goal Management Flow)
+    actor: 家庭管理者 (e.g., Parent)
+    description: "一条围绕'目标生命周期'的动线，从创建到维护，确保任务库的健康和有序。"
+    stages:
+      - "创建与配置 (Create & Configure)"
+      - "日常维护 (Maintain)"
+    related_stories:
+      - "作为一名家庭成员，我希望能为家庭成员创建和分配新的日常目标..."
+      - "作为一名家庭成员，我希望能够为目标设置有效期和重复规则..."
+
+  - journey: 每日任务动线 (Daily Task Flow)
+    actor: 家庭成员 (e.g., Child)
+    description: "一条以'天'为周期的核心循环动线，驱动用户每日的互动和成长。"
+    stages:
+      - "查看今日任务 (View)"
+      - "执行并标记完成 (Execute & Mark)"
+      - "回顾历史 (Review History)"
+    related_stories:
+      - "作为一个家庭成员，我想要在一个清晰的列表中看到我今天需要完成的所有目标..."
+      - "作为一个家庭成员，我希望能将一个目标标记为‘已完成’..."
+      - "作为一名家庭成员，我希望在首页能够无限滚动查看历史任务..."
+
+  - journey: 激励闭环动线 (Incentive Loop Flow)
+    actor: 所有家庭成员 (All Family Members)
+    description: "一条将'努力'与'回报'连接起来的动线，是产品的核心激励机制。"
+    stages:
+      - "结算当天成果 (Settle)"
+      - "回顾长期成就 (Review Achievements)"
+    related_stories:
+      - "作为一名家庭成员，我想要通过一个'结算'按钮来结束一天的任务..."
+      - "星星 (Tab) - 查看通过完成目标获得的奖励"
+
+  - journey: 认证与授权动线 (Authentication Flow)
+    actor: 新用户 / 返回用户 (New/Returning User)
+    description: "一条管理家庭成员访问权限的动线，是所有功能的安全入口。"
+    stages:
+      - "首次设置 (First-time Setup)"
+      - "日常登录 (Login)"
+    related_stories:
+      - "authentication (Page) - 登录页"
+
+# ===========================================================================
+# II. 详细故事与测试用例 (Detailed Stories & Test Cases)
+#
+# The detailed database of all user stories, maintaining the original
+# story -> subStories structure.
+# ===========================================================================
+detailed_stories:
+  - role: 家庭成员
+    story: "作为一名家庭成员，我希望能为家庭成员创建和分配新的日常目标，以便于我能规划和指导他们的学习与活动。"
+    subStories:
+      - story: "我希望使用 _(开放的目标列表 (Open Goal List))，来添加一个新的目标（如'完成数学作业'），以便规划家庭成员当天的具体任务。"
+        gwt_scenarios:
+          - scenario: "成功添加一个新目标"
+            given: "用户已登录并位于'目标'页面"
+            when:
+              - "用户点击右下角的浮动按钮（FAB）"
+              - "在弹出的模态框中填写目标标题'完成数学作业'和奖励'5颗星'"
+              - "用户点击'添加'按钮"
+            then:
+              - "模态框应该关闭"
+              - "目标列表中应该出现一个名为'完成数学作业'的新目标"
+
+      - story: "我希望使用 _(开放的目标列表 (Open Goal List))，来修改一个已存在的目标（如调整星星奖励），以便根据实际情况灵活调整任务。"
+        gwt_scenarios:
+          - scenario: "成功修改一个目标"
+            given: "目标列表中存在一个名为'练琴'的目标"
+            when:
+              - "用户点击'练琴'目标旁边的'编辑'图标按钮"
+              - "在弹出的模态框中，将星星奖励从'10'修改为'15'"
+              - "用户点击'更新'按钮"
+            then:
+              - "模态框应该关闭"
+              - "'练琴'目标的星星奖励应该更新为15颗"
+
+      - story: "我希望使用 _(开放的目标列表 (Open Goal List))，来删除一个不再需要的目标，以便保持目标列表的清晰和有效。"
+        gwt_scenarios:
+          - scenario: "成功删除一个目标"
+            given: "目标列表中存在一个名为'旧任务'的目标"
+            when:
+              - "用户点击'旧任务'目标旁边的'编辑'图标按钮"
+              - "在弹出的模态框中，点击'删除'按钮"
+              - "系统弹出确认对话框后，用户点击'确认'"
+            then:
+              - "模态框应该关闭"
+              - "'旧任务'目标应该从列表中消失"
+
+      - story: "作为一名家庭成员，我希望能够对目标列表进行排序，以便根据我的优先级来安排任务。"
+        gwt_scenarios:
+          - scenario: "通过拖拽改变目标顺序"
+            given: "目标列表中有三个目标：A, B, C"
+            when:
+              - "用户在目标B上长按，直到它浮起"
+              - "用户将目标B拖动到目标A的上方并松开"
+            then:
+              - "列表的顺序应该变为：B, A, C"
+              - "系统应该保存这个新的顺序"
+
+  - role: 家庭成员
+    story: "作为一名家庭成员，我希望能够为目标设置有效期和重复规则，以便更好地管理任务的生命周期和周期性安排。"
+    subStories:
+      - story: "我希望在创建或编辑目标时，能够设置目标的有效期，以便过期任务不再显示为今日任务。"
+        # ... GWT scenarios for setting expiration ...
+      - story: "我希望在创建或编辑目标时，能够选择目标的重复规则（例如每周的周一、周三、周五），以便任务能按周期自动出现。"
+        # ... GWT scenarios for setting repetition ...
+
+  - role: 家庭成员
+    story: "作为一名家庭成员，我希望在首页能够无限滚动查看历史任务，以便回顾和管理过去的目标。"
+    subStories:
+      - story: "我希望在'今日目标'列表下方，能够自动加载并显示过去日期的任务列表，形成一个无限滚动的历史记录。"
+        # ... GWT scenarios for infinite scroll ...
+
+  - role: 家庭成员
+    story: "作为一名家庭成员，我想要通过一个'结算'按钮来结束一天的任务，并正式给予星星奖励。"
+    subStories:
+      - story: "通过一个'结算'按钮来结束一天的任务，并正式给予星星奖励。"
+        # ... GWT scenarios for settlement ...
+
+  - role: 家庭成员
+    story: "作为一个家庭成员，我想要在一个清晰的列表中看到我今天需要完成的所有目标，以便于我知道我该做什么。"
+    subStories:
+      - story: "在一个清晰的列表中看到我今天需要完成的所有目标。"
+        # ... GWT scenarios for viewing goals ...
+
+  - role: 家庭成员
+    story: "作为一个家庭成员，我希望能将一个目标标记为‘已完成’，并等待其他家庭成员为我结算今天的成果。"
+    subStories:
+      - story: "将一个目标标记为‘已完成’。"
+        # ... GWT scenarios for marking as complete ...
+
+  - role: 认证用户
+    story: "作为用户，我需要通过认证才能使用应用。"
+    subStories:
+      - story: "应用首次启动时，引导用户设置家庭邮箱和一个4-6位数字的家庭共享PIN码。"
+      - story: "用户打开应用时，输入家庭邮箱和家庭共享PIN码进行验证。"

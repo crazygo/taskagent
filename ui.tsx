@@ -10,7 +10,6 @@ import { addLog } from './src/logger.js';
 import { createBaseClaudeFlow, type BaseClaudeFlow } from './src/agent/flows/baseClaudeFlow.js';
 import { loadCliConfig } from './src/cli/config.js';
 import type { Task } from './task-manager.js';
-import { handlePlanReviewDo } from './src/drivers/plan-review-do/index.js';
 import { ensureAiProvider, type AiChatProvider } from './src/config/ai-provider.js';
 import * as Types from './src/types.js';
 import { ChatPanel } from './src/components/ChatPanel.js';
@@ -21,18 +20,25 @@ import type { AgentPermissionPromptState, AgentPermissionOption } from './src/co
 import { AgentPermissionPromptComponent } from './src/components/AgentPermissionPrompt.js';
 import { useTaskStore } from './src/domain/taskStore.js';
 import { useConversationStore } from './src/domain/conversationStore.js';
-import { Driver, getDriverEnum } from './src/drivers/types.js';
+import {
+    Driver,
+    type DriverManifestEntry,
+    type ViewDriverEntry,
+    type BackgroundTaskDriverEntry,
+    type DriverRuntimeContext,
+} from './src/drivers/types.js';
 import {
     DRIVER_TABS,
     getDriverBySlash,
     getDriverByLabel,
+    getDriverByCliName,
     getDriverCommandEntries,
-    type DriverManifestEntry,
-    type DriverRuntimeContext,
 } from './src/drivers/registry.js';
 import type { AgentPipelineOverrides } from './src/drivers/pipeline.js';
 import { closeTaskLogger } from './src/task-logger.js';
 import { loadWorkspaceSettings, writeWorkspaceSettings, type WorkspaceSettings } from './src/workspace/settings.js';
+import { DriverView } from './src/components/DriverView.js';
+
 // Guard to prevent double submission in dev double-mount scenarios
 let __nonInteractiveSubmittedOnce = false;
 
@@ -239,6 +245,7 @@ const App = () => {
     const [, setWorkspaceSettings] = useState<WorkspaceSettings | null>(null);
     const [isAgentStreaming, setIsAgentStreaming] = useState(false);
     const { tasks, createTask, waitTask } = useTaskStore();
+    const [positionalPromptWarning, setPositionalPromptWarning] = useState<string | null>(null);
 
     const automationRanRef = useRef(false);
     const handleSubmitRef = useRef<((input: string) => Promise<boolean>) | null>(null);
@@ -247,12 +254,13 @@ const App = () => {
         tasksRef.current = tasks;
     }, [tasks]);
 
-    // 从 CLI 参数初始化 Driver（在 bootstrapConfig 确定后）
     useEffect(() => {
         if (bootstrapConfig?.driver) {
-            const driverEnum = getDriverEnum(bootstrapConfig.driver);
-            addLog(`[Driver Init] Setting driver from CLI: ${driverEnum}`);
-            setSelectedTab(driverEnum);
+            const driver = getDriverByCliName(bootstrapConfig.driver);
+            if (driver) {
+                addLog(`[Driver Init] Setting driver from CLI: ${driver.label}`);
+                setSelectedTab(driver.label);
+            }
         }
     }, [bootstrapConfig?.driver]);
 
@@ -339,6 +347,18 @@ const App = () => {
         }
     }, [finalizeActiveMessages, nextMessageId, setFrozenMessages, setActiveMessages]);
 
+    useEffect(() => {
+        if (!bootstrapConfig.ignoredPositionalPrompt) {
+            setPositionalPromptWarning(null);
+            return;
+        }
+        setPositionalPromptWarning(
+            `⚠️ A prompt was provided without the '-p' or '--prompt' flag and has been ignored. ` +
+                `To submit a prompt on startup, please use the correct flag. ` +
+                `Example: yarn start -- --glossary -p "Your prompt here"`
+        );
+    }, [bootstrapConfig.ignoredPositionalPrompt]);
+
     const activateNextAgentPermissionPrompt = useCallback(() => {
         const queue = agentPermissionQueueRef.current;
         while (queue.length > 0) {
@@ -368,7 +388,7 @@ const App = () => {
         const toolName = request.toolName;
         const hasSuggestions = Boolean(request.suggestions && request.suggestions.length > 0);
 
-        // 更新 placeholder 消息，显示权限详情和操作结果
+        // Update placeholder message
         if (request.placeholderMessageId !== undefined) {
             setActiveMessages(prev => prev.map(msg => {
                 if (msg.id !== request.placeholderMessageId) {
@@ -384,15 +404,12 @@ const App = () => {
                     resultContent = `[Agent] Permission #${id} · ${toolName}\n\n${request.summary}\n\n❌ Denied: ${reason}`;
                 }
                 
-                // 移除 isPending 属性，但不设置为 false，这样消息不会被 finalizeActiveMessages 移走
                 const { isPending, ...msgWithoutPending } = msg;
                 return {
                     ...msgWithoutPending,
                     content: resultContent,
                 };
             }));
-
-            // Finalize the permission message immediately after user action
             finalizeMessageById(request.placeholderMessageId);
         }
 
@@ -422,18 +439,11 @@ const App = () => {
         }
 
         const [commandRaw, ...argTokens] = trimmed.split(/\s+/);
-        if (!commandRaw) {
-            return null;
-        }
+        if (!commandRaw) return null;
         const command = commandRaw.toLowerCase();
 
         if (argTokens.length < 1) {
-            appendSystemMessage(
-                command === '/allow'
-                    ? '[Agent] Usage: /allow <id> [always]'
-                    : '[Agent] Usage: /deny <id> [reason]',
-                true
-            );
+            appendSystemMessage(command === '/allow' ? 'Usage: /allow <id> [always]' : 'Usage: /deny <id> [reason]', true);
             return false;
         }
 
@@ -450,13 +460,7 @@ const App = () => {
         }
 
         if (command === '/allow') {
-            let always = false;
-            for (const token of restTokens) {
-                const normalized = token.toLowerCase();
-                if (normalized === 'always' || normalized === '--always') {
-                    always = true;
-                }
-            }
+            const always = restTokens.some(token => token.toLowerCase() === 'always' || token.toLowerCase() === '--always');
             return resolveAgentPermission(id, { kind: 'allow', always });
         }
 
@@ -469,7 +473,6 @@ const App = () => {
             const { signal, suggestions } = options;
             const requestId = nextAgentPermissionIdRef.current++;
             const summary = formatToolInputSummary(input);
-            const hasSuggestions = Boolean(suggestions && suggestions.length > 0);
 
             const placeholderMessageId = nextMessageId();
             const placeholderMessage: Types.Message = {
@@ -481,8 +484,6 @@ const App = () => {
             setActiveMessages(prev => {
                 const newMessages = [...prev];
                 const lastMessage = newMessages.length > 0 ? newMessages[newMessages.length - 1] : null;
-
-                // If the last message is an assistant placeholder, insert the permission message before it.
                 if (lastMessage && lastMessage.role === 'assistant') {
                     newMessages.splice(newMessages.length - 1, 0, placeholderMessage);
                 } else {
@@ -495,16 +496,10 @@ const App = () => {
 
             return new Promise<PermissionResult>(resolve => {
                 let settled = false;
-                let abortHandler: (() => void) | null = null;
-
                 const finalize = (result: PermissionResult) => {
-                    if (settled) {
-                        return;
-                    }
+                    if (settled) return;
                     settled = true;
-                    if (abortHandler) {
-                        signal.removeEventListener('abort', abortHandler);
-                    }
+                    signal.removeEventListener('abort', abortHandler);
                     agentPermissionRequestsRef.current.delete(requestId);
                     agentPermissionQueueRef.current = agentPermissionQueueRef.current.filter(id => id !== requestId);
                     resolve(result);
@@ -512,33 +507,20 @@ const App = () => {
                     activateNextAgentPermissionPrompt();
                 };
 
-                const request: AgentPermissionRequest = {
-                    id: requestId,
-                    toolName,
-                    input,
-                    suggestions,
-                    summary,
-                    placeholderMessageId,
-                    complete: finalize,
-                    cancel: () =>
-                        finalize({
-                            behavior: 'deny',
-                            message: 'Permission request cancelled.',
-                            interrupt: false,
-                        }),
-                };
-
-                abortHandler = () => {
-                    if (!agentPermissionRequestsRef.current.has(requestId)) {
-                        return;
-                    }
+                const abortHandler = () => {
+                    if (!agentPermissionRequestsRef.current.has(requestId)) return;
                     setActiveMessages(prev => prev.filter(msg => msg.id !== placeholderMessageId));
                     appendSystemMessage(`[Agent] Permission request #${requestId} was cancelled by the agent.`, true);
                     addLog(`[Agent] Permission request #${requestId} cancelled by agent/runtime.`);
-                    request.cancel();
+                    finalize({ behavior: 'deny', message: 'Permission request cancelled.', interrupt: false });
                 };
 
-                agentPermissionRequestsRef.current.set(requestId, request);
+                agentPermissionRequestsRef.current.set(requestId, {
+                    id: requestId, toolName, input, suggestions, summary, placeholderMessageId,
+                    complete: finalize,
+                    cancel: () => finalize({ behavior: 'deny', message: 'Permission request cancelled.', interrupt: false }),
+                });
+
                 agentPermissionQueueRef.current.push(requestId);
                 if (!agentPermissionPrompt) {
                     activateNextAgentPermissionPrompt();
@@ -546,62 +528,43 @@ const App = () => {
 
                 if (signal.aborted) {
                     abortHandler();
-                    return;
+                } else {
+                    signal.addEventListener('abort', abortHandler, { once: true });
                 }
-
-                signal.addEventListener('abort', abortHandler, { once: true });
             });
         },
-        [activateNextAgentPermissionPrompt, agentPermissionPrompt, finalizeActiveMessages, nextMessageId, appendSystemMessage, setActiveMessages]
+        [activateNextAgentPermissionPrompt, agentPermissionPrompt, nextMessageId, appendSystemMessage, setActiveMessages]
     );
 
     const handlePermissionPromptSubmit = useCallback(
         (option: AgentPermissionOption) => {
-            if (!agentPermissionPrompt) {
-                return;
-            }
-            if (option === 'allow') {
-                resolveAgentPermission(agentPermissionPrompt.requestId, { kind: 'allow' });
-            } else if (option === 'always') {
-                resolveAgentPermission(agentPermissionPrompt.requestId, { kind: 'allow', always: true });
-            } else {
-                resolveAgentPermission(agentPermissionPrompt.requestId, { kind: 'deny' });
-            }
+            if (!agentPermissionPrompt) return;
+            const decision: AgentPermissionDecision = option === 'deny' 
+                ? { kind: 'deny' } 
+                : { kind: 'allow', always: option === 'always' };
+            resolveAgentPermission(agentPermissionPrompt.requestId, decision);
         },
         [agentPermissionPrompt, resolveAgentPermission]
     );
 
     const baseClaudeFlow = useMemo(
-        () =>
-            createBaseClaudeFlow({
-                nextMessageId,
-                setActiveMessages,
-                finalizeMessageById,
-                canUseTool: handleAgentPermissionRequest,
-                workspacePath: bootstrapConfig?.workspacePath,
-            }),
-        [
+        () => createBaseClaudeFlow({
             nextMessageId,
             setActiveMessages,
             finalizeMessageById,
-            handleAgentPermissionRequest,
-            bootstrapConfig?.workspacePath,
-        ]
+            canUseTool: handleAgentPermissionRequest,
+            workspacePath: bootstrapConfig?.workspacePath,
+        }),
+        [nextMessageId, setActiveMessages, finalizeMessageById, handleAgentPermissionRequest, bootstrapConfig?.workspacePath]
     );
 
-    const agentFlowRegistry: AgentFlowRegistry = useMemo(
-        () => ({
-            default: baseClaudeFlow,
-            story: baseClaudeFlow,
-        }),
-        [baseClaudeFlow]
-    );
+    const agentFlowRegistry: AgentFlowRegistry = useMemo(() => ({
+        default: baseClaudeFlow,
+        story: baseClaudeFlow,
+    }), [baseClaudeFlow]);
 
     const driverCommandEntries = useMemo(() => getDriverCommandEntries(), []);
-    const inputCommands = useMemo(
-        () => [...BASE_COMMANDS, ...driverCommandEntries],
-        [driverCommandEntries]
-    );
+    const inputCommands = useMemo(() => [...BASE_COMMANDS, ...driverCommandEntries], [driverCommandEntries]);
 
     useEffect(() => {
         if (agentPermissionPrompt) {
@@ -614,24 +577,16 @@ const App = () => {
 
     useEffect(() => {
         if (tasks.length > prevTasksLengthRef.current) {
-            // A new task has been added
             const newTaskIndex = tasks.length - 1;
             setSelectedTab(`Task ${newTaskIndex + 1}`);
         }
         prevTasksLengthRef.current = tasks.length;
-    }, [tasks]); // Dependency on tasks array
+    }, [tasks]);
 
     useEffect(() => {
-        if (selectedTab !== Driver.AGENT) {
-            return;
-        }
-
-        if (agentSessionId) {
-            return;
-        }
-
+        if (selectedTab !== Driver.AGENT) return;
+        if (agentSessionId) return;
         const workspacePath = bootstrapConfig?.workspacePath;
-
         if (!workspacePath) {
             if (!agentWorkspaceStatusRef.current.missingNotified) {
                 appendSystemMessage('[Agent] Missing workspace. Launch with --workspace <path> to retain sessions.', true);
@@ -639,31 +594,23 @@ const App = () => {
             }
             return;
         }
-
         agentWorkspaceStatusRef.current.missingNotified = false;
-
         let cancelled = false;
-
         (async () => {
             try {
                 const settings = await loadWorkspaceSettings(workspacePath);
                 if (cancelled) return;
-
                 setWorkspaceSettings(settings);
-
                 let sessionId = settings.sessions.at(-1);
                 if (!sessionId) {
                     sessionId = randomUUID();
-                    const updatedSettings: WorkspaceSettings = {
-                        sessions: [...settings.sessions, sessionId],
-                    };
+                    const updatedSettings: WorkspaceSettings = { sessions: [...settings.sessions, sessionId] };
                     await writeWorkspaceSettings(workspacePath, updatedSettings);
                     if (cancelled) return;
                     setWorkspaceSettings(updatedSettings);
                     addLog(`[Agent] Created new session ${sessionId} for workspace ${workspacePath}`);
                     agentSessionInitializedRef.current = false;
                 }
-
                 if (cancelled) return;
                 setAgentSessionId(sessionId);
                 lastAnnouncedAgentSessionRef.current = null;
@@ -681,56 +628,30 @@ const App = () => {
                 }
             }
         })();
-
-        return () => {
-            cancelled = true;
-        };
+        return () => { cancelled = true; };
     }, [selectedTab, bootstrapConfig?.workspacePath, agentSessionId, appendSystemMessage]);
 
     useEffect(() => {
-        if (selectedTab !== Driver.AGENT) {
-            return;
-        }
-        if (!agentSessionId) {
-            return;
-        }
-        if (shouldForceNewSessionRef.current || forcedSessionPromiseRef.current) {
-            return;
-        }
-        if (lastAnnouncedAgentSessionRef.current === agentSessionId) {
+        if (selectedTab !== Driver.AGENT || !agentSessionId || shouldForceNewSessionRef.current || forcedSessionPromiseRef.current || lastAnnouncedAgentSessionRef.current === agentSessionId) {
             return;
         }
         const workspacePath = bootstrapConfig?.workspacePath ?? '(no workspace)';
-        appendSystemMessage(
-            `[Agent] Using Claude session ${formatSessionId(agentSessionId)} for workspace ${workspacePath}.`
-        );
+        appendSystemMessage(`[Agent] Using Claude session ${formatSessionId(agentSessionId)} for workspace ${workspacePath}.`);
         lastAnnouncedAgentSessionRef.current = agentSessionId;
     }, [selectedTab, agentSessionId, bootstrapConfig?.workspacePath, appendSystemMessage]);
 
     useInput((input, key) => {
-        // 当命令菜单显示时，不响应 Tab 键（让 InputBar 处理）
-        if (agentPermissionPrompt) {
-            return;
-        }
-
-        if (key.tab && isCommandMenuShown) {
-            return;
-        }
-
+        if (agentPermissionPrompt || (key.tab && isCommandMenuShown)) return;
         if (key.tab) {
             const newFocusOrder: Array<typeof focusedControl> = ['input', 'tabs'];
-            if (activeTask) {
-                newFocusOrder.push('task');
-            }
+            if (activeTask) newFocusOrder.push('task');
             const currentFocusIndex = newFocusOrder.indexOf(focusedControl);
             const nextFocusIndex = (currentFocusIndex + 1) % newFocusOrder.length;
             setFocusedControl(newFocusOrder[nextFocusIndex]!);
         }
     });
 
-    // 顶层仅做记录：Ctrl+N 何时被捕获（不改变行为，便于与 InputBar 日志对照）
     useInput((input, key) => {
-        // Debug: log ALL input at top level to diagnose Expect
         if (process.env.E2E_SENTINEL && (input || key.ctrl || key.shift || key.meta || key.return || key.tab)) {
             const inputCode = input ? input.charCodeAt(0) : null;
             addLog(`[App] RAW INPUT: input="${input}" charCode=${inputCode} ctrl=${key.ctrl} shift=${key.shift} meta=${key.meta} tab=${key.tab} return=${key.return}`);
@@ -742,9 +663,7 @@ const App = () => {
         }
     });
 
-    const handleEscStateChange = useCallback((isEscActive: boolean) => {
-        setIsEscActive(isEscActive);
-    }, []);
+    const handleEscStateChange = useCallback((isEscActive: boolean) => setIsEscActive(isEscActive), []);
 
     const createNewAgentSession = useCallback(async (): Promise<string | null> => {
         const workspacePath = bootstrapConfig?.workspacePath;
@@ -752,21 +671,14 @@ const App = () => {
             appendSystemMessage('[Agent] Cannot create a new session without --workspace.', true);
             return null;
         }
-
         if (isAgentStreaming) {
             appendSystemMessage('[Agent] Wait for the current response to finish before creating a new session.', true);
             return null;
         }
-
         try {
             const settings = await loadWorkspaceSettings(workspacePath);
             const newSessionId = randomUUID();
-            const updatedSettings: WorkspaceSettings = {
-                sessions: [
-                    ...settings.sessions.filter(session => typeof session === 'string' && session.trim().length > 0),
-                    newSessionId,
-                ],
-            };
+            const updatedSettings: WorkspaceSettings = { sessions: [...settings.sessions.filter(s => typeof s === 'string' && s.trim().length > 0), newSessionId] };
             await writeWorkspaceSettings(workspacePath, updatedSettings);
             setWorkspaceSettings(updatedSettings);
             setAgentSessionId(newSessionId);
@@ -784,109 +696,55 @@ const App = () => {
     }, [bootstrapConfig?.workspacePath, appendSystemMessage, isAgentStreaming]);
 
     useEffect(() => {
-        if (!bootstrapConfig?.newSession) {
-            return;
-        }
-        if (bootstrapNewSessionAppliedRef.current) {
-            return;
-        }
-        if (!shouldForceNewSessionRef.current) {
-            return;
-        }
+        if (!bootstrapConfig?.newSession || bootstrapNewSessionAppliedRef.current || !shouldForceNewSessionRef.current) return;
         bootstrapNewSessionAppliedRef.current = true;
         shouldForceNewSessionRef.current = false;
         const promise = createNewAgentSession();
         forcedSessionPromiseRef.current = promise;
-        promise
-            .then(sessionId => {
-                if (sessionId) {
-                    addLog(`[CLI] Started fresh Claude session ${formatSessionId(sessionId)} via --newsession flag.`);
-                } else {
-                    shouldForceNewSessionRef.current = true;
-                }
-            })
-            .catch(error => {
-                const message = error instanceof Error ? error.message : String(error);
-                addLog(`[CLI] Failed to start new session from --newsession flag: ${message}`);
-                shouldForceNewSessionRef.current = true;
-            })
-            .finally(() => {
-                if (forcedSessionPromiseRef.current === promise) {
-                    forcedSessionPromiseRef.current = null;
-                }
-            });
+        promise.finally(() => {
+            if (forcedSessionPromiseRef.current === promise) {
+                forcedSessionPromiseRef.current = null;
+            }
+        });
     }, [bootstrapConfig?.newSession, createNewAgentSession]);
 
     const ensureAgentSession = useCallback(async (): Promise<string | null> => {
         if (forcedSessionPromiseRef.current) {
             const pending = await forcedSessionPromiseRef.current;
-            if (pending) {
-                return pending;
-            }
+            if (pending) return pending;
         }
-
         if (shouldForceNewSessionRef.current) {
             shouldForceNewSessionRef.current = false;
             const fresh = await createNewAgentSession();
-            if (!fresh) {
-                shouldForceNewSessionRef.current = true;
-            }
+            if (!fresh) shouldForceNewSessionRef.current = true;
             return fresh;
         }
-
-        if (agentSessionId) {
-            return agentSessionId;
-        }
-        return await createNewAgentSession();
+        return agentSessionId ?? await createNewAgentSession();
     }, [agentSessionId, createNewAgentSession]);
 
     const startAgentPrompt = useCallback(async (job: AgentPromptJob): Promise<boolean> => {
         const { rawInput, prompt, pendingMessageIds, overrides, sessionId, flowId } = job;
-
         const userMessageId = nextMessageId();
-        const userMessage: Types.Message = {
-            id: userMessageId,
-            role: 'user',
-            content: rawInput,
-        };
-
-        setActiveMessages(prev => {
-            const retainedPending = prev.filter(msg =>
-                msg.isPending && !(pendingMessageIds?.includes(msg.id))
-            );
-            return [...retainedPending, userMessage];
-        });
-
-        // Finalize the user message so it's added to the history
+        const userMessage: Types.Message = { id: userMessageId, role: 'user', content: rawInput };
+        setActiveMessages(prev => [...prev.filter(msg => msg.isPending && !(pendingMessageIds?.includes(msg.id))), userMessage]);
         finalizeMessageById(userMessageId);
-
         setIsAgentStreaming(true);
         addLog(`[Agent] Sending prompt with session ${sessionId}: ${prompt.replace(/\s+/g, ' ').slice(0, 120)}`);
-
         try {
-            const activeAgentFlow: BaseClaudeFlow =
-                (flowId ? agentFlowRegistry[flowId] : undefined) ?? agentFlowRegistry.default;
-
+            const activeAgentFlow: BaseClaudeFlow = (flowId ? agentFlowRegistry[flowId] : undefined) ?? agentFlowRegistry.default;
             await activeAgentFlow.handleUserInput({
                 prompt,
                 agentSessionId: sessionId,
                 sessionInitialized: agentSessionInitializedRef.current,
-                systemPrompt: overrides?.systemPrompt,
-                allowedTools: overrides?.allowedTools,
-                disallowedTools: overrides?.disallowedTools,
-                permissionMode: overrides?.permissionMode,
-                agents: overrides?.agents,
+                ...overrides,
             });
-
             agentSessionInitializedRef.current = true;
             return true;
-
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
             const details = formatErrorForDisplay(error);
             const combinedMessage = details ? `${message}\n${details}` : message;
             addLog(`[Agent] Error: ${combinedMessage}`);
-            // Finalize the user message on error as well
             finalizeMessageById(userMessageId);
             appendSystemMessage(`[Agent] Error: ${combinedMessage}`, true);
             return false;
@@ -894,179 +752,99 @@ const App = () => {
             setIsAgentStreaming(false);
             if (agentPendingQueueRef.current.length > 0) {
                 const nextJob = agentPendingQueueRef.current.shift();
-                if (nextJob) {
-                    void startAgentPrompt(nextJob);
-                }
+                if (nextJob) void startAgentPrompt(nextJob);
             }
         }
     }, [agentFlowRegistry, appendSystemMessage, nextMessageId, setActiveMessages, finalizeMessageById]);
 
     const runAgentTurn = useCallback(async (rawInput: string, overrides?: AgentTurnOverrides, sessionIdHint?: string, flowId?: string): Promise<boolean> => {
         const prompt = rawInput.trim();
-        if (prompt.length === 0) {
-            return false;
-        }
-
+        if (prompt.length === 0) return false;
         const activeSessionId = agentSessionId ?? sessionIdHint ?? null;
-
         if (!activeSessionId) {
             appendSystemMessage('[Agent] Session not ready yet. Switch to the Agent tab again to initialize.', true);
             return false;
         }
-
-        const isBusy = isAgentStreaming || agentPendingQueueRef.current.length > 0;
-
-        if (isBusy) {
+        if (isAgentStreaming || agentPendingQueueRef.current.length > 0) {
             const pendingUserMessageId = nextMessageId();
             const pendingAssistantMessageId = nextMessageId();
-
-            const pendingUserMessage: Types.Message = {
-                id: pendingUserMessageId,
-                role: 'user',
-                content: rawInput,
-                isPending: true,
-            };
-
-            const pendingAssistantMessage: Types.Message = {
-                id: pendingAssistantMessageId,
-                role: 'assistant',
-                content: '',
-                reasoning: '',
-                isPending: true,
-            };
-
+            const pendingUserMessage: Types.Message = { id: pendingUserMessageId, role: 'user', content: rawInput, isPending: true };
+            const pendingAssistantMessage: Types.Message = { id: pendingAssistantMessageId, role: 'assistant', content: '', reasoning: '', isPending: true };
             setActiveMessages(prev => [...prev.filter(msg => msg.isPending), pendingUserMessage, pendingAssistantMessage]);
-
-            agentPendingQueueRef.current.push({
-                rawInput,
-                prompt,
-                pendingMessageIds: [pendingUserMessageId, pendingAssistantMessageId],
-                sessionId: activeSessionId,
-                overrides,
-                flowId,
-            });
-
-            appendSystemMessage(
-                `[Agent] Still processing previous request. Your message has been queued (${agentPendingQueueRef.current.length} pending).`
-            );
+            agentPendingQueueRef.current.push({ rawInput, prompt, pendingMessageIds: [pendingUserMessageId, pendingAssistantMessageId], sessionId: activeSessionId, overrides, flowId });
+            appendSystemMessage(`[Agent] Still processing previous request. Your message has been queued (${agentPendingQueueRef.current.length} pending).`);
             return true;
         }
-
         return await startAgentPrompt({ rawInput, prompt, overrides, sessionId: activeSessionId, flowId });
     }, [agentSessionId, appendSystemMessage, isAgentStreaming, nextMessageId, setActiveMessages, startAgentPrompt]);
 
-    const runDriverEntry = useCallback(
-        async (entry: DriverManifestEntry, prompt: string): Promise<boolean> => {
-            let sessionContext = undefined as { id: string; initialized: boolean; markInitialized: () => void } | undefined;
-
-            if (entry.requiresSession) {
-                const sessionId = await ensureAgentSession();
-                if (!sessionId) {
-                    appendSystemMessage(`[${entry.label}] Failed to initialize Claude session.`, true);
-                    addLog(`[Driver] Failed to ensure Claude session for ${entry.label}`);
-                    return false;
-                }
-
-                sessionContext = {
-                    id: sessionId,
-                    initialized: agentSessionInitializedRef.current,
-                    markInitialized: () => {
-                        agentSessionInitializedRef.current = true;
-                    },
-                };
-            }
-
-            const runtimeContext: DriverRuntimeContext = {
-                nextMessageId,
-                setActiveMessages,
-                setFrozenMessages,
-                finalizeMessageById,
-                canUseTool: handleAgentPermissionRequest,
-                workspacePath: bootstrapConfig?.workspacePath,
-                createTask,
-                waitTask,
-                session: sessionContext,
-            };
-
-            if (entry.useAgentPipeline) {
-                let processedPrompt = prompt;
-                let overrides: AgentTurnOverrides = {
-                    systemPrompt: entry.pipelineOptions?.systemPromptFactory?.(),
-                    allowedTools: entry.pipelineOptions?.allowedTools,
-                    disallowedTools: entry.pipelineOptions?.disallowedTools,
-                    permissionMode: entry.pipelineOptions?.permissionMode,
-                    agents: entry.pipelineOptions?.agents as Record<string, AgentDefinition> | undefined,
-                };
-                let flowId = entry.pipelineFlowId;
-
-                if (entry.prepare) {
-                    try {
-                        const preparation = await entry.prepare(prompt, runtimeContext);
-                        if (preparation?.prompt !== undefined) {
-                            processedPrompt = preparation.prompt;
-                        }
-                        if (preparation?.overrides) {
-                            overrides = {
-                                ...overrides,
-                                ...preparation.overrides,
-                            };
-                        }
-                        if (preparation?.flowId) {
-                            flowId = preparation.flowId;
-                        }
-                        if (preparation?.debugLog) {
-                            addLog(preparation.debugLog);
-                        }
-                    } catch (error) {
-                        const message = error instanceof Error ? error.message : String(error);
-                        addLog(`[Driver] ${entry.label} preparation failed: ${message}`);
-                        appendSystemMessage(`[${entry.label}] ${message}`, true);
-                        return false;
-                    }
-                }
-
-                addLog(
-                    `[Driver] Dispatching to ${entry.label} via agent pipeline${flowId ? ` (flow=${flowId})` : ''}`
-                );
-                return await runAgentTurn(
-                    processedPrompt,
-                    overrides,
-                    runtimeContext.session?.id ?? agentSessionId ?? undefined,
-                    flowId
-                );
-            }
-
-            const userMessage: Types.Message = {
-                id: nextMessageId(),
-                role: 'user',
-                content: prompt,
-            };
-
-            try {
-                addLog(`[Driver] Dispatching to ${entry.label}`);
-                return await entry.handler(userMessage, runtimeContext);
-            } catch (error) {
-                const message = error instanceof Error ? error.message : String(error);
-                addLog(`[Driver] Error in ${entry.label}: ${message}`);
-                appendSystemMessage(`[${entry.label}] Error: ${message}`, true);
+    const runDriverEntry = useCallback(async (entry: DriverManifestEntry, prompt: string): Promise<boolean> => {
+        let sessionContext = undefined as { id: string; initialized: boolean; markInitialized: () => void } | undefined;
+        if (entry.requiresSession) {
+            const sessionId = await ensureAgentSession();
+            if (!sessionId) {
+                appendSystemMessage(`[${entry.label}] Failed to initialize Claude session.`, true);
+                addLog(`[Driver] Failed to ensure Claude session for ${entry.label}`);
                 return false;
             }
-        },
-        [
-            agentSessionId,
-            appendSystemMessage,
-            bootstrapConfig?.workspacePath,
-            createTask,
-            ensureAgentSession,
-            finalizeMessageById,
-            handleAgentPermissionRequest,
-            runAgentTurn,
+            sessionContext = {
+                id: sessionId,
+                initialized: agentSessionInitializedRef.current,
+                markInitialized: () => { agentSessionInitializedRef.current = true; },
+            };
+        }
+
+        const runtimeContext: Omit<DriverRuntimeContext, 'session'> & { session?: typeof sessionContext } = {
             nextMessageId,
             setActiveMessages,
             setFrozenMessages,
+            finalizeMessageById,
+            canUseTool: handleAgentPermissionRequest,
+            workspacePath: bootstrapConfig?.workspacePath,
+            createTask,
             waitTask,
-        ]
-    );
+            session: sessionContext,
+        };
+
+        if (entry.type === 'view' && entry.useAgentPipeline) {
+            let processedPrompt = prompt;
+            let overrides: AgentTurnOverrides = { ...entry.pipelineOptions };
+            let flowId: string | undefined;
+
+            if (entry.prepare) {
+                try {
+                    const preparation = await entry.prepare(prompt, runtimeContext);
+                    if (preparation?.prompt !== undefined) processedPrompt = preparation.prompt;
+                    if (preparation?.overrides) overrides = { ...overrides, ...preparation.overrides };
+                    if (preparation?.flowId) flowId = preparation.flowId;
+                    if (preparation?.debugLog) addLog(preparation.debugLog);
+                } catch (error) {
+                    const message = error instanceof Error ? error.message : String(error);
+                    addLog(`[Driver] ${entry.label} preparation failed: ${message}`);
+                    appendSystemMessage(`[${entry.label}] ${message}`, true);
+                    return false;
+                }
+            }
+            addLog(`[Driver] Dispatching to ${entry.label} via agent pipeline${flowId ? ` (flow=${flowId})` : ''}`);
+            return await runAgentTurn(processedPrompt, overrides, runtimeContext.session?.id ?? agentSessionId ?? undefined, flowId);
+        }
+
+        const userMessage: Types.Message = { id: nextMessageId(), role: 'user', content: prompt };
+        try {
+            addLog(`[Driver] Dispatching to ${entry.label}`);
+            if (entry.type === 'background_task') {
+                return await entry.handler(userMessage, runtimeContext);
+            } else if (entry.type === 'view' && entry.handler) {
+                return await entry.handler(userMessage, runtimeContext);
+            }
+            return false;
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            addLog(`[Driver] Error in ${entry.label}: ${message}`);
+            appendSystemMessage(`[${entry.label}] Error: ${message}`, true);
+            return false;
+        }
+    }, [agentSessionId, appendSystemMessage, bootstrapConfig?.workspacePath, createTask, ensureAgentSession, finalizeMessageById, handleAgentPermissionRequest, runAgentTurn, nextMessageId, setActiveMessages, setFrozenMessages, waitTask]);
 
     const handleSubmit = useCallback(async (userInput: string): Promise<boolean> => {
         addLog('--- New Submission ---');
@@ -1075,9 +853,7 @@ const App = () => {
 
         const permissionHandled = handleAgentPermissionCommand(trimmedInput);
         if (permissionHandled !== null) {
-            if (permissionHandled) {
-                setInputValue('');
-            }
+            if (permissionHandled) setInputValue('');
             return permissionHandled;
         }
 
@@ -1086,21 +862,17 @@ const App = () => {
             return (await createNewAgentSession()) !== null;
         }
 
-        const slashMatch = userInput.startsWith('/')
-            ? /^\/([^\s]+)(?:\s+([\s\S]*))?$/.exec(userInput)
-            : null;
-
+        const slashMatch = userInput.startsWith('/') ? /^\/([^\s]+)(?:\s+([\s\S]*))?$/.exec(userInput) : null;
         if (slashMatch) {
             const command = slashMatch[1]?.toLowerCase() ?? '';
             const rest = slashMatch[2] ?? '';
 
             if (command === 'task') {
-                const prompt = rest.length > 0 ? rest : '';
-                if (!prompt) {
+                if (!rest) {
                     addLog('[Command] /task requires a prompt');
                     return false;
                 }
-                createTask(prompt);
+                createTask(rest);
                 setInputValue('');
                 return true;
             }
@@ -1112,17 +884,13 @@ const App = () => {
                     addLog(`[Command] /${command} requires a prompt`);
                     return false;
                 }
-                if (selectedTab !== driverEntry.label) {
-                    addLog(`[Command] Switching to ${driverEntry.label} tab`);
-                    setSelectedTab(driverEntry.label);
-                }
+                // Note: We don't switch tabs for background tasks
                 setInputValue('');
                 return await runDriverEntry(driverEntry, prompt);
             }
         }
 
         setInputValue('');
-
         const activeDriver = getDriverByLabel(selectedTab);
         if (activeDriver) {
             addLog(`[Driver] Routing to ${activeDriver.label}`);
@@ -1133,34 +901,7 @@ const App = () => {
             return await runAgentTurn(userInput);
         }
 
-        setInputValue('');
-
-        if (selectedTab === Driver.PLAN_REVIEW_DO) {
-            const newUserMessage: Types.Message = {
-                id: nextMessageId(),
-                role: 'user',
-                content: userInput,
-            };
-            addLog('[Driver] Routing to Plan-Review-DO');
-            return await handlePlanReviewDo(newUserMessage, {
-                nextMessageId,
-                setActiveMessages,
-                setFrozenMessages,
-                createTask,
-                waitTask,
-            });
-        }
-
-        if (selectedTab === Driver.AGENT) {
-            return await runAgentTurn(userInput);
-        }
-
-        const newUserMessage: Types.Message = {
-            id: nextMessageId(),
-            role: 'user',
-            content: userInput,
-        };
-
+        const newUserMessage: Types.Message = { id: nextMessageId(), role: 'user', content: userInput };
         if (selectedTab === Driver.CHAT) {
             addLog('[Driver] Using Chat mode');
         } else {
@@ -1194,87 +935,31 @@ const App = () => {
             }
         }
         return succeeded && !flushFailed;
-    }, [
-        appendSystemMessage,
-        createNewAgentSession,
-        createTask,
-        flushPendingQueue,
-        handleAgentPermissionCommand,
-        isProcessingQueueRef,
-        isStreaming,
-        handleAgentPermissionCommand,
-        nextMessageId,
-        pendingUserInputsRef,
-        runAgentTurn,
-        runDriverEntry,
-        runStreamForUserMessage,
-        selectedTab,
-        setInputValue,
-        setSelectedTab,
-    ]);
+    }, [appendSystemMessage, createNewAgentSession, createTask, flushPendingQueue, handleAgentPermissionCommand, isProcessingQueueRef, isStreaming, nextMessageId, pendingUserInputsRef, runAgentTurn, runDriverEntry, runStreamForUserMessage, selectedTab, setInputValue]);
+
+    useEffect(() => { handleSubmitRef.current = handleSubmit; }, [handleSubmit]);
 
     useEffect(() => {
-        handleSubmitRef.current = handleSubmit;
-    }, [handleSubmit]);
-
-    useEffect(() => {
-        if (!nonInteractiveInput || hasProcessedNonInteractiveRef.current || __nonInteractiveSubmittedOnce) {
-            return;
-        }
-
-        // 如果 CLI 指定了 driver，则等待 selectedDriver 与之匹配后再提交
-        const desired = bootstrapConfig?.driver ? getDriverEnum(bootstrapConfig.driver) : null;
-        if (desired && selectedTab !== desired) {
-            return; // 等待 driver 初始化完成
-        }
-
+        if (!nonInteractiveInput || hasProcessedNonInteractiveRef.current || __nonInteractiveSubmittedOnce) return;
+        const desiredDriver = bootstrapConfig?.driver ? getDriverByCliName(bootstrapConfig.driver) : null;
+        if (desiredDriver && selectedTab !== desiredDriver.label) return;
         hasProcessedNonInteractiveRef.current = true;
         __nonInteractiveSubmittedOnce = true;
         addLog(`Non-interactive mode: Processing input "${nonInteractiveInput}"`);
         handleSubmit(nonInteractiveInput)
-            .then(success => {
-                setTimeout(() => {
-                    process.exit(success ? 0 : 1);
-                }, 100);
-            })
-            .catch(() => {
-                setTimeout(() => {
-                    process.exit(1);
-                }, 100);
-            });
+            .then(success => setTimeout(() => process.exit(success ? 0 : 1), 100))
+            .catch(() => setTimeout(() => process.exit(1), 100));
     }, [handleSubmit, nonInteractiveInput, selectedTab, bootstrapConfig?.driver]);
 
     useEffect(() => {
-        if (!e2eSteps || e2eSteps.length === 0) {
-            return;
-        }
-        if (nonInteractiveInput) {
-            addLog('[E2E] Automation skipped: nonInteractiveInput already provided.');
-            return;
-        }
-        if (automationRanRef.current) {
-            return;
-        }
+        if (!e2eSteps || e2eSteps.length === 0 || nonInteractiveInput || automationRanRef.current) return;
         automationRanRef.current = true;
-
         let cancelled = false;
-
-        const sleep = (ms = 0) =>
-            new Promise<void>(resolve => {
-                const duration = Math.max(0, ms);
-                setTimeout(() => {
-                    if (!cancelled) {
-                        resolve();
-                    }
-                }, duration);
-            });
-
+        const sleep = (ms = 0) => new Promise<void>(resolve => setTimeout(() => !cancelled && resolve(), Math.max(0, ms)));
         const waitForStreamIdle = async (timeoutMs = 30000) => {
             const started = Date.now();
             while (!cancelled) {
-                if (!isStreamingRef.current && !isProcessingQueueRef.current) {
-                    return true;
-                }
+                if (!isStreamingRef.current && !isProcessingQueueRef.current) return true;
                 if (Date.now() - started > timeoutMs) {
                     addLog(`[E2E] waitForStreamIdle timed out after ${timeoutMs}ms`);
                     return false;
@@ -1283,122 +968,57 @@ const App = () => {
             }
             return false;
         };
-
-        const getAllTabs = () => {
-            const taskList = tasksRef.current ?? [];
-            return [
-                ...STATIC_TABS,
-                ...taskList.map((_task, index: number) => `Task ${index + 1}`),
-            ];
-        };
+        const getAllTabs = () => [...STATIC_TABS, ...(tasksRef.current ?? []).map((_, i) => `Task ${i + 1}`)];
 
         (async () => {
             addLog(`[E2E] Automation starting with ${e2eSteps.length} steps.`);
             for (const step of e2eSteps) {
-                if (cancelled) {
-                    break;
-                }
-
+                if (cancelled) break;
                 switch (step.action) {
-                    case 'wait': {
-                        const ms = Math.max(0, step.ms ?? 0);
-                        addLog(`[E2E] wait ${ms}ms`);
-                        await sleep(ms);
-                        break;
-                    }
-                    case 'press': {
-                        const key = step.key.toLowerCase();
-                        if (key === 'ctrl+n') {
-                            const repeat = Math.max(1, step.repeat ?? 1);
-                            for (let count = 0; count < repeat && !cancelled; count++) {
+                    case 'wait': await sleep(step.ms); break;
+                    case 'press':
+                        if (step.key.toLowerCase() === 'ctrl+n') {
+                            for (let i = 0; i < (step.repeat ?? 1) && !cancelled; i++) {
                                 const tabs = getAllTabs();
-                                if (tabs.length === 0) {
-                                    addLog('[E2E] press ctrl+n skipped (no tabs available)');
-                                    break;
-                                }
-                                const current = selectedTabRef.current ?? tabs[0];
-                                const currentIndex = tabs.indexOf(current);
+                                if (tabs.length === 0) break;
+                                const currentIndex = tabs.indexOf(selectedTabRef.current ?? tabs[0]!);
                                 const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % tabs.length : 0;
-                                const nextTab = tabs[nextIndex]!;
-                                addLog(`[E2E] press ctrl+n -> ${nextTab}`);
-                                setSelectedTab(nextTab);
+                                setSelectedTab(tabs[nextIndex]!);
                                 await sleep(step.delayMs ?? 200);
                             }
-                        } else {
-                            addLog(`[E2E] Unsupported press key: ${step.key}`);
                         }
                         break;
-                    }
-                    case 'switchTab': {
-                        const target = step.tab?.toLowerCase?.();
-                        const tabs = getAllTabs();
-                        if (!target) {
-                            addLog('[E2E] switchTab step missing tab value');
-                            break;
-                        }
-                        const found = tabs.find(tab => tab.toLowerCase() === target);
-                        if (found) {
-                            addLog(`[E2E] switchTab -> ${found}`);
-                            setSelectedTab(found);
+                    case 'switchTab':
+                        const target = getAllTabs().find(t => t.toLowerCase() === step.tab?.toLowerCase());
+                        if (target) {
+                            setSelectedTab(target);
                             await sleep(step.delayMs ?? 200);
-                        } else {
-                            addLog(`[E2E] switchTab: tab "${step.tab}" not found in [${tabs.join(', ')}]`);
                         }
                         break;
-                    }
-                    case 'submit': {
-                        const message = step.text ?? '';
-                        addLog(`[E2E] submit -> ${JSON.stringify(message)}`);
-                        setInputValue(message);
+                    case 'submit':
+                        setInputValue(step.text ?? '');
                         await sleep(step.preDelayMs ?? 50);
                         const submitFn = handleSubmitRef.current;
-                        if (!submitFn) {
-                            addLog('[E2E] submit skipped: handleSubmit not available');
-                            break;
+                        if (submitFn) {
+                            await submitFn(step.text ?? '');
+                            if (step.waitForStream !== false) await waitForStreamIdle(step.timeoutMs);
                         }
-                        const success = await submitFn(message);
-                        addLog(`[E2E] submit result=${success}`);
-                        if (!cancelled && step.waitForStream !== false) {
-                            const ok = await waitForStreamIdle(step.timeoutMs ?? 30000);
-                            addLog(`[E2E] waitForStream result=${ok}`);
-                        }
-                        if (step.postDelayMs && step.postDelayMs > 0) {
-                            await sleep(step.postDelayMs);
-                        }
+                        if (step.postDelayMs) await sleep(step.postDelayMs);
                         break;
-                    }
-                    case 'exit': {
-                        const delay = Math.max(0, step.delayMs ?? 500);
-                        const code = step.code ?? 0;
-                        addLog(`[E2E] exit scheduled in ${delay}ms with code ${code}`);
-                        setTimeout(() => {
-                            addLog(`[E2E] exit now with code ${code}`);
-                            process.exit(code);
-                        }, delay);
+                    case 'exit':
+                        setTimeout(() => process.exit(step.code ?? 0), Math.max(0, step.delayMs ?? 500));
                         cancelled = true;
                         break;
-                    }
-                    default: {
-                        addLog(`[E2E] Unknown automation step: ${JSON.stringify(step)}`);
-                        break;
-                    }
                 }
             }
-        })().catch(error => {
-            const message = error instanceof Error ? error.stack ?? error.message : String(error);
-            addLog(`[E2E] Automation crashed: ${message}`);
-        });
-
-        return () => {
-            cancelled = true;
-        };
+        })().catch(error => addLog(`[E2E] Automation crashed: ${error instanceof Error ? error.stack ?? error.message : String(error)}`));
+        return () => { cancelled = true; };
     }, [e2eSteps, nonInteractiveInput]);
 
     // --- RENDER ---
     const staticTabs = STATIC_TABS;
     const taskTabs = tasks.map((_: Task, index: number) => `Task ${index + 1}`);
-    const allTabs = [...staticTabs, ...taskTabs];
-
+    
     let activeTask: Task | null = null;
     let activeTaskNumber = 0;
     if (selectedTab.startsWith('Task ')) {
@@ -1409,6 +1029,8 @@ const App = () => {
         }
     }
 
+    const isDriverViewActive = STATIC_TABS.includes(selectedTab) && selectedTab !== Driver.CHAT && selectedTab !== Driver.AGENT;
+
     return (
         <Box flexDirection="column" height="100%">
             <ChatPanel
@@ -1416,7 +1038,10 @@ const App = () => {
                 activeMessages={activeMessages}
                 modelName={modelName}
                 workspacePath={bootstrapConfig.workspacePath}
+                positionalPromptWarning={positionalPromptWarning}
             />
+
+            {isDriverViewActive && <DriverView selectedTab={selectedTab} />}
 
             {!nonInteractiveInput && (
                 <>
@@ -1462,47 +1087,19 @@ const App = () => {
             )}
         </Box>
     );
-};// --- Render ---
-// Force stdin to be enabled even under Expect/PTY for E2E testing
+};
+
+// --- Render ---
 const { stdin, stdout, stderr } = process;
-
-// Log stdin state for debugging
-addLog(`[Render] stdin.isTTY=${stdin.isTTY}, stdin.isRaw=${stdin.isRaw}`);
-
-// Ensure stdin is in raw mode for Ink (required for useInput to work)
 if (stdin.isTTY && !stdin.isRaw) {
-    addLog('[Render] Setting stdin to raw mode');
     stdin.setRawMode(true);
 }
-
-// For E2E testing: disable stdout buffering for real-time display
-if (process.env.E2E_SENTINEL) {
-    addLog('[Render] E2E mode: disabling stdout buffering');
-    if (stdout.isTTY && typeof (stdout as any).setNoDelay === 'function') {
-        (stdout as any).setNoDelay(true);
-    }
+if (process.env.E2E_SENTINEL && stdout.isTTY && typeof (stdout as any).setNoDelay === 'function') {
+    (stdout as any).setNoDelay(true);
 }
-
-render(<App />, {
-    stdin,
-    stdout,
-    stderr,
-    debug: false,
-    exitOnCtrlC: true,
-    patchConsole: false,
-});
+render(<App />, { stdin, stdout, stderr, debug: false, exitOnCtrlC: true, patchConsole: false });
 
 // --- Cleanup on exit ---
-process.on('exit', () => {
-    closeTaskLogger();
-});
-
-process.on('SIGINT', () => {
-    closeTaskLogger();
-    process.exit(0);
-});
-
-process.on('SIGTERM', () => {
-    closeTaskLogger();
-    process.exit(0);
-});
+process.on('exit', closeTaskLogger);
+process.on('SIGINT', () => { closeTaskLogger(); process.exit(0); });
+process.on('SIGTERM', () => { closeTaskLogger(); process.exit(0); });

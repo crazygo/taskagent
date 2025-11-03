@@ -1,6 +1,7 @@
 import minimist from 'minimist';
+
 import { addLog } from '../logger.js';
-import type { DriverName } from '../drivers/types.js';
+import { type DriverName } from '../drivers/types.js';
 
 interface CliArgs {
   prompt?: string;
@@ -8,15 +9,14 @@ interface CliArgs {
   workspace?: string;
   newSession?: boolean;
   help?: boolean;
+  ignoredPositionalPrompt?: string; // New field
 }
 
 export const parseCliArgs = (): CliArgs => {
-  // Robustly locate the first flag (ignoring script paths like ui.tsx)
   const raw = process.argv.slice(2);
   try { addLog(`[CLI] process.argv: ${JSON.stringify(process.argv)}`); } catch {}
   const firstFlagIdx = raw.findIndex(arg => typeof arg === 'string' && arg.startsWith('-'));
   let toParse = firstFlagIdx >= 0 ? raw.slice(firstFlagIdx) : [];
-  // Drop leading "--" separators so minimist will actually parse flags
   while (toParse.length > 0 && toParse[0] === '--') {
     toParse = toParse.slice(1);
   }
@@ -26,7 +26,6 @@ export const parseCliArgs = (): CliArgs => {
   const validDrivers: DriverName[] = [
     'chat',
     'agent',
-    'manual',
     'plan-review-do',
     'glossary',
     'story',
@@ -35,6 +34,11 @@ export const parseCliArgs = (): CliArgs => {
     'data-review',
   ];
 
+  const normalizeDriverSlug = (value: string): DriverName | undefined => {
+    const normalized = value.trim().toLowerCase().replace(/\s+/g, '-');
+    return validDrivers.find(candidate => candidate === normalized);
+  };
+
   const detectDriverFlag = (): DriverName | undefined => {
     for (const candidate of validDrivers) {
       if (argv[candidate] === true) {
@@ -42,17 +46,15 @@ export const parseCliArgs = (): CliArgs => {
       }
       const value = argv[candidate];
       if (typeof value === 'string' && value.trim().length > 0) {
-        const normalized = value.trim().toLowerCase();
-        if (normalized === candidate) {
-          return candidate;
-        }
+        const normalizedValue = normalizeDriverSlug(value);
+        if (normalizedValue === candidate) return candidate;
       }
     }
     return undefined;
   };
 
   const rawDriverInput = argv.d ?? argv.driver;
-  const rawDriver = rawDriverInput ?? detectDriverFlag();
+  const detectedDriver = rawDriverInput ?? detectDriverFlag(); // Use a new variable for detected driver
 
   const coerceBoolean = (value: unknown): boolean | undefined => {
     if (typeof value === 'boolean') {
@@ -83,14 +85,11 @@ export const parseCliArgs = (): CliArgs => {
   };
 
   const coerceDriver = (): DriverName | undefined => {
-    if (typeof rawDriver === 'string') {
-      const normalized = rawDriver.toLowerCase();
-      if (validDrivers.includes(normalized as DriverName)) {
-        return normalized as DriverName;
-      }
+    if (typeof detectedDriver === 'string') {
+      return normalizeDriverSlug(detectedDriver);
     }
-    if (typeof rawDriver === 'boolean' && rawDriver) {
-      // When minimist produces a boolean (e.g. `--story`), detectDriverFlag has already resolved it.
+    if (typeof detectedDriver === 'boolean' && detectedDriver) {
+      // This case should ideally be handled by detectDriverFlag, but as a fallback
       addLog('[CLI] Warning: --driver flag was passed (e.g. --story), but no driver was detected. This may indicate a bug in driver detection logic.');
       return undefined;
     }
@@ -111,17 +110,24 @@ export const parseCliArgs = (): CliArgs => {
     return undefined;
   };
   
+  let ignoredPositionalPrompt: string | undefined;
+  // Detect if a driver was specified, but no -p/--prompt, and there's a single positional arg
+  if (detectedDriver && !rawPrompt && argv._ && argv._.length === 1 && typeof argv._[0] === 'string') {
+    ignoredPositionalPrompt = argv._[0];
+  }
+
   const result: CliArgs = {
     prompt: coercePrompt(),
     driver: coerceDriver(),
     workspace: coerceWorkspace(),
     newSession: rawNewSession,
     help: rawHelp,
+    ignoredPositionalPrompt, // Add new field to result
   };
 
   try {
     addLog(
-      `[CLI] Parsed args -> driver: ${result.driver ?? 'undefined'}, prompt: ${result.prompt ?? 'undefined'}, workspace: ${result.workspace ?? 'undefined'}, newSession: ${result.newSession ?? 'undefined'}, help: ${result.help ?? 'undefined'}`
+      `[CLI] Parsed args -> driver: ${result.driver ?? 'undefined'}, prompt: ${result.prompt ?? 'undefined'}, ignoredPositionalPrompt: ${result.ignoredPositionalPrompt ?? 'undefined'}, workspace: ${result.workspace ?? 'undefined'}, newSession: ${result.newSession ?? 'undefined'}, help: ${result.help ?? 'undefined'}`
     );
   } catch {}
 

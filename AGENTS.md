@@ -10,6 +10,24 @@ To facilitate automated testing of the application's initialization and UI rende
 
 **Usage:** `yarn start:test`
 
+## Automated & Non-Interactive Testing
+
+For scripting and testing purposes, it is possible to submit a prompt automatically upon application startup. This is achieved by using a combination of a driver flag (e.g., `--story`) and a prompt flag (`-p` or `--prompt`).
+
+**Rule:** The `-p` or `--prompt` flag is **mandatory** to trigger the automatic submission workflow. Any text provided after a driver flag without `-p` will be treated as a positional argument and ignored by the submission logic.
+
+**Correct Usage (Auto-submits):**
+```bash
+yarn start -- --glossary -p "What is a 'user story'?"
+```
+
+**Incorrect Usage (Does NOT auto-submit):**
+```bash
+# This will NOT switch to the Glossary tab and will NOT submit the prompt.
+# The application will start in the default Chat view.
+yarn start -- --glossary "What is a 'user story'?"
+```
+
 
 ## Core Mandate
 
@@ -198,11 +216,10 @@ OPENROUTER_BASE_URL='https://openrouter.ai/api/v1'
 ### Dependencies
 - **Core**: React, Ink, AI SDK, TypeScript
 - **Utilities**: dotenv for environment, zod for validation
+- **Package manager**: Yarn Berry with Plug'n'Play. Avoid running `npm install` or other npm-driven commands (they create `package-lock.json` and bypass `.pnp.cjs`). After changing dependencies run `yarn install` (or `yarn install --immutable`) so the PnP manifest stays in sync. Use `yarn add`, `yarn remove`, `yarn dlx`, and `yarn run`; never commit a `package-lock.json`.
 - **Development**: tsx for TypeScript execution, type definitions
 
 ## Important Technical Details
-
-### Terminal UI Considerations
 - ASCII-safe rendering with proper newline handling
 - Color-coded messages based on role (white=user, gray=assistant, yellow=system)
 - Box styling for system errors and welcome screen
