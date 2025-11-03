@@ -7,8 +7,10 @@ export interface StoryPromptContext {
 }
 
 export function buildStorySystemPrompt({ featureSlug, storyFilePath, relativePath }: StoryPromptContext): string {
-    const slugDisplay = featureSlug ?? '(pending slug · confirm with user)';
-    const pathDisplay = storyFilePath ?? '(pending until slug confirmed)';
+    const slugDisplay =
+        featureSlug ?? '(pending · ask the product partner to confirm an explicit slug before any write)';
+    const pathDisplay =
+        storyFilePath ?? '(pending · once slug confirmed, use .askman/features/<slug>/story.md)';
     const relativeDisplay = relativePath ?? '(pending)';
     return [
         '[System · Story Orchestration]',
@@ -25,12 +27,12 @@ export function buildStorySystemPrompt({ featureSlug, storyFilePath, relativePat
         '1. Begin by stating the current understanding of the Story (narrative summary + key goals).',
         '2. When the user adds details, immediately fold them into updated Story structure.',
         '3. Use clarifying questions to plug gaps, explicitly referencing the GWT-DENG fields that need info.',
-        '4. Confirm alignment before locking anything into the canonical document.',
+        '4. Confirm alignment before locking anything into the canonical document or invoking builders.',
         '',
         'Feature confirmation:',
         '- Before any @story_builder write, the feature slug MUST be explicitly confirmed with the user.',
         '- If the slug is unclear, propose a concise candidate (kebab-case) and ask for approval.',
-        '- Repeat the approved slug back to the user before proceeding.',
+        '- Repeat the approved slug back to the user and wait for explicit confirmation.',
         '',
         'Document contract:',
         '- Story file stays ASCII-safe Markdown with YAML front matter (feature, updated_at ISO timestamp, version counter).',
@@ -58,10 +60,13 @@ export function buildStorySystemPrompt({ featureSlug, storyFilePath, relativePat
 }
 
 export function buildStoryAgentsConfig({ featureSlug, storyFilePath }: StoryPromptContext): Record<string, AgentDefinition> {
-    if (!featureSlug || !storyFilePath) {
-        return {};
-    }
-    const lowerSlug = featureSlug.toLowerCase();
+    const lowerSlug = featureSlug?.toLowerCase() ?? '(pending-slug)';
+    const pathGuidance = storyFilePath
+        ? `The confirmed document path is "${storyFilePath}".`
+        : 'The document path is pending. Once the slug is confirmed, write to ".askman/features/<slug>/story.md".';
+    const slugGuidance = featureSlug
+        ? `The coordinator confirmed slug "${featureSlug}". Use it consistently.`
+        : 'Do not proceed until the coordinator confirms a slug. Propose one if needed, but wait for explicit approval.';
     return {
         story_builder: {
             description: `Produces and maintains the canonical story document for "${lowerSlug}".`,
@@ -71,8 +76,18 @@ export function buildStoryAgentsConfig({ featureSlug, storyFilePath }: StoryProm
                 'Follow the coordinator instructions precisely.',
                 'Your scope is limited to document synthesis and file persistence. Do not handle conversational duties.',
                 '',
+                slugGuidance,
+                pathGuidance,
+                '',
+                'If the slug has not been confirmed yet:',
+                '- Ask the coordinator for the slug.',
+                '- Once confirmed, restate the slug and expected file path.',
+                '- Only then consider using any Write/Edit tool.',
+                '',
                 'When asked to update the story document:',
-                `- Read the existing Markdown at "${storyFilePath}" (if present) using Read/Glob only as needed.`,
+                storyFilePath
+                    ? `- Read the existing Markdown at "${storyFilePath}" (if present) using Read/Glob only as needed.`
+                    : '- After confirmation, read the existing Markdown (if any) from ".askman/features/<slug>/story.md".',
                 '- Merge the incoming Story summary into a full canonical document honouring all required sections.',
                 '- Update YAML front matter (feature, updated_at ISO timestamp, version: increment by 1 for each successful write).',
                 '- Organise sections in this order:',

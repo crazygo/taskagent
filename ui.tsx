@@ -28,9 +28,9 @@ import {
     getDriverByLabel,
     getDriverCommandEntries,
     type DriverManifestEntry,
+    type DriverRuntimeContext,
 } from './src/drivers/registry.js';
-import { buildStorySystemPrompt, buildStoryAgentsConfig } from './src/drivers/story/prompt.js';
-import { prepareStoryInput } from './src/drivers/story/utils.js';
+import type { AgentPipelineOverrides } from './src/drivers/pipeline.js';
 import { closeTaskLogger } from './src/task-logger.js';
 import { loadWorkspaceSettings, writeWorkspaceSettings, type WorkspaceSettings } from './src/workspace/settings.js';
 // Guard to prevent double submission in dev double-mount scenarios
@@ -47,13 +47,7 @@ const BASE_COMMANDS: readonly { name: string; description: string }[] = [
     { name: 'newsession', description: 'Start a fresh Claude agent session' },
 ];
 
-type AgentTurnOverrides = {
-    systemPrompt?: string;
-    allowedTools?: string[];
-    disallowedTools?: string[];
-    permissionMode?: string;
-    agents?: Record<string, AgentDefinition>;
-};
+type AgentTurnOverrides = AgentPipelineOverrides;
 
 type AgentPromptJob = {
     rawInput: string;
@@ -982,9 +976,21 @@ const App = () => {
                 };
             }
 
+            const runtimeContext: DriverRuntimeContext = {
+                nextMessageId,
+                setActiveMessages,
+                setFrozenMessages,
+                finalizeMessageById,
+                canUseTool: handleAgentPermissionRequest,
+                workspacePath: bootstrapConfig?.workspacePath,
+                createTask,
+                waitTask,
+                session: sessionContext,
+            };
+
             if (entry.useAgentPipeline) {
                 let processedPrompt = prompt;
-                const baseOverrides: AgentTurnOverrides = {
+                let overrides: AgentTurnOverrides = {
                     systemPrompt: entry.pipelineOptions?.systemPromptFactory?.(),
                     allowedTools: entry.pipelineOptions?.allowedTools,
                     disallowedTools: entry.pipelineOptions?.disallowedTools,
@@ -993,28 +999,28 @@ const App = () => {
                 };
                 let flowId = entry.pipelineFlowId;
 
-                if (entry.id === Driver.STORY) {
+                if (entry.prepare) {
                     try {
-                        const storyInput = await prepareStoryInput(prompt, bootstrapConfig?.workspacePath);
-                        processedPrompt = storyInput.userPrompt;
-                        baseOverrides.systemPrompt = buildStorySystemPrompt({
-                            featureSlug: storyInput.featureSlug,
-                            storyFilePath: storyInput.absolutePath,
-                            relativePath: storyInput.relativePath,
-                        });
-                        baseOverrides.agents = buildStoryAgentsConfig({
-                            featureSlug: storyInput.featureSlug,
-                            storyFilePath: storyInput.absolutePath,
-                            relativePath: storyInput.relativePath,
-                        });
-                        flowId = flowId ?? 'story';
-                        addLog(
-                            `[StoryDriver] Prepared feature="${storyInput.featureSlug ?? '(pending)'}" path=${storyInput.relativePath ?? '(pending)'}`
-                        );
+                        const preparation = await entry.prepare(prompt, runtimeContext);
+                        if (preparation?.prompt !== undefined) {
+                            processedPrompt = preparation.prompt;
+                        }
+                        if (preparation?.overrides) {
+                            overrides = {
+                                ...overrides,
+                                ...preparation.overrides,
+                            };
+                        }
+                        if (preparation?.flowId) {
+                            flowId = preparation.flowId;
+                        }
+                        if (preparation?.debugLog) {
+                            addLog(preparation.debugLog);
+                        }
                     } catch (error) {
                         const message = error instanceof Error ? error.message : String(error);
-                        addLog(`[StoryDriver] Failed to prepare story input: ${message}`);
-                        appendSystemMessage(`[Story] Failed to prepare story document: ${message}`, true);
+                        addLog(`[Driver] ${entry.label} preparation failed: ${message}`);
+                        appendSystemMessage(`[${entry.label}] ${message}`, true);
                         return false;
                     }
                 }
@@ -1024,8 +1030,8 @@ const App = () => {
                 );
                 return await runAgentTurn(
                     processedPrompt,
-                    baseOverrides,
-                    sessionContext?.id ?? agentSessionId ?? undefined,
+                    overrides,
+                    runtimeContext.session?.id ?? agentSessionId ?? undefined,
                     flowId
                 );
             }
@@ -1038,17 +1044,7 @@ const App = () => {
 
             try {
                 addLog(`[Driver] Dispatching to ${entry.label}`);
-                return await entry.handler(userMessage, {
-                    nextMessageId,
-                    setActiveMessages,
-                    setFrozenMessages,
-                    finalizeMessageById,
-                    canUseTool: handleAgentPermissionRequest,
-                    workspacePath: bootstrapConfig?.workspacePath,
-                    createTask,
-                    waitTask,
-                    session: sessionContext,
-                });
+                return await entry.handler(userMessage, runtimeContext);
             } catch (error) {
                 const message = error instanceof Error ? error.message : String(error);
                 addLog(`[Driver] Error in ${entry.label}: ${message}`);
@@ -1057,6 +1053,7 @@ const App = () => {
             }
         },
         [
+            agentSessionId,
             appendSystemMessage,
             bootstrapConfig?.workspacePath,
             createTask,
@@ -1064,7 +1061,6 @@ const App = () => {
             finalizeMessageById,
             handleAgentPermissionRequest,
             runAgentTurn,
-            agentSessionId,
             nextMessageId,
             setActiveMessages,
             setFrozenMessages,
