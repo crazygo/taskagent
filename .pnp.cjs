@@ -601,7 +601,7 @@ const RAW_RUNTIME_STATE =
           ["p-queue", "npm:6.6.2"],\
           ["p-retry", "npm:4.6.2"],\
           ["uuid", "npm:10.0.0"],\
-          ["zod", "npm:3.25.76"]\
+          ["zod", "npm:4.1.12"]\
         ],\
         "linkType": "HARD"\
       }]\
@@ -2707,6 +2707,13 @@ const RAW_RUNTIME_STATE =
         "packageLocation": "../../../.yarn/berry/cache/zod-npm-3.25.76-7de26333f8-10c0.zip/node_modules/zod/",\
         "packageDependencies": [\
           ["zod", "npm:3.25.76"]\
+        ],\
+        "linkType": "HARD"\
+      }],\
+      ["npm:4.1.12", {\
+        "packageLocation": "../../../.yarn/berry/cache/zod-npm-4.1.12-8e1ffc4d68-10c0.zip/node_modules/zod/",\
+        "packageDependencies": [\
+          ["zod", "npm:4.1.12"]\
         ],\
         "linkType": "HARD"\
       }]\

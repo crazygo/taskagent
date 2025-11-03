@@ -13,9 +13,9 @@ export type DriverName =
   | 'agent'
   | 'manual'
   | 'plan-review-do'
+  | 'glossary'
   | 'story'
   | 'ui-review'
-  | 'user-flow-review'
   | 'logic-review'
   | 'data-review';
 
@@ -26,9 +26,9 @@ export enum Driver {
   CHAT = 'Chat',
   AGENT = 'Agent',
   PLAN_REVIEW_DO = 'Plan-Review-DO',
+  GLOSSARY = 'Glossary',
   STORY = 'Story',
   UI_REVIEW = 'UI Review',
-  USER_FLOW_REVIEW = 'User Flow Review',
   LOGIC_REVIEW = 'Logic Review',
   DATA_REVIEW = 'Data Review',
 }
@@ -42,9 +42,9 @@ export function getDriverEnum(name: DriverName): Driver {
     'manual': Driver.CHAT,
     'agent': Driver.AGENT,
     'plan-review-do': Driver.PLAN_REVIEW_DO,
+    'glossary': Driver.GLOSSARY,
     'story': Driver.STORY,
     'ui-review': Driver.UI_REVIEW,
-    'user-flow-review': Driver.USER_FLOW_REVIEW,
     'logic-review': Driver.LOGIC_REVIEW,
     'data-review': Driver.DATA_REVIEW,
   };
@@ -59,9 +59,9 @@ export function getDriverName(driver: Driver): DriverName {
     [Driver.CHAT]: 'chat',
     [Driver.AGENT]: 'agent',
     [Driver.PLAN_REVIEW_DO]: 'plan-review-do',
+    [Driver.GLOSSARY]: 'glossary',
     [Driver.STORY]: 'story',
     [Driver.UI_REVIEW]: 'ui-review',
-    [Driver.USER_FLOW_REVIEW]: 'user-flow-review',
     [Driver.LOGIC_REVIEW]: 'logic-review',
     [Driver.DATA_REVIEW]: 'data-review',
   };

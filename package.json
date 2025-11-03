@@ -44,9 +44,7 @@
     "package.json",
     "README.md"
   ],
-  "bin": {
-    "task": "dist/ui.js"
-  },
+  "bin": "dist/ui.js",
   "main": "dist/ui.js",
   "types": "dist/ui.d.ts"
 }

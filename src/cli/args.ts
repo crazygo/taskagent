@@ -28,9 +28,9 @@ export const parseCliArgs = (): CliArgs => {
     'agent',
     'manual',
     'plan-review-do',
+    'glossary',
     'story',
     'ui-review',
-    'user-flow-review',
     'logic-review',
     'data-review',
   ];

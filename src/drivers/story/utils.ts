@@ -1,6 +1,9 @@
 import path from 'path';
 import { promises as fs } from 'fs';
 
+import { buildStoryAgentsConfig, buildStorySystemPrompt } from './prompt.js';
+import type { DriverPrepareResult } from '../pipeline.js';
+
 const FEATURE_DIRECTIVE_REGEX = /^(?:feature|slug)\s*[:=]\s*([A-Za-z0-9][A-Za-z0-9_-]*)\s*(.*)$/i;
 
 export interface StoryInputPreparation {
@@ -70,5 +73,39 @@ export const prepareStoryInput = async (
         userPrompt: userPrompt.length > 0 ? userPrompt : trimmed,
         absolutePath,
         relativePath,
+    };
+};
+
+export const prepareStoryAgentInvocation = async (
+    rawInput: string,
+    workspacePath?: string | null
+): Promise<DriverPrepareResult> => {
+    const storyInput = await prepareStoryInput(rawInput, workspacePath);
+
+    const overrides: DriverPrepareResult['overrides'] = {
+        systemPrompt: buildStorySystemPrompt({
+            featureSlug: storyInput.featureSlug,
+            storyFilePath: storyInput.absolutePath,
+            relativePath: storyInput.relativePath,
+        }),
+    };
+
+    const agentDefinitions = buildStoryAgentsConfig({
+        featureSlug: storyInput.featureSlug,
+        storyFilePath: storyInput.absolutePath,
+        relativePath: storyInput.relativePath,
+    });
+
+    if (storyInput.featureSlug && storyInput.absolutePath && Object.keys(agentDefinitions).length > 0) {
+        overrides.agents = agentDefinitions;
+    }
+
+    const agentsState = overrides.agents ? 'enabled' : 'pending';
+
+    return {
+        prompt: storyInput.userPrompt,
+        overrides,
+        flowId: 'story',
+        debugLog: `[StoryDriver] Prepared feature="${storyInput.featureSlug ?? '(pending)'}" path=${storyInput.relativePath ?? '(pending)'} agents=${agentsState}`,
     };
 };

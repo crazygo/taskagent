@@ -7,6 +7,8 @@ import type { Task } from '../../task-manager.js';
 import { Driver } from './types.js';
 import { handlePlanReviewDo } from './plan-review-do/index.js';
 import { buildUiReviewSystemPrompt } from './ui-review/prompt.js';
+import type { DriverPrepareResult } from './pipeline.js';
+import { prepareStoryAgentInvocation } from './story/utils.js';
 
 export interface DriverSessionContext {
     id: string;
@@ -27,6 +29,11 @@ export interface DriverRuntimeContext {
 }
 
 export type DriverHandler = (message: Message, context: DriverRuntimeContext) => Promise<boolean>;
+
+export type DriverPrepareFn = (
+    prompt: string,
+    context: DriverRuntimeContext
+) => Promise<DriverPrepareResult | null>;
 
 interface BaseDriverManifestEntry {
     id: Driver;
@@ -71,6 +78,7 @@ interface AgentPipelineDriverEntry extends BaseDriverManifestEntry {
         agents?: Record<string, AgentDefinition>;
     };
     pipelineFlowId?: string;
+    prepare?: DriverPrepareFn;
     handler?: DriverHandler;
 }
 
@@ -143,6 +151,15 @@ export const DRIVER_MANIFEST: readonly DriverManifestEntry[] = [
         },
     },
     {
+        id: Driver.GLOSSARY,
+        label: Driver.GLOSSARY,
+        slash: 'glossary',
+        description: 'Glossary · 敬请期待',
+        requiresSession: false,
+        isPlaceholder: true,
+        handler: createPlaceholderHandler(Driver.GLOSSARY),
+    },
+    {
         id: Driver.STORY,
         label: Driver.STORY,
         slash: 'story',
@@ -153,6 +170,9 @@ export const DRIVER_MANIFEST: readonly DriverManifestEntry[] = [
         pipelineOptions: {
             allowedTools: ['Read', 'Write', 'Edit', 'Glob', 'Grep'],
             disallowedTools: ['Bash', 'NotebookEdit', 'TodoWrite'],
+        },
+        prepare: async (prompt, context) => {
+            return await prepareStoryAgentInvocation(prompt, context.workspacePath);
         },
     },
     {
@@ -168,15 +188,6 @@ export const DRIVER_MANIFEST: readonly DriverManifestEntry[] = [
             allowedTools: ['Read', 'Grep', 'Glob'],
             disallowedTools: ['Write', 'Edit', 'Bash', 'NotebookEdit', 'FileWrite', 'FileEdit', 'TodoWrite'],
         },
-    },
-    {
-        id: Driver.USER_FLOW_REVIEW,
-        label: Driver.USER_FLOW_REVIEW,
-        slash: 'user-flow-review',
-        description: 'User Flow Review · 敬请期待',
-        requiresSession: false,
-        isPlaceholder: true,
-        handler: createPlaceholderHandler(Driver.USER_FLOW_REVIEW),
     },
     {
         id: Driver.LOGIC_REVIEW,
