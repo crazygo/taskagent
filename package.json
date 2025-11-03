@@ -29,7 +29,7 @@
   "license": "ISC",
   "name": "@askman-dev/task",
   "packageManager": "yarn@4.9.1",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "type": "module",
   "scripts": {
     "start": "tsx ui.tsx --",
