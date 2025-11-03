@@ -1,55 +1,91 @@
-Good direction. I’ll tighten the concepts and show what this means for naming, lifecycle, and minimal architecture changes.
+Good direction. I'll tighten the concepts and show what this means for naming, lifecycle, and minimal architecture changes.
+
+> **Implementation Status (2025-11-04)**: ✅ Phase 0-4 completed. Background task system operational with LogMonitor agent. See `memory/docs/2025-11-04-task-agent-implementation.md` for details.
 
 ## Quick glossary
 
-- Agent: An execution scheme (Atomic or Stack). It defines “how” to do work.
-- Task: A runtime instance of an Agent execution. It defines “this concrete run”.
-- Foreground Task: Runs in the current tab (Story tab messages are FG tasks). Interactive permissions; outputs go to ChatPanel.
-- Background Task: Runs detached. Has a Task N tab; permissionMode=auto; writes logs/{taskId}.log; emits events to source tab.
+- **Agent**: An execution scheme (Atomic or Stack). It defines "how" to do work.
+  - `AtomicAgent`: Base class with `getPrompt()`, `getTools()`, `getModel()`, `parseOutput()`
+  - `StackAgent`: Extended class supporting sub-agent orchestration
+  - `DefaultAtomicAgent`: Pass-through implementation for direct Chat/Agent tab usage
+- **Task**: A runtime instance of an Agent execution. It defines "this concrete run".
+  - State: pending → in_progress → completed | failed | cancelled
+  - Properties: id, agent, prompt, status, output, events, session, timeoutSec
+- **Foreground Task**: Runs in the current tab (Story tab messages are FG tasks). Interactive permissions; outputs go to ChatPanel.
+- **Background Task**: Runs detached. Has EventEmitter; permissionMode=auto; emits events to source tab.
+  - **Implemented**: `/bg:log-monitor` - monitors debug.log, emits TaskEvents
 
-Implication: “/task” is a user interaction to spawn a Task in background mode. Renaming to “/bg” matches intent; keep “/task” as an alias for backwards compatibility.
+Implication: "/task" is a user interaction to spawn a Task in background mode. Renaming to "/bg" matches intent; keep "/task" as an alias for backwards compatibility.
 
 ## Commands and naming
 
-- /bg <description>  (alias: /task)
-  - Start a background task from any tab.
+- **`/bg:log-monitor <description>`** ✅ **Implemented**
+  - Start background log monitoring task from any tab
+  - Monitors debug.log file for changes
+  - Emits events (ℹ️ info, ⚠️ warning, ❌ error) to source tab
+  - Uses session support (`requiresSession: true`)
+  
+- `/bg <description>` (future: alias: /task)
+  - Start a generic background task from any tab
   - Options:
-    - --stay: don’t auto-switch to the Task tab (current behavior auto-switches; this flag prevents it)
-    - --name "<label>": attach a friendly task label
-- Optional: /fg <description>
-  - Explicitly run a foreground task in the current tab (clarifies intent vs. background).
+    - `--stay`: don't auto-switch to the Task tab (current behavior auto-switches; this flag prevents it)
+    - `--name "<label>"`: attach a friendly task label
+    
+- Optional: `/fg <description>`
+  - Explicitly run a foreground task in the current tab (clarifies intent vs. background)
+  
 - Natural language integrations:
-  - “看看监控状态” in the source tab should route to an Atomic-Agent that reads the task log and summarizes.
+  - "看看监控状态" in the source tab should route to an Atomic-Agent that reads the task log and summarizes
 
 ## Lifecycle and contracts (concise)
 
-- Task states: pending → in_progress → completed | failed | cancelled
-- Create
-  - Input: { description: string, sourceTabId: string, contextSnapshot: Message[], agentHint?: string }
-  - Output: { taskId: string }
-- Observe
-  - Event: { type, taskId, severity?: 'info'|'warn'|'urgent', message, ts }
-  - Log: logs/{taskId}.log (append-only)
-- Cancel
-  - Input: { taskId }, Output: { ok: boolean }
-- Permission policy
+> **Implementation Note**: TaskManager.createTaskWithAgent() and runTaskWithAgent() implement these contracts.
+
+- **Task states**: pending → in_progress → completed | failed | cancelled
+- **Create**
+  - Input: `{ agent: AtomicAgent, userPrompt: string, context: { sourceTabId, workspacePath?, timeoutSec?, session? } }`
+  - Output: `{ task: TaskExtended, emitter: EventEmitter }`
+  - Implementation: `TaskManager.createTaskWithAgent()`
+- **Observe**
+  - Event: `{ level: 'info'|'warning'|'error', message: string, ts: number }`
+  - EventEmitter events: 'event', 'completed', 'failed', 'cancelled'
+  - Parsing: Agent's `parseOutput()` method extracts events from LLM output
+- **Cancel**
+  - Input: `{ taskId }`, Output: `{ ok: boolean }`
+  - Implementation: `TaskManager.cancelTask()`
+- **Permission policy**
   - FG: interactive permission prompts (existing behavior)
-  - BG: permissionMode='auto', limited allowlist (Read/FS, EventEmit, LogRead)
+  - BG: `canUseTool: async () => undefined` (auto-approve), limited to Read/Glob tools
 
 ## Orchestration: tying Agent to Task
 
-- Agent Selection
-  - Orchestrator decides which Agent to run based on /bg description (e.g., detects “monitor…” → monitor Stack-Agent).
-- Background Context
-  - Isolated sessionId; bind taskId ↔ sourceTabId; pass contextSnapshot (frozenMessages) to Agent.
-- Monitor Stack-Agent (graph-style, borrow from plan-review-do)
+> **Implementation**: LogMonitor demonstrates the Atomic-Agent pattern with self-managed loops.
+
+- **Agent Selection**
+  - Driver registry maps slash commands to agents (e.g., `/bg:log-monitor` → LogMonitor agent)
+  - Orchestrator in driver handler creates agent instance and calls `createTaskWithAgent()`
+  
+- **Background Context**
+  - Isolated sessionId per task; bind taskId ↔ sourceTabId
+  - Session handling: `extraArgs: { 'session-id': uuid }` for new, `resume: sessionId` for initialized
+  - Pass workspacePath to agent context for absolute paths
+  
+- **LogMonitor Implementation** ✅ **Working**
+  - Type: Atomic-Agent (self-managed loop via prompt)
+  - Loop cycle: Every 30 seconds, read last 100 lines of debug.log
+  - Tools: `['Read', 'Glob']` (exact SDK tool names)
+  - Output parsing: `/^\[EVENT:(info|warning|error)\]\s*(.+)$/i`
+  - Event emission: TaskEvent → EventEmitter → UI with icons (ℹ️⚠️❌)
+  
+- **Monitor Stack-Agent** (future: graph-style, borrow from plan-review-do)
   - loop:
     - @read_context (Atomic): read source conversation snapshot/state
     - @analyze_progress (Atomic): assess plan/implementation status vs. description
     - if severity >= urgent: emit_event("monitor.severity", payload)
     - wait(60s); goto loop
-- Log Reader (Atomic)
-  - @task_log_reader: read logs/{taskId}.log, summarize, return status on demand (“看看监控状态”).
+    
+- **Log Reader** (future: Atomic)
+  - @task_log_reader: read logs/{taskId}.log, summarize, return status on demand ("看看监控状态")
 
 ## Why this framing helps
 
@@ -57,6 +93,37 @@ Implication: “/task” is a user interaction to spawn a Task in background mod
 - Adds a consistent mental model: foreground = conversational, background = autonomous with events and logs.
 - Reuses plan-review-do style graphs for robust monitor flows.
 - Requires small, incremental changes to the current codebase.
+
+## ✅ Implementation Achievements (2025-11-04)
+
+### Core Architecture
+- **Agent Type System**: `AtomicAgent`, `StackAgent`, `DefaultAtomicAgent` defined in `src/agent/types.ts`
+- **Task Extensions**: `TaskExtended` interface with agent, session, events, timeoutSec
+- **EventEmitter Integration**: Each task gets EventEmitter with 'event', 'completed', 'failed', 'cancelled'
+- **TaskManager Methods**: `createTaskWithAgent()`, `runTaskWithAgent()` fully functional
+
+### LogMonitor Agent
+- **Location**: `src/agents/log-monitor/LogMonitor.ts`
+- **Capabilities**: Monitors debug.log, 100 lines tail, 30-second intervals
+- **Self-Managed**: Loop logic in prompt, no external orchestration needed
+- **Event Parsing**: Regex-based extraction of `[EVENT:level] message` patterns
+
+### Critical Bug Fixes
+1. **SDK Configuration**: Removed `allowedTools` and `permissionMode` (caused exit code 1 with presets)
+2. **Session Handling**: Aligned with Story/Agent flow (extraArgs vs resume based on initialized flag)
+3. **Tool Names**: Corrected to 'Read', 'Glob' matching SDK registry
+4. **Console Cleanup**: Separated UI logs from debug file logs for clean terminal
+
+### Validation
+- ✅ End-to-end test: `/bg:log-monitor 11122` executed successfully
+- ✅ Output: "Initial snapshot taken. Now monitoring for changes..."
+- ✅ Events: Emitted to source tab with level-based icons
+- ✅ Completion: "✅ [Log Monitor] 监控任务已完成"
+
+### Documentation
+- **Implementation Details**: `memory/docs/2025-11-04-task-agent-implementation.md`
+- **Chat Memory**: `memory/chat/2025-11-04-task-agent-implementation.jsonl`
+- **This Document**: Updated with implementation status and learnings
 
 
 ## Scenarios and investigation methods
