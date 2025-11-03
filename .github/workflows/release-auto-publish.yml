@@ -4,13 +4,44 @@ on:
   push:
     branches:
       - release
+  pull_request:
+    branches:
+      - main
+      - release
 
 permissions:
   contents: write
 
 jobs:
+  precheck:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Build package (dry run)
+        run: |
+          yarn build
+          yarn pack --dry-run
+
   build-and-bump:
-    if: ${{ github.actor != 'github-actions[bot]' }}
+    if: github.event_name == 'push' && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     environment: copilot
 
@@ -20,14 +51,14 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Enable Corepack
+        run: corepack enable
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: yarn
-
-      - name: Enable Corepack (Yarn Berry)
-        run: corepack enable
 
       - name: Install dependencies
         run: yarn install --immutable
