@@ -5,7 +5,8 @@
   "exports": {
     "./types/*": "./types/*.ts",
     "./schemas/*": "./schemas/*.ts",
-    "./event-bus": "./event-bus/index.ts"
+    "./event-bus": "./event-bus/index.ts",
+    "./logger.js": "./logger.ts"
   },
   "dependencies": {
     "zod": "^4.1.12"

@@ -5,8 +5,8 @@ import { Driver, type ViewDriverEntry } from '../types.js';
 import StackAgentView from '../../components/StackAgentView.js';
 import type { DriverPrepareResult } from '../pipeline.js';
 import type { DriverRuntimeContext } from '../types.js';
-import { loadAgentPipelineConfig } from '@taskagent/agents/runtime/agentLoader.js';
-import { buildUiReviewSystemPrompt } from './prompt.js';
+import { loadAgentPipelineConfig } from '@taskagent/agents';
+import { buildUiReviewSystemPrompt } from '@taskagent/agents/ui-review/prompt.js';
 
 async function prepareUiReviewInvocation(
     rawInput: string,

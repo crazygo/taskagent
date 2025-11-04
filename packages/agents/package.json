@@ -3,9 +3,13 @@
   "version": "0.0.1",
   "type": "module",
   "exports": {
-    "./*": "./*/*.ts",
-    "./runtime/*": "./runtime/*.ts",
-    "./registry": "./registry/index.ts"
+    ".": "./index.ts",
+    "./runtime/*.js": "./runtime/*.ts",
+    "./story/*.js": "./story/*.ts",
+    "./glossary/*.js": "./glossary/*.ts",
+    "./ui-review/*.js": "./ui-review/*.ts",
+    "./monitor/*.js": "./monitor/*.ts",
+    "./registry/*.js": "./registry/*.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^2.0.48",

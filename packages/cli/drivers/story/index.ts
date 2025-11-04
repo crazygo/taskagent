@@ -2,7 +2,7 @@ import { Driver, type ViewDriverEntry } from '../types.js';
 import StackAgentView from '../../components/StackAgentView.js';
 import type { DriverRuntimeContext } from '../types.js';
 import type { Message } from '../../types.js';
-import { createStoryPromptAgent } from '@taskagent/agents/story/index.js';
+import { createStoryPromptAgent } from '@taskagent/agents';
 
 // Best-practice runtime: run Story as a PromptAgent instance in Foreground by default
 async function handleStoryInvocation(message: Message, context: DriverRuntimeContext): Promise<boolean> {
