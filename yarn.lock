@@ -822,6 +822,7 @@ __metadata:
     "@anthropic-ai/claude-agent-sdk": "npm:^0.1.25"
     "@openrouter/ai-sdk-provider": "https://github.com/crazygo/ai-sdk-provider/releases/download/1.2.1/openrouter-ai-sdk-provider-1.2.1.tgz"
     "@taskagent/core": "workspace:*"
+    "@taskagent/execution": "workspace:*"
     "@taskagent/shared": "workspace:*"
     "@types/js-yaml": "npm:^4.0.9"
     "@types/node": "npm:^24.7.1"
@@ -843,6 +844,8 @@ __metadata:
     "@openrouter/ai-sdk-provider": "https://github.com/crazygo/ai-sdk-provider/releases/download/1.2.1/openrouter-ai-sdk-provider-1.2.1.tgz"
     "@taskagent/agents": "workspace:*"
     "@taskagent/core": "workspace:*"
+    "@taskagent/execution": "workspace:*"
+    "@taskagent/presets": "workspace:*"
     "@taskagent/shared": "workspace:*"
     "@taskagent/tabs": "workspace:*"
     "@types/ink": "npm:^2.0.3"
@@ -876,7 +879,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@taskagent/execution@workspace:packages/execution":
+"@taskagent/execution@workspace:*, @taskagent/execution@workspace:packages/execution":
   version: 0.0.0-use.local
   resolution: "@taskagent/execution@workspace:packages/execution"
   dependencies:
@@ -885,7 +888,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@taskagent/presets@workspace:packages/presets":
+"@taskagent/presets@workspace:*, @taskagent/presets@workspace:packages/presets":
   version: 0.0.0-use.local
   resolution: "@taskagent/presets@workspace:packages/presets"
   languageName: unknown

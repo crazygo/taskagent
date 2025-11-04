@@ -5,9 +5,9 @@
   "main": "index.js",
   "types": "index.d.ts",
   "exports": {
-    ".": "./index.js",
-    "./default": "./default.js",
-    "./monitor": "./monitor.js",
-    "./types": "./types.js"
+    ".": "./index.ts",
+    "./default": "./default.ts",
+    "./monitor": "./monitor.ts",
+    "./types": "./types.ts"
   }
 }

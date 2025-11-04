@@ -5,11 +5,12 @@
   "main": "index.js",
   "types": "index.d.ts",
   "exports": {
-    ".": "./index.js",
-    "./MessageAdapter": "./MessageAdapter.js",
-    "./TabExecutor": "./TabExecutor.js",
-    "./TabExecutionManager": "./TabExecutionManager.js",
-    "./types": "./types.js"
+    ".": "./index.ts",
+    "./MessageAdapter": "./MessageAdapter.ts",
+    "./MessageAdapter.js": "./MessageAdapter.ts",
+    "./TabExecutor": "./TabExecutor.ts",
+    "./TabExecutionManager": "./TabExecutionManager.ts",
+    "./types": "./types.ts"
   },
   "dependencies": {
     "@taskagent/agents": "workspace:*",

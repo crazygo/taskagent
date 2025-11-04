@@ -1140,6 +1140,7 @@ const RAW_RUNTIME_STATE =
           ["@openrouter/ai-sdk-provider", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#https://github.com/crazygo/ai-sdk-provider/releases/download/1.2.1/openrouter-ai-sdk-provider-1.2.1.tgz"],\
           ["@taskagent/agents", "workspace:packages/agents"],\
           ["@taskagent/core", "workspace:packages/core"],\
+          ["@taskagent/execution", "workspace:packages/execution"],\
           ["@taskagent/shared", "workspace:packages/shared"],\
           ["@types/js-yaml", "npm:4.0.9"],\
           ["@types/node", "npm:24.10.0"],\
@@ -1163,6 +1164,8 @@ const RAW_RUNTIME_STATE =
           ["@taskagent/agents", "workspace:packages/agents"],\
           ["@taskagent/cli", "workspace:packages/cli"],\
           ["@taskagent/core", "workspace:packages/core"],\
+          ["@taskagent/execution", "workspace:packages/execution"],\
+          ["@taskagent/presets", "workspace:packages/presets"],\
           ["@taskagent/shared", "workspace:packages/shared"],\
           ["@taskagent/tabs", "workspace:packages/tabs"],\
           ["@types/ink", "npm:2.0.3"],\

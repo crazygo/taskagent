@@ -14,6 +14,8 @@
     "@openrouter/ai-sdk-provider": "https://github.com/crazygo/ai-sdk-provider/releases/download/1.2.1/openrouter-ai-sdk-provider-1.2.1.tgz",
     "@taskagent/agents": "workspace:*",
     "@taskagent/core": "workspace:*",
+    "@taskagent/execution": "workspace:*",
+    "@taskagent/presets": "workspace:*",
     "@taskagent/shared": "workspace:*",
     "@taskagent/tabs": "workspace:*",
     "ai": "^5.0.78",
