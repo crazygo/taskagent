@@ -20,6 +20,7 @@ import { uiReviewDriverEntry } from './ui-review/index.js';
 import { storyDriverEntry } from './story/index.js';
 import { createStoryPromptAgent } from './story/agent.js';
 import { glossaryDriverEntry } from './glossary/index.js';
+import { createGlossaryPromptAgent } from './glossary/agent.js';
 import { createLogMonitor } from '../agents/log-monitor/index.js';
 import { monitorDriverEntry } from './monitor/index.js';
 import { addLog } from '../logger.js';
@@ -104,22 +105,42 @@ export function getDriverManifest(): readonly DriverManifestEntry[] {
             context.finalizeMessageById(userId);
             const pendingId = context.nextMessageId();
             context.setActiveMessages(prev => [...prev, { id: pendingId, role: 'assistant', content: '', isPending: true }]);
+            let hasFinalizedPending = false;
             context.startForeground(
                 agent,
                 prompt,
                 { sourceTabId: context.sourceTabId || String(spec.driverId), workspacePath: context.workspacePath, session: context.session },
                 {
                     onText: (chunk: string) => {
-                        context.setActiveMessages(prev => prev.map(m => m.id === pendingId ? { ...m, content: (m.content || '') + chunk } : m));
+                        if (!chunk) {
+                            return;
+                        }
+
+                        if (!hasFinalizedPending) {
+                            context.finalizeMessageById(pendingId);
+                            hasFinalizedPending = true;
+                        }
+
+                        const textMsgId = context.nextMessageId();
+                        const sysMsg: Message = { id: textMsgId, role: 'assistant', content: chunk };
+                        context.setFrozenMessages(prev => [...prev, sysMsg]);
                     },
                     onEvent: (event) => {
                         const icon = levelIcons[event.level] || '📝';
                         const sysMsg: Message = { id: context.nextMessageId(), role: 'system', content: `${icon} [${spec.driverId}] ${event.message}`, isBoxed: event.level === 'error' };
                         context.setFrozenMessages(prev => [...prev, sysMsg]);
                     },
-                    onCompleted: () => context.finalizeMessageById(pendingId),
+                    onCompleted: () => {
+                        if (!hasFinalizedPending) {
+                            context.finalizeMessageById(pendingId);
+                            hasFinalizedPending = true;
+                        }
+                    },
                     onFailed: (error: string) => {
-                        context.finalizeMessageById(pendingId);
+                        if (!hasFinalizedPending) {
+                            context.finalizeMessageById(pendingId);
+                            hasFinalizedPending = true;
+                        }
                         const sysMsg: Message = { id: context.nextMessageId(), role: 'system', content: `❌ [${spec.driverId}] 前台运行失败：${error}`, isBoxed: true };
                         context.setFrozenMessages(prev => [...prev, sysMsg]);
                     },

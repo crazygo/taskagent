@@ -17,6 +17,7 @@ async function handleGlossaryInvocation(message: Message, context: DriverRuntime
 
     const pendingId = context.nextMessageId();
     context.setActiveMessages(prev => [...prev, { id: pendingId, role: 'assistant', content: '', isPending: true }]);
+    let hasFinalizedPending = false;
 
     const levelIcons = { info: 'ℹ️', warning: '⚠️', error: '❌' } as const;
 
@@ -26,18 +27,34 @@ async function handleGlossaryInvocation(message: Message, context: DriverRuntime
         { sourceTabId: context.sourceTabId || 'Glossary', workspacePath: context.workspacePath, session: context.session },
         {
             onText: (chunk: string) => {
-                context.setActiveMessages(prev => prev.map(m => m.id === pendingId ? { ...m, content: (m.content || '') + chunk } : m));
+                if (!chunk) {
+                    return;
+                }
+
+                if (!hasFinalizedPending) {
+                    context.finalizeMessageById(pendingId);
+                    hasFinalizedPending = true;
+                }
+
+                const textMsgId = context.nextMessageId();
+                context.setFrozenMessages(prev => [...prev, { id: textMsgId, role: 'assistant', content: chunk }]);
             },
             onEvent: (event) => {
                 const icon = levelIcons[event.level] || '📝';
                 context.setFrozenMessages(prev => [...prev, { id: context.nextMessageId(), role: 'system', content: `${icon} [Glossary] ${event.message}`, isBoxed: event.level === 'error' }]);
             },
             onCompleted: () => {
-                context.finalizeMessageById(pendingId);
+                if (!hasFinalizedPending) {
+                    context.finalizeMessageById(pendingId);
+                    hasFinalizedPending = true;
+                }
                 context.session?.markInitialized();
             },
             onFailed: (error: string) => {
-                context.finalizeMessageById(pendingId);
+                if (!hasFinalizedPending) {
+                    context.finalizeMessageById(pendingId);
+                    hasFinalizedPending = true;
+                }
                 context.setFrozenMessages(prev => [...prev, { id: context.nextMessageId(), role: 'system', content: `❌ [Glossary] 失败：${error}`, isBoxed: true }]);
             },
             canUseTool: context.canUseTool,
