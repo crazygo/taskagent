@@ -7,6 +7,8 @@ export interface Message {
     isBoxed?: boolean;
     isPending?: boolean;
     reasoning?: string;
+    sourceTabId?: string;      // Tab isolation support
+    timestamp?: number;         // Event timestamp
 }
 
 export type LogMessage = {
