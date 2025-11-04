@@ -9,11 +9,18 @@
     ".": "./main.tsx"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^2.0.48",
+    "@anthropic-ai/claude-agent-sdk": "^0.1.25",
+    "@openrouter/ai-sdk-provider": "https://github.com/crazygo/ai-sdk-provider/releases/download/1.2.1/openrouter-ai-sdk-provider-1.2.1.tgz",
     "@taskagent/agents": "workspace:*",
     "@taskagent/core": "workspace:*",
+    "@taskagent/shared": "workspace:*",
+    "ai": "^5.0.78",
     "dotenv": "^17.2.3",
+    "glob": "^11.0.3",
     "ink": "^6.3.1",
     "ink-text-input": "^6.0.0",
+    "js-yaml": "^4.1.0",
     "minimist": "^1.2.8",
     "react": "^19.2.0",
     "zod": "^4.1.12"

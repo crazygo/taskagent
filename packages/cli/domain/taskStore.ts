@@ -1,0 +1,64 @@
+import { useEffect, useMemo, useState } from 'react';
+import { TaskManager, type Task, type TaskWithEmitter, type ForegroundSinks, type ForegroundHandle } from '../../task-manager.js';
+import type { PromptAgent } from '../agent/types.js';
+
+interface UseTaskStoreOptions {
+  pollIntervalMs?: number;
+}
+
+export const useTaskStore = ({ pollIntervalMs = 1000 }: UseTaskStoreOptions = {}) => {
+  const taskManager = useMemo(() => new TaskManager(), []);
+  const [tasks, setTasks] = useState<Task[]>([]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTasks(taskManager.getAllTasks());
+    }, pollIntervalMs);
+    return () => clearInterval(interval);
+  }, [pollIntervalMs, taskManager]);
+
+  /**
+   * startBackground - create a background Task with Agent instance and events
+   */
+  const startBackground = (
+    agent: PromptAgent,
+    userPrompt: string,
+    context: {
+      sourceTabId?: string;
+      workspacePath?: string;
+      timeoutSec?: number;
+      session?: { id: string; initialized: boolean };
+      forkSession?: boolean;
+    } = {}
+  ): TaskWithEmitter => {
+    const finalContext = {
+      sourceTabId: context.sourceTabId || 'unknown',
+      workspacePath: context.workspacePath,
+      timeoutSec: context.timeoutSec,
+      session: context.session,
+      forkSession: context.forkSession,
+    };
+    const result = taskManager.startBackground(agent, userPrompt, finalContext);
+    setTasks(taskManager.getAllTasks()); // Immediately update tasks state
+    return result;
+  };
+
+  const waitTask = (taskId: string) => taskManager.waitTask(taskId);
+  const cancelTask = (taskId: string) => taskManager.cancelTask(taskId);
+  const startForeground = (
+    agent: PromptAgent,
+    userPrompt: string,
+    context: { sourceTabId: string; workspacePath?: string; session?: { id: string; initialized: boolean }; forkSession?: boolean },
+    sinks: ForegroundSinks,
+  ): ForegroundHandle => {
+    return taskManager.startForeground(agent, userPrompt, context, sinks);
+  };
+
+  return {
+    tasks,
+    startBackground,
+    startForeground,
+    waitTask,
+    cancelTask,
+  };
+};

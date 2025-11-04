@@ -42,7 +42,7 @@
   "packageManager": "yarn@4.9.1",
   "type": "module",
   "scripts": {
-    "start": "tsx ui.tsx --",
+    "start": "tsx packages/cli/main.tsx --",
     "build": "tsc",
     "prepublishOnly": "yarn build",
     "start:test": "concurrently --raw --kill-others --success first \"yarn start\" \"sleep 10\"",
@@ -59,7 +59,7 @@
     "package.json",
     "README.md"
   ],
-  "bin": "dist/ui.js",
-  "main": "dist/ui.js",
-  "types": "dist/ui.d.ts"
+  "bin": "dist/packages/cli/main.js",
+  "main": "dist/packages/cli/main.js",
+  "types": "dist/packages/cli/main.d.ts"
 }

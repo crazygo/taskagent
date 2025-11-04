@@ -1,10 +1,10 @@
 import crypto from 'crypto';
 import { EventEmitter } from 'events';
 import { type PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
-import { getTaskLogger } from './src/task-logger.js';
-import { addLog } from './src/logger.js';
-import { PromptAgent } from './src/agent/types.js';
-import type { TaskEvent } from './src/types.js';
+import { getTaskLogger } from './task-logger.js';
+import { addLog } from './logger.js';
+import type { PromptAgent } from '@taskagent/agents/runtime/types.js';
+import type { TaskEvent } from '@taskagent/core/types/TaskEvent.js';
 
 export interface Task {
   id: string;

@@ -6,13 +6,10 @@ import { randomUUID } from 'crypto';
 import { inspect } from 'util';
 import { type AgentDefinition, type PermissionUpdate, type PermissionResult } from '@anthropic-ai/claude-agent-sdk';
 
-import { addLog } from './logger.js';
-import { createBaseClaudeFlow, type BaseClaudeFlow } from '@taskagent/agents/runtime/flows/baseClaudeFlow.js';
+import { addLog } from '../logger.js';
+import { createBaseClaudeFlow, type BaseClaudeFlow } from '../agents/runtime/flows/baseClaudeFlow.js';
 import { loadCliConfig } from './cli/config.js';
-import { EventBus } from '@taskagent/core/event-bus/index.js';
-import type { AgentEvent } from '@taskagent/core/types/AgentEvent.js';
-import { registerAllAgents } from '@taskagent/agents';
-import type { Task } from './task-manager.js';
+import type { Task } from '../task-manager.js';
 import { ensureAiProvider, type AiChatProvider } from './config/ai-provider.js';
 import * as Types from './types.js';
 import { ChatPanel } from './components/ChatPanel.js';
@@ -38,20 +35,12 @@ import {
     getDriverCommandEntries,
 } from './drivers/registry.js';
 import type { AgentPipelineOverrides } from './drivers/pipeline.js';
-import { closeTaskLogger } from './task-logger.js';
+import { closeTaskLogger } from '../task-logger.js';
 import { loadWorkspaceSettings, writeWorkspaceSettings, type WorkspaceSettings } from './workspace/settings.js';
 import { DriverView } from './components/DriverView.js';
 
 // Guard to prevent double submission in dev double-mount scenarios
 let __nonInteractiveSubmittedOnce = false;
-
-// Initialize Agent Registry - register all available agents
-let __agentRegistryInitialized = false;
-if (!__agentRegistryInitialized) {
-    registerAllAgents();
-    __agentRegistryInitialized = true;
-    addLog('[AgentRegistry] All agents registered');
-}
 
 const STATIC_TABS: readonly string[] = [
     Driver.CHAT,
@@ -256,13 +245,6 @@ const App = () => {
     const [isAgentStreaming, setIsAgentStreaming] = useState(false);
     const { tasks, startBackground, waitTask, cancelTask, startForeground } = useTaskStore();
     const [positionalPromptWarning, setPositionalPromptWarning] = useState<string | null>(null);
-    
-    // Event Bus instance - single instance for the entire app
-    const eventBusRef = useRef<EventBus | null>(null);
-    if (!eventBusRef.current) {
-        eventBusRef.current = new EventBus();
-        addLog('[EventBus] Created new EventBus instance');
-    }
 
     const automationRanRef = useRef(false);
     const handleSubmitRef = useRef<((input: string) => Promise<boolean>) | null>(null);
@@ -270,109 +252,6 @@ const App = () => {
     useEffect(() => {
         tasksRef.current = tasks;
     }, [tasks]);
-    
-    // Subscribe to Event Bus events
-    useEffect(() => {
-        const eventBus = eventBusRef.current;
-        if (!eventBus) return;
-        
-        // Handler for agent text events
-        const handleAgentText = (event: AgentEvent) => {
-            addLog(`[EventBus] Received agent:text from ${event.agentId} (tab: ${event.tabId})`);
-            const textContent = typeof event.payload === 'string' ? event.payload : JSON.stringify(event.payload);
-            
-            setFrozenMessages(prev => [
-                ...prev,
-                {
-                    id: Date.now(),
-                    role: 'assistant',
-                    content: textContent,
-                    sourceTabId: event.tabId,
-                    timestamp: event.timestamp,
-                }
-            ]);
-        };
-        
-        // Handler for agent reasoning events
-        const handleAgentReasoning = (event: AgentEvent) => {
-            addLog(`[EventBus] Received agent:reasoning from ${event.agentId} (tab: ${event.tabId})`);
-            const reasoningContent = typeof event.payload === 'string' ? event.payload : JSON.stringify(event.payload);
-            
-            setFrozenMessages(prev => [
-                ...prev,
-                {
-                    id: Date.now(),
-                    role: 'assistant',
-                    content: reasoningContent,
-                    reasoning: reasoningContent,
-                    sourceTabId: event.tabId,
-                    timestamp: event.timestamp,
-                }
-            ]);
-        };
-        
-        // Handler for agent event (system messages)
-        const handleAgentEvent = (event: AgentEvent) => {
-            addLog(`[EventBus] Received agent:event from ${event.agentId} (tab: ${event.tabId})`);
-            const eventContent = typeof event.payload === 'string' ? event.payload : JSON.stringify(event.payload);
-            
-            setFrozenMessages(prev => [
-                ...prev,
-                {
-                    id: Date.now(),
-                    role: 'system',
-                    content: eventContent,
-                    sourceTabId: event.tabId,
-                    timestamp: event.timestamp,
-                    isBoxed: true,
-                }
-            ]);
-        };
-        
-        // Handler for agent completed events
-        const handleAgentCompleted = (event: AgentEvent) => {
-            addLog(`[EventBus] Agent ${event.agentId} completed in tab ${event.tabId}`);
-            setIsAgentStreaming(false);
-        };
-        
-        // Handler for agent failed events
-        const handleAgentFailed = (event: AgentEvent) => {
-            addLog(`[EventBus] Agent ${event.agentId} failed in tab ${event.tabId}`);
-            const errorContent = typeof event.payload === 'string' ? event.payload : JSON.stringify(event.payload);
-            
-            setFrozenMessages(prev => [
-                ...prev,
-                {
-                    id: Date.now(),
-                    role: 'system',
-                    content: `❌ Agent failed: ${errorContent}`,
-                    sourceTabId: event.tabId,
-                    timestamp: event.timestamp,
-                    isBoxed: true,
-                }
-            ]);
-            setIsAgentStreaming(false);
-        };
-        
-        // Subscribe to events
-        eventBus.on('agent:text', handleAgentText);
-        eventBus.on('agent:reasoning', handleAgentReasoning);
-        eventBus.on('agent:event', handleAgentEvent);
-        eventBus.on('agent:completed', handleAgentCompleted);
-        eventBus.on('agent:failed', handleAgentFailed);
-        
-        addLog('[EventBus] Subscribed to all agent events');
-        
-        // Cleanup: unsubscribe on unmount
-        return () => {
-            eventBus.off('agent:text', handleAgentText);
-            eventBus.off('agent:reasoning', handleAgentReasoning);
-            eventBus.off('agent:event', handleAgentEvent);
-            eventBus.off('agent:completed', handleAgentCompleted);
-            eventBus.off('agent:failed', handleAgentFailed);
-            addLog('[EventBus] Unsubscribed from all agent events');
-        };
-    }, []);
 
     useEffect(() => {
         if (bootstrapConfig?.driver) {
@@ -1199,26 +1078,12 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
     }
 
     const isDriverViewActive = STATIC_TABS.includes(selectedTab) && selectedTab !== Driver.CHAT && selectedTab !== Driver.AGENT;
-    
-    // Filter messages by Tab (Tab isolation)
-    // Messages without sourceTabId are shown in all tabs for backward compatibility
-    const filteredFrozenMessages = useMemo(() => {
-        return frozenMessages.filter(msg => 
-            !msg.sourceTabId || msg.sourceTabId === selectedTab
-        );
-    }, [frozenMessages, selectedTab]);
-    
-    const filteredActiveMessages = useMemo(() => {
-        return activeMessages.filter(msg => 
-            !msg.sourceTabId || msg.sourceTabId === selectedTab
-        );
-    }, [activeMessages, selectedTab]);
 
     return (
         <Box flexDirection="column" height="100%">
             <ChatPanel
-                frozenMessages={filteredFrozenMessages}
-                activeMessages={filteredActiveMessages}
+                frozenMessages={frozenMessages}
+                activeMessages={activeMessages}
                 modelName={modelName}
                 workspacePath={bootstrapConfig.workspacePath}
                 positionalPromptWarning={positionalPromptWarning}

@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { addLog } from '@taskagent/core/logger.js';
+import { addLog } from '../../logger.js';
 import { runClaudeStream } from './runClaudeStream.js';
 import type { AgentDefinition } from '@anthropic-ai/claude-agent-sdk';
 import type { AgentStartContext, AgentStartSinks, ExecutionHandle } from '../types.js';
