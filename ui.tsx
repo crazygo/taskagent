@@ -602,7 +602,10 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
     }, [tasks]);
 
     useEffect(() => {
-        if (selectedTab !== Driver.AGENT) return;
+        const driverEntry = getDriverByLabel(selectedTab);
+        const needsSession = selectedTab === Driver.AGENT || (driverEntry?.requiresSession ?? false);
+
+        if (!needsSession) return;
         if (agentSessionId) return;
         const workspacePath = bootstrapConfig?.workspacePath;
         if (!workspacePath) {

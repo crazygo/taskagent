@@ -41,6 +41,7 @@ async function handleStoryInvocation(message: Message, context: DriverRuntimeCon
             },
             onCompleted: () => {
                 context.finalizeMessageById(pendingId);
+                context.session?.markInitialized();
             },
             onFailed: (error: string) => {
                 // Finalize any partial output and show error

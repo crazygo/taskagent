@@ -19,6 +19,7 @@ export function buildPromptAgentStart(
 ): (userInput: string, context: AgentStartContext, sinks: AgentStartSinks) => ExecutionHandle {
   return (userInput: string, context: AgentStartContext, sinks: AgentStartSinks): ExecutionHandle => {
     const controller = new AbortController();
+    try { addLog(`[RunPromptAgentStart] Context session received: ${JSON.stringify(context.session)}`); } catch {}
     const session = context.session ?? { id: crypto.randomUUID(), initialized: false };
 
     const prompt = adapter.getPrompt(userInput, {

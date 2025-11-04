@@ -50,6 +50,69 @@ export function getDriverManifest(): readonly DriverManifestEntry[] {
     // Background Task Drivers
     {
         type: 'background_task',
+        id: Driver.LOG_MONITOR_FG,
+        label: 'log-monitor (fg)',
+        slash: 'log-monitor',
+        description: '在前台监控 debug.log（流式输出到当前标签）',
+        requiresSession: true,
+        handler: async (message: Message, context: DriverRuntimeContext) => {
+            const prompt = message.content.trim();
+            if (!prompt) return false;
+
+            const agent = createLogMonitor('debug.log', 100, 30);
+
+            if (!context.startForeground) {
+                const systemMsg: Message = {
+                    id: context.nextMessageId(),
+                    role: 'system',
+                    content: `❌ [Log Monitor] 前台模式不可用（缺少 startForeground）`,
+                    isBoxed: true,
+                };
+                context.setFrozenMessages(prev => [...prev, systemMsg]);
+                return true;
+            }
+
+            // Echo user input (consistent with Story handler UX)
+            const userId = context.nextMessageId();
+            context.setActiveMessages(prev => [...prev, { id: userId, role: 'user', content: prompt }]);
+            context.finalizeMessageById(userId);
+
+            // Pending assistant message container
+            const pendingId = context.nextMessageId();
+            context.setActiveMessages(prev => [...prev, { id: pendingId, role: 'assistant', content: '', isPending: true }]);
+
+            const levelIcons = { info: 'ℹ️', warning: '⚠️', error: '❌' } as const;
+
+            context.startForeground(
+                agent,
+                prompt,
+                { sourceTabId: context.sourceTabId || 'Log Monitor', workspacePath: context.workspacePath, session: context.session },
+                {
+                    onText: (chunk: string) => {
+                        context.setActiveMessages(prev => prev.map(m => m.id === pendingId ? { ...m, content: (m.content || '') + chunk } : m));
+                    },
+                    onEvent: (event) => {
+                        const icon = levelIcons[event.level] || '📝';
+                        const sysMsg: Message = { id: context.nextMessageId(), role: 'system', content: `${icon} [Log Monitor] ${event.message}`, isBoxed: event.level === 'error' };
+                        context.setFrozenMessages(prev => [...prev, sysMsg]);
+                    },
+                    onCompleted: () => {
+                        context.finalizeMessageById(pendingId);
+                    },
+                    onFailed: (error: string) => {
+                        context.finalizeMessageById(pendingId);
+                        const sysMsg: Message = { id: context.nextMessageId(), role: 'system', content: `❌ [Log Monitor] 前台运行失败：${error}`, isBoxed: true };
+                        context.setFrozenMessages(prev => [...prev, sysMsg]);
+                    },
+                    canUseTool: context.canUseTool,
+                }
+            );
+
+            return true;
+        },
+    },
+    {
+        type: 'background_task',
         id: Driver.PLAN_REVIEW_DO,
         label: Driver.PLAN_REVIEW_DO,
         slash: 'plan-review-do',

@@ -104,7 +104,7 @@ Background tasks are invoked via /bg:* commands. The legacy /task alias has been
 
 ### LogMonitor Agent
 - **Location**: `src/agents/log-monitor/LogMonitor.ts`
-- **Capabilities**: Monitors debug.log, 100 lines tail, 30-second intervals
+- **Capabilities**: Monitors debug.log (tail 100 lines, every 30s), also scans latest task log under `logs/*.log`; if Bash/git available, performs a tiny `git diff` check for recent risky changes
 - **Self-Managed**: Loop logic in prompt, no external orchestration needed
 - **Event Parsing**: Regex-based extraction of `[EVENT:level] message` patterns
 

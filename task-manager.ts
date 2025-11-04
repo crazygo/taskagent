@@ -48,6 +48,7 @@ export interface ForegroundHandle {
 export class TaskManager {
   private tasks: Map<string, TaskExtended> = new Map();
   private eventEmitters: Map<string, EventEmitter> = new Map();
+  private handles: Map<string, { cancel: () => void; sessionId: string }> = new Map();
   private timeouts: Map<string, NodeJS.Timeout> = new Map();
 
   /**
@@ -138,7 +139,7 @@ export class TaskManager {
         const em = this.eventEmitters.get(id);
         em?.emit('event', e);
       },
-      onCompleted: (fullText: string) => {
+  onCompleted: (fullText: string) => {
         logger.logStatusChange(id, 'in_progress', 'completed');
         logger.logTaskCompleted(id, fullText, 0);
         task.status = 'completed';
@@ -149,6 +150,7 @@ export class TaskManager {
         em?.emit('completed');
         const timeout = this.timeouts.get(id);
         if (timeout) { clearTimeout(timeout); this.timeouts.delete(id); }
+        this.handles.delete(id);
       },
       onFailed: (error: string) => {
         logger.logStatusChange(id, 'in_progress', 'failed');
@@ -161,6 +163,7 @@ export class TaskManager {
         em?.emit('failed', error);
         const timeout = this.timeouts.get(id);
         if (timeout) { clearTimeout(timeout); this.timeouts.delete(id); }
+        this.handles.delete(id);
       },
       onReasoning: undefined,
       canUseTool: async (toolName: string) => {
@@ -169,12 +172,15 @@ export class TaskManager {
       },
     };
 
-    void maybeStart.call(
+    const handle = maybeStart.call(
       agent,
       userPrompt,
       { sourceTabId: context.sourceTabId, workspacePath: context.workspacePath, session: context.session },
       sinks,
     );
+    if (handle && typeof handle.cancel === 'function') {
+      this.handles.set(id, handle);
+    }
     return { task, emitter };
   }
 
@@ -197,6 +203,7 @@ export class TaskManager {
       throw new Error('[FG] agent.start() is required for foreground runs');
     }
     addLog('[FG] Using agent.start()');
+    try { addLog(`[TaskManager-FG] Context session received: ${JSON.stringify(context.session)}`); } catch {}
     return maybeStart.call(
       agent,
       userPrompt,
@@ -217,6 +224,9 @@ export class TaskManager {
     }
     
     if (task.status === 'pending' || task.status === 'in_progress') {
+      const h = this.handles.get(taskId);
+      try { h?.cancel(); } catch {}
+      this.handles.delete(taskId);
       task.status = 'cancelled';
       this.tasks.set(taskId, task);
       

@@ -34,6 +34,7 @@ async function handleGlossaryInvocation(message: Message, context: DriverRuntime
             },
             onCompleted: () => {
                 context.finalizeMessageById(pendingId);
+                context.session?.markInitialized();
             },
             onFailed: (error: string) => {
                 context.finalizeMessageById(pendingId);

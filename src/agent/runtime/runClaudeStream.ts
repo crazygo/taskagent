@@ -74,8 +74,10 @@ export const runClaudeStream = async ({
 
     if (session.initialized) {
         options.resume = session.id;
+        log(`[Agent-RunClaudeStream] Using RESUME logic for session: ${session.id}`);
     } else {
         options.extraArgs = { 'session-id': session.id };
+        log(`[Agent-RunClaudeStream] Using EXTRA_ARGS (new session) logic for session: ${session.id}`);
     }
 
     if (queryOptions.agents) {
@@ -95,10 +97,15 @@ export const runClaudeStream = async ({
         (options as Record<string, unknown>).permissionMode = queryOptions.permissionMode;
     }
 
-    // Log full options and prompt similarly to TaskManager for Story/Agent runs
+    // A.) Log full options and prompt similarly to TaskManager for Story/Agent runs
+    // B.) Add additional logging for query parameters as requested by the user.
     try {
-        log(`[Agent] Options: ${inspect(options, { depth: 2 })}`);
-        log(`[Agent] Prompt (len=${prompt.length}):\n${truncate(prompt, 5000)}`);
+        log(`[Agent-PreQuery] Full Options for query: ${inspect(options, { depth: 5 })}`); // Increased depth for more detail
+        log(`[Agent-PreQuery] Prompt (len=${prompt.length}):\n${truncate(prompt, 5000)}`);
+    } catch {}
+
+    try {
+        log(`[Agent-FinalQueryOptions] Final options passed to SDK: ${inspect(options, { depth: 5 })}`);
     } catch {}
 
     const result = query({
