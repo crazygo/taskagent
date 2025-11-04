@@ -102,11 +102,29 @@ export interface RunnableAgent {
  * DefaultAtomicAgent - Pass-through agent for direct SDK query
  * Used by Chat and Agent tabs to maintain existing behavior
  */
-export class DefaultAtomicAgent extends PromptAgent {
+export class DefaultAtomicAgent implements RunnableAgent {
     readonly id = 'default';
     readonly description = 'Direct query without agent wrapper';
 
     getPrompt(userInput: string): string {
         return userInput; // Pass through without modification
+    }
+
+    getTools(): string[] {
+        return [];
+    }
+
+    getModel(): string | undefined {
+        return undefined;
+    }
+
+    start(userInput: string, context: AgentStartContext, sinks: AgentStartSinks): ExecutionHandle {
+        // Use the shared builder for standard prompt agent behavior
+        const { buildPromptAgentStart } = require('./runPromptAgentStart.js');
+        const starter = buildPromptAgentStart({
+            getPrompt: (input: string) => input,
+            getSystemPrompt: () => ({ type: 'preset', preset: 'claude_code' } as const),
+        });
+        return starter(userInput, context, sinks);
     }
 }

@@ -45,12 +45,17 @@ import { glossaryTabConfig } from '@taskagent/tabs/configs/glossary';
 import { uiReviewTabConfig } from '@taskagent/tabs/configs/ui-review';
 import { monitorTabConfig } from '@taskagent/tabs/configs/monitor';
 import { getPresetOrDefault } from '@taskagent/presets';
+import { globalAgentRegistry } from '@taskagent/agents/registry';
+import { registerAllAgents } from '@taskagent/agents/registry/registerAgents.js';
 
 // Guard to prevent double submission in dev double-mount scenarios
 let __nonInteractiveSubmittedOnce = false;
 
 // Initialize TabRegistry - tabs will be registered based on preset in App component
 const tabRegistry = getGlobalTabRegistry();
+
+// Initialize Agent Registry - register all built-in agents
+registerAllAgents();
 
 // STATIC_TABS will be populated dynamically after tabs are registered
 function getStaticTabs(): string[] {
@@ -920,7 +925,85 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
         finalizeMessageById(userMessageId);
         setIsAgentStreaming(true);
         addLog(`[Agent] Sending prompt with session ${sessionId}: ${prompt.replace(/\s+/g, ' ').slice(0, 120)}`);
+        
         try {
+            // Get agentId from current tab
+            const tabConfig = tabRegistry.get(selectedTab);
+            const targetAgentId = tabConfig?.agentId ?? 'default';
+            
+            // Use AgentRegistry for all agents
+            if (globalAgentRegistry.has(targetAgentId)) {
+                addLog(`[Agent] Using AgentRegistry agent: ${targetAgentId}`);
+                const agent = await globalAgentRegistry.createAgent(targetAgentId);
+                if (!agent) {
+                    throw new Error(`Failed to create agent: ${targetAgentId}`);
+                }
+                
+                // Create initial assistant message
+                const assistantMessageId = nextMessageId();
+                const assistantMessage: Types.Message = { 
+                    id: assistantMessageId, 
+                    role: 'assistant', 
+                    content: '',
+                    reasoning: '',
+                    isPending: true 
+                };
+                setActiveMessages(prev => [...prev, assistantMessage]);
+                
+                // Prepare context and sinks for agent.start()
+                const context: AgentStartContext = {
+                    sourceTabId: selectedTab,
+                    workspacePath: bootstrapConfig?.workspacePath,
+                    session: { id: sessionId, initialized: agentSessionInitializedRef.current },
+                    forkSession: false,
+                };
+                
+                const sinks: AgentStartSinks = {
+                    onText: (chunk: string) => {
+                        setActiveMessages(prev => {
+                            return prev.map(msg => 
+                                msg.id === assistantMessageId 
+                                    ? { ...msg, content: msg.content + chunk }
+                                    : msg
+                            );
+                        });
+                    },
+                    onReasoning: (chunk: string) => {
+                        setActiveMessages(prev => {
+                            return prev.map(msg =>
+                                msg.id === assistantMessageId
+                                    ? { ...msg, reasoning: (msg.reasoning ?? '') + chunk }
+                                    : msg
+                            );
+                        });
+                    },
+                    onSessionId: (sid: string) => {
+                        addLog(`[Agent] Resolved session ID: ${sid}`);
+                    },
+                    onCompleted: (fullText: string) => {
+                        // Mark message as no longer pending
+                        setActiveMessages(prev => {
+                            return prev.map(msg =>
+                                msg.id === assistantMessageId
+                                    ? { ...msg, isPending: false }
+                                    : msg
+                            );
+                        });
+                        finalizeMessageById(assistantMessageId);
+                    },
+                    onFailed: (error: string) => {
+                        appendSystemMessage(`[Agent] Failed: ${error}`, true);
+                    },
+                    canUseTool: handleAgentPermissionRequest,
+                };
+                
+                await agent.start(rawInput, context, sinks);
+                agentSessionInitializedRef.current = true;
+                return true;
+            }
+            
+            // Fallback to old flow if agent not in registry
+            addLog(`[Agent] Agent ${targetAgentId} not in registry, using baseClaudeFlow`);
             const activeAgentFlow: BaseClaudeFlow = (flowId ? agentFlowRegistry[flowId] : undefined) ?? agentFlowRegistry.default;
             await activeAgentFlow.handleUserInput({
                 prompt,
@@ -945,9 +1028,9 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
                 if (nextJob) void startAgentPrompt(nextJob);
             }
         }
-    }, [agentFlowRegistry, appendSystemMessage, nextMessageId, setActiveMessages, finalizeMessageById]);
+    }, [agentFlowRegistry, appendSystemMessage, nextMessageId, setActiveMessages, finalizeMessageById, selectedTab, bootstrapConfig?.workspacePath, handleAgentPermissionRequest]);
 
-    const runAgentTurn = useCallback(async (rawInput: string, overrides?: AgentTurnOverrides, sessionIdHint?: string, flowId?: string): Promise<boolean> => {
+    const runAgentTurn = useCallback(async (rawInput: string, overrides?: AgentTurnOverrides, sessionIdHint?: string, flowId?: string, agentIdOverride?: string): Promise<boolean> => {
         const prompt = rawInput.trim();
         if (prompt.length === 0) return false;
         const activeSessionId = agentSessionId ?? sessionIdHint ?? null;
@@ -955,6 +1038,21 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
             appendSystemMessage('[Agent] Session not ready yet. Switch to the Agent tab again to initialize.', true);
             return false;
         }
+        
+        // Determine which agent to use
+        let targetAgentId = agentIdOverride;
+        if (!targetAgentId) {
+            // Get agentId from current tab
+            const tabConfig = tabRegistry.get(selectedTab);
+            targetAgentId = tabConfig?.agentId ?? 'default';
+        }
+        
+        // Check if agent exists in registry (skip for 'default' which uses old flow)
+        if (targetAgentId !== 'default' && !globalAgentRegistry.has(targetAgentId)) {
+            appendSystemMessage(`[Agent] Agent '${targetAgentId}' not found in registry. Available agents: ${globalAgentRegistry.getAllIds().join(', ')}`, true);
+            return false;
+        }
+        
         if (isAgentStreaming || agentPendingQueueRef.current.length > 0) {
             const pendingUserMessageId = nextMessageId();
             const pendingAssistantMessageId = nextMessageId();
@@ -965,8 +1063,10 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
             appendSystemMessage(`[Agent] Still processing previous request. Your message has been queued (${agentPendingQueueRef.current.length} pending).`);
             return true;
         }
+        
+        addLog(`[AgentTurn] Using agent: ${targetAgentId} for tab: ${selectedTab}`);
         return await startAgentPrompt({ rawInput, prompt, overrides, sessionId: activeSessionId, flowId });
-    }, [agentSessionId, appendSystemMessage, isAgentStreaming, nextMessageId, setActiveMessages, startAgentPrompt]);
+    }, [agentSessionId, appendSystemMessage, isAgentStreaming, nextMessageId, setActiveMessages, startAgentPrompt, selectedTab]);
 
     const runDriverEntry = useCallback(async (entry: DriverManifestEntry, prompt: string): Promise<boolean> => {
         let sessionContext = undefined as { id: string; initialized: boolean; markInitialized: () => void } | undefined;
@@ -1073,16 +1173,23 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
         }
 
         setInputValue('');
+        
+        // Check TabRegistry first for agent tabs
+        const tabConfig = tabRegistry.get(selectedTab);
+        if (tabConfig && tabConfig.type === 'agent' && !tabConfig.isPlaceholder) {
+            // Agent tab - use agent pipeline
+            addLog(`[Tab] Routing to agent tab: ${tabConfig.label} (agentId: ${tabConfig.agentId})`);
+            return await runAgentTurn(userInput);
+        }
+        
+        // Check old Driver registry for backward compatibility
         const activeDriver = getDriverByLabel(selectedTab);
         if (activeDriver) {
             addLog(`[Driver] Routing to ${activeDriver.label}`);
             return await runDriverEntry(activeDriver, userInput);
         }
 
-        if (selectedTab === Driver.AGENT) {
-            return await runAgentTurn(userInput);
-        }
-
+        // Fallback to Chat
         const newUserMessage: Types.Message = { id: nextMessageId(), role: 'user', content: userInput };
         if (selectedTab === Driver.CHAT) {
             addLog('[Driver] Using Chat mode');
