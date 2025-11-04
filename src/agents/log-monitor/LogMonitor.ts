@@ -19,40 +19,35 @@ export class LogMonitor extends PromptAgent {
         super();
     }
 
-    getPrompt(userInput: string, context: AgentContext): string {
-        const workspaceHint = context.workspacePath 
-            ? `\nWorkspace: ${context.workspacePath}` 
-            : '';
-        
-        // Use absolute path if workspace is provided, otherwise relative
-        const logPath = context.workspacePath 
-            ? `${context.workspacePath}/${this.logFilePath}`
-            : this.logFilePath;
+        getPrompt(userInput: string, context: AgentContext): string {
+                // Pass through user instruction as the actual user message.
+                return userInput;
+        }
 
-        // Secondary sources (optional, best-effort)
-        const logsDir = context.workspacePath
-            ? `${context.workspacePath}/logs`
-            : 'logs';
-
-        return `
-You are a project log and health monitoring agent.${workspaceHint}
+        /**
+         * Provide the monitoring instructions as a system prompt (preset + append).
+         * Keep paths generic to avoid coupling to dynamic workspace context at this layer.
+         */
+        getSystemPrompt(): { type: 'preset'; preset: 'claude_code'; append: string } {
+                const instructions = `
+You are a project log and health monitoring agent.
 
 Your goals:
-- Primary: Monitor the file ${logPath} every ${this.intervalSec}s and read the last ${this.tailLines} lines.
+- Primary: Monitor the file ${this.logFilePath} every ${this.intervalSec}s and read the last ${this.tailLines} lines.
 - Secondary (best-effort):
-  - Check the most recent task log under ${logsDir}/*.log and scan the last ${this.tailLines} lines.
-  - If a shell (Bash) tool is available and the workspace is a git repo, run a small git diff to detect recent changes since the previous cycle.
+    - Check the most recent task log under logs/*.log and scan the last ${this.tailLines} lines.
+    - If a shell (Bash) tool is available and the workspace is a git repo, run a small git diff to detect recent changes since the previous cycle.
 
 Looping policy (self-managed, keep short):
 1) Maintain a small in-memory snapshot for each source (debug.log tail, latest task log tail, recent git diff summary).
 2) On each cycle, fetch fresh data for each source and compare with the previous snapshot.
 3) Only when a meaningful change is detected, emit a single concise event line using the format below.
-4) Otherwise, stay quiet. Do not emit anything if there’s no change.
+4) Otherwise, stay quiet. Do not emit anything if there's no change.
 
 Output format (exactly one line per event):
-  [EVENT:info] <concise change summary>
-  [EVENT:warning] <concise risk or anomaly>
-  [EVENT:error] <concise failure or critical issue>
+    [EVENT:info] <concise change summary>
+    [EVENT:warning] <concise risk or anomaly>
+    [EVENT:error] <concise failure or critical issue>
 
 Guidelines:
 - Prefer signal-to-noise: a single sentence with the highest-value change.
@@ -60,11 +55,9 @@ Guidelines:
 - If Bash/git is unavailable, skip git checks silently.
 - Do NOT print thoughts, steps, or raw contents; only emit event lines when warranted.
 
-User instruction: ${userInput}
-
-Begin the monitoring loop now. Continue until stopped or timed out. Emit events only on change.
-`.trim();
-    }
+Begin the monitoring loop now. Continue until stopped or timed out. Emit events only on change.`.trim();
+                return { type: 'preset', preset: 'claude_code', append: instructions } as const;
+        }
 
     getTools(): string[] {
         // Read/Glob are sufficient for log scanning; Bash enables small git diff checks; Grep optional.
@@ -77,6 +70,7 @@ Begin the monitoring loop now. Continue until stopped or timed out. Emit events 
     start(userInput: string, ctx: AgentStartContext, sinks: AgentStartSinks) {
         const starter = buildPromptAgentStart({
             getPrompt: (input: string, c: { sourceTabId: string; workspacePath?: string }) => this.getPrompt(input, c as AgentContext),
+            getSystemPrompt: () => this.getSystemPrompt(),
             getModel: () => this.getModel?.(),
             // Reuse parseOutput for streaming event emission if available
             parseOutput: this.parseOutput?.bind(this),

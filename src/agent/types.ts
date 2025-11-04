@@ -84,37 +84,8 @@ export interface RunnableAgent {
     start: (userInput: string, context: AgentStartContext, sinks: AgentStartSinks) => ExecutionHandle;
 }
 
-/**
- * StackAgent - Orchestrates multiple PromptAgents
- * Inherits from PromptAgent but adds coordinator capabilities
- */
-export abstract class StackAgent extends PromptAgent {
-    abstract readonly subAgents: Record<string, PromptAgent>;
-    abstract readonly coordinatorPrompt: string;
-
-    /**
-     * Override: Return coordinator prompt with user input
-     */
-    getPrompt(userInput: string, context: AgentContext): string {
-        return this.coordinatorPrompt.replace(/\{\{USER_INPUT\}\}/g, userInput);
-    }
-
-    /**
-     * Get SDK agent definitions for sub-agents
-     */
-    getAgentDefinitions(): Record<string, AgentDefinition> {
-        const defs: Record<string, AgentDefinition> = {};
-        for (const [name, agent] of Object.entries(this.subAgents)) {
-            defs[name] = {
-                description: agent.description,
-                prompt: agent.getPrompt('', { sourceTabId: '' }),
-                tools: agent.getTools?.(),
-                model: agent.getModel?.() as any,
-            };
-        }
-        return defs;
-    }
-}
+// Note: Legacy StackAgent removed. New pattern uses PromptAgent + systemPrompt (preset+append)
+// and supplies sub-agents as SDK agent definitions directly when needed.
 
 /**
  * DefaultAtomicAgent - Pass-through agent for direct SDK query
