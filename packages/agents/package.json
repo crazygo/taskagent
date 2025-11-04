@@ -9,6 +9,7 @@
     "./glossary/*.js": "./glossary/*.ts",
     "./ui-review/*.js": "./ui-review/*.ts",
     "./monitor/*.js": "./monitor/*.ts",
+    "./registry": "./registry/index.ts",
     "./registry/*.js": "./registry/*.ts"
   },
   "dependencies": {

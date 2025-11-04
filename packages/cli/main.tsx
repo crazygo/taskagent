@@ -45,8 +45,7 @@ import { glossaryTabConfig } from '@taskagent/tabs/configs/glossary';
 import { uiReviewTabConfig } from '@taskagent/tabs/configs/ui-review';
 import { monitorTabConfig } from '@taskagent/tabs/configs/monitor';
 import { getPresetOrDefault } from '@taskagent/presets';
-import { globalAgentRegistry } from '@taskagent/agents/registry';
-import { registerAllAgents } from '@taskagent/agents/registry/registerAgents.js';
+import { globalAgentRegistry, registerAllAgents } from '@taskagent/agents/registry';
 
 // Guard to prevent double submission in dev double-mount scenarios
 let __nonInteractiveSubmittedOnce = false;
