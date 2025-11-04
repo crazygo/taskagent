@@ -12,6 +12,7 @@ import type { AgentStartContext, AgentStartSinks, ExecutionHandle } from '../typ
 export function buildPromptAgentStart(
   adapter: {
     getPrompt: (userInput: string, ctx: { sourceTabId: string; workspacePath?: string }) => string;
+    getSystemPrompt?: () => string | { type: 'preset'; preset: 'claude_code'; append?: string };
     getAgentDefinitions?: () => Record<string, AgentDefinition> | undefined;
     getModel?: () => string | undefined;
     parseOutput?: (rawChunk: string) => { level: 'info'|'warning'|'error'; message: string; ts: number }[];
@@ -31,7 +32,7 @@ export function buildPromptAgentStart(
       model: adapter.getModel?.() || process.env.ANTHROPIC_MODEL,
       cwd: context.workspacePath,
       canUseTool: sinks.canUseTool,
-      systemPrompt: { type: 'preset', preset: 'claude_code' } as any,
+      systemPrompt: (adapter.getSystemPrompt?.() ?? { type: 'preset', preset: 'claude_code' }) as any,
     };
 
     // Inject sub-agents if present

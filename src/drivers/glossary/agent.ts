@@ -28,8 +28,13 @@ export async function createGlossaryPromptAgent() {
 
     // PromptAgent contract (prompt-driven)
     getPrompt(userInput: string) {
-      // Use coordinator prompt with {{USER_INPUT}} substitution (parity with prior pipeline)
-      return coordinator?.replace(/\{\{USER_INPUT\}\}/g, userInput) ?? userInput;
+      // Send user's text directly; coordinator is provided as system prompt.
+      return userInput;
+    },
+
+    // Provide the coordinator as system prompt in preset format with append
+    getSystemPrompt() {
+      return { type: 'preset', preset: 'claude_code', append: coordinator } as const;
     },
 
     // Expose sub-agent definitions to the runtime (SDK `agents` option)
@@ -42,9 +47,8 @@ export async function createGlossaryPromptAgent() {
     getModel(): string | undefined { return undefined; },
     start(userInput: string, ctx: AgentStartContext, sinks: AgentStartSinks) {
       const self = {
-        getPrompt: (input: string, c: { sourceTabId: string; workspacePath?: string }) => {
-          return coordinator?.replace(/\{\{USER_INPUT\}\}/g, input) ?? input;
-        },
+        getPrompt: (input: string, c: { sourceTabId: string; workspacePath?: string }) => input,
+        getSystemPrompt: () => coordinator,
         getAgentDefinitions: () => agents,
         getModel: () => undefined,
         parseOutput: undefined,

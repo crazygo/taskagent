@@ -28,8 +28,13 @@ export async function createStoryPromptAgent() {
 
     // PromptAgent contract (prompt-driven)
     getPrompt(userInput: string) {
-      // Embed user input into coordinator prompt (matches previous pipeline semantics)
-      return coordinator?.replace(/\{\{USER_INPUT\}\}/g, userInput) ?? userInput;
+      // Send the user's text as the actual prompt; coordinator goes into systemPrompt.
+      return userInput;
+    },
+
+    // Provide the coordinator as system prompt for the SDK, appended to preset
+    getSystemPrompt() {
+      return { type: 'preset', preset: 'claude_code', append: coordinator } as const;
     },
 
     // Expose sub-agent definitions to the runtime (SDK `agents` option)
@@ -42,9 +47,8 @@ export async function createStoryPromptAgent() {
     getModel(): string | undefined { return undefined; },
     start(userInput: string, ctx: AgentStartContext, sinks: AgentStartSinks) {
       const self = {
-        getPrompt: (input: string, c: { sourceTabId: string; workspacePath?: string }) => {
-          return coordinator?.replace(/\{\{USER_INPUT\}\}/g, input) ?? input;
-        },
+        getPrompt: (input: string, c: { sourceTabId: string; workspacePath?: string }) => input,
+        getSystemPrompt: () => coordinator,
         getAgentDefinitions: () => agents,
         getModel: () => undefined,
         parseOutput: undefined,

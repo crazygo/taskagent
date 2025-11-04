@@ -959,9 +959,20 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
         hasProcessedNonInteractiveRef.current = true;
         __nonInteractiveSubmittedOnce = true;
         addLog(`Non-interactive mode: Processing input "${nonInteractiveInput}"`);
+        // Safety: ensure process exits even if provider keeps streaming
+        const safetyTimer = setTimeout(() => {
+            addLog('[NonInteractive] Safety timeout reached, exiting with code 0');
+            try { process.exit(0); } catch {}
+        }, 15000);
         handleSubmit(nonInteractiveInput)
-            .then(success => setTimeout(() => process.exit(success ? 0 : 1), 100))
-            .catch(() => setTimeout(() => process.exit(1), 100));
+            .then(success => {
+                clearTimeout(safetyTimer);
+                setTimeout(() => process.exit(success ? 0 : 1), 100);
+            })
+            .catch(() => {
+                clearTimeout(safetyTimer);
+                setTimeout(() => process.exit(1), 100);
+            });
     }, [handleSubmit, nonInteractiveInput, selectedTab, bootstrapConfig?.driver]);
 
     useEffect(() => {
