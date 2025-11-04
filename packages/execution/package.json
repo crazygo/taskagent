@@ -1,0 +1,18 @@
+{
+  "name": "@taskagent/execution",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "exports": {
+    ".": "./index.js",
+    "./MessageAdapter": "./MessageAdapter.js",
+    "./TabExecutor": "./TabExecutor.js",
+    "./TabExecutionManager": "./TabExecutionManager.js",
+    "./types": "./types.js"
+  },
+  "dependencies": {
+    "@taskagent/agents": "workspace:*",
+    "@taskagent/core": "workspace:*"
+  }
+}

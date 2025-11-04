@@ -122,7 +122,8 @@ __metadata:
     vitest: "npm:^4.0.6"
     zod: "npm:^4.1.12"
   bin:
-    task: dist/packages/cli/main.js
+    taskagent: dist/packages/cli/main.js
+    taskagent-monitor: dist/main-monitor.js
   languageName: unknown
   linkType: soft
 
@@ -872,6 +873,21 @@ __metadata:
     "@types/node": "npm:^24.7.1"
     typescript: "npm:^5.9.3"
     zod: "npm:^4.1.12"
+  languageName: unknown
+  linkType: soft
+
+"@taskagent/execution@workspace:packages/execution":
+  version: 0.0.0-use.local
+  resolution: "@taskagent/execution@workspace:packages/execution"
+  dependencies:
+    "@taskagent/agents": "workspace:*"
+    "@taskagent/core": "workspace:*"
+  languageName: unknown
+  linkType: soft
+
+"@taskagent/presets@workspace:packages/presets":
+  version: 0.0.0-use.local
+  resolution: "@taskagent/presets@workspace:packages/presets"
   languageName: unknown
   linkType: soft
 

@@ -44,6 +44,7 @@ import { storyTabConfig } from '@taskagent/tabs/configs/story';
 import { glossaryTabConfig } from '@taskagent/tabs/configs/glossary';
 import { uiReviewTabConfig } from '@taskagent/tabs/configs/ui-review';
 import { monitorTabConfig } from '@taskagent/tabs/configs/monitor';
+import { getPresetOrDefault } from '@taskagent/presets';
 
 // Guard to prevent double submission in dev double-mount scenarios
 let __nonInteractiveSubmittedOnce = false;
@@ -296,8 +297,8 @@ const App = () => {
             return; // Already initialized
         }
         
-        const preset = bootstrapConfig.preset || 'default';
-        addLog(`[Preset] Initializing with preset: ${preset}`);
+        const presetName = bootstrapConfig.preset || 'default';
+        addLog(`[Preset] Initializing with preset: ${presetName}`);
         
         try {
             // Check if tabs already registered (e.g., in test environment)
@@ -308,24 +309,45 @@ const App = () => {
                 return;
             }
 
-            if (preset === 'monitor') {
-                // Monitor-only preset
-                tabRegistry.registerMany([monitorTabConfig]);
-                addLog('[Preset] Registered monitor preset (1 tab)');
-                // Set default tab to Monitor for monitor preset
-                setSelectedTab('Monitor');
-            } else {
-                // Default preset - all tabs
+            // Load preset configuration from @taskagent/presets
+            const presetConfig = getPresetOrDefault(presetName);
+            addLog(`[Preset] Loaded preset '${presetConfig.name}' with ${presetConfig.tabs.length} tabs`);
+
+            // Map tab IDs to tab configs
+            const tabConfigMap: Record<string, TabConfig> = {
+                'Chat': chatTabConfig,
+                'Agent': agentTabConfig,
+                'Story': storyTabConfig,
+                'Glossary': glossaryTabConfig,
+                'UI-Review': uiReviewTabConfig,
+                'Monitor': monitorTabConfig,
+            };
+
+            // Register tabs based on preset
+            const tabsToRegister = presetConfig.tabs
+                .map(tabId => tabConfigMap[tabId])
+                .filter((config): config is TabConfig => config !== undefined);
+
+            if (tabsToRegister.length === 0) {
+                addLog(`[Preset] Warning: No valid tabs found for preset '${presetName}', falling back to default`);
+                // Fallback to all tabs
                 tabRegistry.registerMany([
                     chatTabConfig,
                     agentTabConfig,
                     storyTabConfig,
                     glossaryTabConfig,
                     uiReviewTabConfig,
-                    monitorTabConfig,
+                    monitorTabConfig
                 ]);
-                addLog('[Preset] Registered default preset (6 tabs)');
-                // Default tab is already Chat (set in useState)
+            } else {
+                tabRegistry.registerMany(tabsToRegister);
+                addLog(`[Preset] Registered ${tabsToRegister.length} tabs: ${tabsToRegister.map(t => t.label).join(', ')}`);
+            }
+
+            // Set default tab based on preset
+            if (presetConfig.defaultTab && tabConfigMap[presetConfig.defaultTab]) {
+                setSelectedTab(presetConfig.defaultTab);
+                addLog(`[Preset] Default tab set to: ${presetConfig.defaultTab}`);
             }
             
             setTabsInitialized(true);
