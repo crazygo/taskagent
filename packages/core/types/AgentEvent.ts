@@ -1,0 +1,47 @@
+/**
+ * Agent Event Types - Event Bus protocol
+ * 
+ * All Agent-to-UI communication happens through these events.
+ * Agents emit events, CLI subscribes and updates UI.
+ */
+
+export type AgentEventType = 
+    | 'agent:text'          // Text chunk from Agent
+    | 'agent:reasoning'     // Reasoning/thinking text
+    | 'agent:event'         // Task event (info/warning/error)
+    | 'agent:completed'     // Agent execution completed
+    | 'agent:failed';       // Agent execution failed
+
+export interface AgentEvent {
+    type: AgentEventType;
+    agentId: string;        // Which Agent emitted this
+    tabId: string;          // Which Tab this event belongs to
+    timestamp: number;
+    payload: unknown;       // Event-specific payload
+    version: '1.0';         // Protocol version (fixed, no wildcards)
+}
+
+// Event-specific payload types
+export interface AgentTextPayload {
+    chunk: string;
+}
+
+export interface AgentReasoningPayload {
+    reasoning: string;
+}
+
+export interface AgentEventPayload {
+    level: 'info' | 'warning' | 'error';
+    message: string;
+}
+
+export interface AgentCompletedPayload {
+    fullText: string;
+    sessionId?: string;
+}
+
+export interface AgentFailedPayload {
+    error: string;
+    code?: string;
+}
+

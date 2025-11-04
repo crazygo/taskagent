@@ -91,3 +91,4 @@ unpack/
 
 # Test artifacts
 artifacts/
+.tmp-test-workspaces/

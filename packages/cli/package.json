@@ -1,0 +1,34 @@
+{
+  "name": "@taskagent/cli",
+  "version": "0.0.1",
+  "type": "module",
+  "bin": {
+    "taskagent": "./dist/main.js"
+  },
+  "exports": {
+    ".": "./main.tsx"
+  },
+  "dependencies": {
+    "@taskagent/agents": "workspace:*",
+    "@taskagent/core": "workspace:*",
+    "dotenv": "^17.2.3",
+    "ink": "^6.3.1",
+    "ink-text-input": "^6.0.0",
+    "minimist": "^1.2.8",
+    "react": "^19.2.0",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/ink": "^2.0.3",
+    "@types/ink-text-input": "^2.0.2",
+    "@types/minimist": "^1.2.0",
+    "@types/node": "^24.7.1",
+    "@types/react": "^19.2.2",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  },
+  "scripts": {
+    "start": "tsx main.tsx --",
+    "build": "tsc"
+  }
+}

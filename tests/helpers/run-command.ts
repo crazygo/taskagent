@@ -20,9 +20,21 @@ export async function runCommand(
   // Ensure the artifacts directory exists
   await fs.mkdir(artifactsDir, { recursive: true });
 
+  // Use a test workspace inside the project directory if not specified
+  const testWorkspace = workspaceDir || path.join(projectRoot, '.tmp-test-workspaces', testName);
+  
+  // Ensure test workspace exists
+  await fs.mkdir(testWorkspace, { recursive: true });
+
   const childProcess = execa(command, args, {
     cwd: projectRoot,
-    env: { FORCE_COLOR: '0', ...process.env, E2E_WORKSPACE: workspaceDir },
+    env: { 
+      FORCE_COLOR: '0', 
+      ...process.env, 
+      E2E_WORKSPACE: testWorkspace,
+      // Disable non-interactive timeout for most tests (except e2e-automation which needs it)
+      ...(testName !== 'e2e-automation' && { E2E_DISABLE_TIMEOUT: '1' })
+    },
     reject: false, // Don't throw on non-zero exit codes
   });
 

@@ -11,5 +11,12 @@ export default defineConfig({
     hookTimeout: 60_000,
     bail: false,
     globals: true,
+    // Use threads pool to avoid PTY exhaustion and kill EPERM issues
+    pool: 'threads',
+    poolOptions: {
+      threads: {
+        singleThread: true, // Run tests sequentially to avoid resource conflicts
+      },
+    },
   },
 });

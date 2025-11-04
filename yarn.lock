@@ -813,6 +813,59 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@taskagent/agents@workspace:*, @taskagent/agents@workspace:packages/agents":
+  version: 0.0.0-use.local
+  resolution: "@taskagent/agents@workspace:packages/agents"
+  dependencies:
+    "@ai-sdk/openai": "npm:^2.0.48"
+    "@anthropic-ai/claude-agent-sdk": "npm:^0.1.25"
+    "@openrouter/ai-sdk-provider": "https://github.com/crazygo/ai-sdk-provider/releases/download/1.2.1/openrouter-ai-sdk-provider-1.2.1.tgz"
+    "@taskagent/core": "workspace:*"
+    "@types/js-yaml": "npm:^4.0.9"
+    "@types/node": "npm:^24.7.1"
+    ai: "npm:^5.0.78"
+    dotenv: "npm:^17.2.3"
+    glob: "npm:^11.0.3"
+    js-yaml: "npm:^4.1.0"
+    typescript: "npm:^5.9.3"
+    zod: "npm:^4.1.12"
+  languageName: unknown
+  linkType: soft
+
+"@taskagent/cli@workspace:packages/cli":
+  version: 0.0.0-use.local
+  resolution: "@taskagent/cli@workspace:packages/cli"
+  dependencies:
+    "@taskagent/agents": "workspace:*"
+    "@taskagent/core": "workspace:*"
+    "@types/ink": "npm:^2.0.3"
+    "@types/ink-text-input": "npm:^2.0.2"
+    "@types/minimist": "npm:^1.2.0"
+    "@types/node": "npm:^24.7.1"
+    "@types/react": "npm:^19.2.2"
+    dotenv: "npm:^17.2.3"
+    ink: "npm:^6.3.1"
+    ink-text-input: "npm:^6.0.0"
+    minimist: "npm:^1.2.8"
+    react: "npm:^19.2.0"
+    tsx: "npm:^4.20.6"
+    typescript: "npm:^5.9.3"
+    zod: "npm:^4.1.12"
+  bin:
+    taskagent: ./dist/main.js
+  languageName: unknown
+  linkType: soft
+
+"@taskagent/core@workspace:*, @taskagent/core@workspace:packages/core":
+  version: 0.0.0-use.local
+  resolution: "@taskagent/core@workspace:packages/core"
+  dependencies:
+    "@types/node": "npm:^24.7.1"
+    typescript: "npm:^5.9.3"
+    zod: "npm:^4.1.12"
+  languageName: unknown
+  linkType: soft
+
 "@types/chai@npm:^5.2.2":
   version: 5.2.3
   resolution: "@types/chai@npm:5.2.3"
