@@ -25,6 +25,7 @@ export type RunClaudeStreamCallbacks = {
     onToolUse?: (event: ToolUseEvent) => void;
     onToolResult?: (event: ToolResultEvent) => void;
     onNonAssistantEvent?: (event: unknown) => void;
+    onSessionId?: (sessionId: string) => void;
 };
 
 export type RunClaudeStreamParams = {
@@ -221,6 +222,11 @@ export const runClaudeStream = async ({
                     log(`[Agent] Event full (type=${String(kind)}): ${JSON.stringify(m)}`);
                 } catch (error) {
                     log(`[Agent] Event full (inspect) type=${String(kind)}: ${inspect(m, { depth: 6 })}`);
+                }
+
+                // Detect first system event carrying session_id and notify
+                if (kind === 'system' && typeof m?.session_id === 'string' && m.session_id.trim()) {
+                    cb.onSessionId?.(String(m.session_id));
                 }
             } catch (error) {
                 log(`[Agent] Non-assistant event (logging failed): ${String(error)}`);

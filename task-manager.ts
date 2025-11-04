@@ -13,6 +13,8 @@ export interface Task {
   output: string;
   exitCode?: number | null;
   error?: string | null;
+  /** Actual SDK session id (may differ from internal task id), if available */
+  sdkSessionId?: string;
 }
 
 export interface TaskExtended extends Task {
@@ -71,6 +73,7 @@ export class TaskManager {
     addLog(`[TaskManager] startBackground agent=${agent.id}`);
     addLog(`[TaskManager] User prompt: ${userPrompt}`);
     try { addLog(`[TaskManager] Context: ${JSON.stringify(context)}`); } catch {}
+  try { addLog(`[TaskManager] forkSession flag: ${context.forkSession === true ? 'true' : 'false'}`); } catch {}
 
     const agentContext = {
       sourceTabId: context.sourceTabId || 'unknown',
@@ -177,7 +180,18 @@ export class TaskManager {
       agent,
       userPrompt,
       { sourceTabId: context.sourceTabId, workspacePath: context.workspacePath, session: context.session, forkSession: context.forkSession },
-      sinks,
+      {
+        ...sinks,
+        onSessionId: (sid: string) => {
+          try {
+            addLog(`[TaskManager] SDK session resolved: ${sid}`);
+          } catch {}
+          task.sdkSessionId = sid;
+          this.tasks.set(id, task);
+          const em = this.eventEmitters.get(id);
+          em?.emit('event', { level: 'info', message: `SDK session: ${sid}`, ts: Date.now() });
+        },
+      },
     );
     if (handle && typeof handle.cancel === 'function') {
       this.handles.set(id, handle);
@@ -289,6 +303,6 @@ export class TaskManager {
   // CLI task runner removed as part of cleanup (runCliTask)
 
   getAllTasks(): Task[] {
-    return Array.from(this.tasks.values()).map(t => ({ id: t.id, prompt: t.prompt, status: t.status, output: t.output, exitCode: t.exitCode ?? null, error: t.error ?? null }));
+    return Array.from(this.tasks.values()).map(t => ({ id: t.id, prompt: t.prompt, status: t.status, output: t.output, exitCode: t.exitCode ?? null, error: t.error ?? null, sdkSessionId: t.sdkSessionId }));
   }
 }

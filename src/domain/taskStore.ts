@@ -28,6 +28,7 @@ export const useTaskStore = ({ pollIntervalMs = 1000 }: UseTaskStoreOptions = {}
       workspacePath?: string;
       timeoutSec?: number;
       session?: { id: string; initialized: boolean };
+      forkSession?: boolean;
     } = {}
   ): TaskWithEmitter => {
     const finalContext = {
@@ -35,6 +36,7 @@ export const useTaskStore = ({ pollIntervalMs = 1000 }: UseTaskStoreOptions = {}
       workspacePath: context.workspacePath,
       timeoutSec: context.timeoutSec,
       session: context.session,
+      forkSession: context.forkSession,
     };
     const result = taskManager.startBackground(agent, userPrompt, finalContext);
     setTasks(taskManager.getAllTasks()); // Immediately update tasks state
@@ -46,7 +48,7 @@ export const useTaskStore = ({ pollIntervalMs = 1000 }: UseTaskStoreOptions = {}
   const startForeground = (
     agent: PromptAgent,
     userPrompt: string,
-    context: { sourceTabId: string; workspacePath?: string; session?: { id: string; initialized: boolean } },
+    context: { sourceTabId: string; workspacePath?: string; session?: { id: string; initialized: boolean }; forkSession?: boolean },
     sinks: ForegroundSinks,
   ): ForegroundHandle => {
     return taskManager.startForeground(agent, userPrompt, context, sinks);

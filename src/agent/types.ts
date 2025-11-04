@@ -34,6 +34,11 @@ export type AgentStartSinks = {
     onCompleted?: (fullText: string) => void;
     onFailed?: (error: string) => void;
     canUseTool: (toolName: string, input: Record<string, unknown>, options: { signal: AbortSignal; suggestions?: PermissionUpdate[] }) => Promise<unknown>;
+    /**
+     * Notifies the resolved SDK session id (first system event),
+     * which may differ from the input context session id when forking.
+     */
+    onSessionId?: (sessionId: string) => void;
 };
 
 export interface ExecutionHandle {

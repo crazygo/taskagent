@@ -70,6 +70,7 @@ export function buildPromptAgentStart(
           }
         },
         onReasoningDelta: sinks.onReasoning,
+            onSessionId: (sid: string) => { try { sinks.onSessionId?.(sid); } catch {} },
         onToolUse: (event) => {
           // Forward tool use events to UI as info events
           if (sinks.onEvent) {
