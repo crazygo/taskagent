@@ -1,7 +1,7 @@
 
 import crypto from 'crypto';
 import { EventEmitter } from 'events';
-import { query } from '@anthropic-ai/claude-agent-sdk';
+import { query, type PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
 import type {
   Options,
   SDKAssistantMessage,
@@ -10,6 +10,7 @@ import { getTaskLogger } from './src/task-logger.js';
 import { addLog } from './src/logger.js';
 import { AtomicAgent, StackAgent, DefaultAtomicAgent } from './src/agent/types.js';
 import type { TaskEvent } from './src/types.js';
+import { runClaudeStream } from './src/agent/runtime/runClaudeStream.js';
 
 export interface Task {
   id: string;
@@ -35,15 +36,30 @@ export interface TaskWithEmitter {
   emitter: EventEmitter;
 }
 
+// Foreground streaming API Types
+export type ForegroundSinks = {
+  onText: (chunk: string) => void;
+  onReasoning?: (chunk: string) => void;
+  onEvent?: (e: TaskEvent) => void;
+  onCompleted?: (fullText: string) => void;
+  onFailed?: (error: string) => void;
+  canUseTool: (toolName: string, input: Record<string, unknown>, options: { signal: AbortSignal; suggestions?: PermissionUpdate[] }) => Promise<unknown>;
+};
+
+export interface ForegroundHandle {
+  cancel: () => void;
+  sessionId: string;
+}
+
 export class TaskManager {
   private tasks: Map<string, TaskExtended> = new Map();
   private eventEmitters: Map<string, EventEmitter> = new Map();
   private timeouts: Map<string, NodeJS.Timeout> = new Map();
 
   /**
-   * Create a task with an agent (new API)
+   * Start a background agent run (creates a Task tab)
    */
-  createTaskWithAgent(
+  startBackground(
     agent: AtomicAgent,
     userPrompt: string,
     context: {
@@ -56,7 +72,7 @@ export class TaskManager {
     const id = crypto.randomUUID();
     const emitter = new EventEmitter();
     
-    addLog(`[TaskManager] createTaskWithAgent agent=${agent.id}`);
+  addLog(`[TaskManager] startBackground agent=${agent.id}`);
     addLog(`[TaskManager] User prompt: ${userPrompt}`);
     try { addLog(`[TaskManager] Context: ${JSON.stringify(context)}`); } catch {}
     
@@ -106,6 +122,95 @@ export class TaskManager {
   addLog('[TaskManager] Starting runTaskWithAgent');
     this.runTaskWithAgent(task);
     return { task, emitter };
+  }
+
+  /**
+   * Start a foreground agent run with streaming into provided sinks (no Task tab)
+   * Does not register a Task in the internal map; lifecycle handled by the caller via the returned handle.
+   */
+  startForeground(
+    agent: AtomicAgent,
+    userPrompt: string,
+    context: {
+      sourceTabId: string;
+      workspacePath?: string;
+      session?: { id: string; initialized: boolean };
+    },
+    sinks: ForegroundSinks,
+  ): ForegroundHandle {
+    const agentContext = {
+      sourceTabId: context.sourceTabId || 'unknown',
+      workspacePath: context.workspacePath,
+    };
+    const prompt = agent.getPrompt(userPrompt, agentContext);
+
+    const controller = new AbortController();
+
+    // Build query options similar to runTaskWithAgent but with interactive permissions
+    const options: Record<string, unknown> = {
+      model: agent.getModel?.() || process.env.ANTHROPIC_MODEL,
+      cwd: context.workspacePath,
+      canUseTool: sinks.canUseTool,
+      systemPrompt: { type: 'preset', preset: 'claude_code' } as any,
+    };
+
+    // Inject sub-agent definitions if provided
+    try {
+      const maybeGetDefs = (agent as unknown as { getAgentDefinitions?: () => Record<string, unknown> | undefined })
+        .getAgentDefinitions;
+      if (typeof maybeGetDefs === 'function') {
+        const defs = maybeGetDefs.call(agent);
+        if (defs && Object.keys(defs).length > 0) {
+          (options as any).agents = defs;
+          addLog('[FG] Agent definitions detected, injected');
+        }
+      }
+    } catch (e) {
+      addLog(`[FG] getAgentDefinitions failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+
+    // Session handling
+    const session = context.session ?? { id: crypto.randomUUID(), initialized: false };
+
+    // Accumulate full text for onCompleted
+    let fullText = '';
+
+    // Kick off stream
+    void runClaudeStream({
+      prompt,
+      session,
+      queryOptions: options as any,
+      callbacks: {
+        onTextDelta: (chunk: string) => {
+          fullText += chunk;
+          try {
+            sinks.onText(chunk);
+          } catch {}
+          // Parse TaskEvents, if supported
+          if (agent.parseOutput) {
+            try {
+              const events = agent.parseOutput(chunk);
+              if (events?.length && sinks.onEvent) {
+                for (const e of events) sinks.onEvent(e);
+              }
+            } catch {}
+          }
+        },
+        onReasoningDelta: sinks.onReasoning,
+      },
+      log: addLog,
+    }).then(() => {
+      try { sinks.onCompleted?.(fullText); } catch {}
+    }).catch((err) => {
+      const message = err instanceof Error ? err.message : String(err);
+      addLog(`[FG] Stream failed: ${message}`);
+      try { sinks.onFailed?.(message); } catch {}
+    });
+
+    return {
+      cancel: () => controller.abort(),
+      sessionId: session.id,
+    };
   }
 
   /**
@@ -220,10 +325,21 @@ export class TaskManager {
         addLog(`[TaskManager] Set cwd: ${task.workspacePath}`);
       }
 
-      // For StackAgent, add agent definitions
-      if (agent instanceof StackAgent) {
-        options.agents = agent.getAgentDefinitions();
-        addLog('[TaskManager] StackAgent detected, added agent definitions');
+      // Add agent definitions if provided (feature detection, not type-based)
+      try {
+        const maybeGetDefs = (agent as unknown as { getAgentDefinitions?: () => Record<string, unknown> | undefined })
+          .getAgentDefinitions;
+        if (typeof maybeGetDefs === 'function') {
+          const defs = maybeGetDefs.call(agent);
+          if (defs && Object.keys(defs).length > 0) {
+            (options as any).agents = defs;
+            addLog('[TaskManager] Agent definitions detected, added to options');
+          } else {
+            addLog('[TaskManager] Agent definitions present but empty; skipping');
+          }
+        }
+      } catch (e) {
+        addLog(`[TaskManager] Failed to detect/add agent definitions: ${e instanceof Error ? e.message : String(e)}`);
       }
 
       // Ensure Claude Code preset and session handling like Agent flow

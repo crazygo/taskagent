@@ -1,7 +1,7 @@
 import type React from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import type { AgentDefinition, PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
-import type { Task } from '../../task-manager.js';
+import type { Task, TaskWithEmitter } from '../../task-manager.js';
 import type { Message } from '../types.js';
 import type { DriverPrepareResult } from './pipeline.js';
 
@@ -51,7 +51,24 @@ export interface DriverRuntimeContext {
     workspacePath?: string;
     sourceTabId?: string;
     createTask: (prompt: string, queryOptions?: { agents?: Record<string, any> }) => Task;
-    createTaskWithAgent?: (agent: any, userPrompt: string, context: any) => any;
+    startBackground?: (
+        agent: any,
+        userPrompt: string,
+        context: { sourceTabId?: string; workspacePath?: string; timeoutSec?: number; session?: { id: string; initialized: boolean } }
+    ) => TaskWithEmitter;
+    startForeground?: (
+        agent: any,
+        userPrompt: string,
+        context: { sourceTabId: string; workspacePath?: string; session?: { id: string; initialized: boolean } },
+        sinks: {
+            onText: (chunk: string) => void;
+            onReasoning?: (chunk: string) => void;
+            onEvent?: (e: { level: 'info'|'warning'|'error'; message: string; ts: number }) => void;
+            onCompleted?: (fullText: string) => void;
+            onFailed?: (error: string) => void;
+            canUseTool: (toolName: string, input: Record<string, unknown>, options: { signal: AbortSignal; suggestions?: PermissionUpdate[] }) => Promise<unknown>;
+        }
+    ) => { cancel: () => void; sessionId: string };
     waitTask: (taskId: string) => Promise<Task>;
     session?: DriverSessionContext;
 }

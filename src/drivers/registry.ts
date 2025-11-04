@@ -17,6 +17,7 @@ import { uiReviewDriverEntry } from './ui-review/index.js';
 
 // import { buildUiReviewSystemPrompt } from './ui-review/prompt.js'; // No longer needed here
 import { storyDriverEntry } from './story/index.js';
+import { createStoryPromptAgent } from './story/agent.js';
 import { glossaryDriverEntry } from './glossary/index.js';
 import { createLogMonitor } from '../agents/log-monitor/index.js';
 import { addLog } from '../logger.js';
@@ -75,17 +76,17 @@ export function getDriverManifest(): readonly DriverManifestEntry[] {
             addLog(`[LogMonitor] Message: ${message.content}`);
             addLog(`[LogMonitor] Workspace: ${context.workspacePath ?? '(none)'}`);
             addLog(`[LogMonitor] SourceTab: ${String(context.sourceTabId)}`);
-            addLog(`[LogMonitor] createTaskWithAgent: ${typeof context.createTaskWithAgent}`);
+            addLog(`[LogMonitor] startBackground: ${typeof (context as any).startBackground}`);
             
             // Create LogMonitor agent instance
             const logMonitor = createLogMonitor('debug.log', 100, 30);
             addLog(`[LogMonitor] Agent created: ${logMonitor.id}`);
             
-            // Create task with agent (using new API if available)
-            if ('createTaskWithAgent' in context && typeof context.createTaskWithAgent === 'function') {
-                addLog('[LogMonitor] Using createTaskWithAgent');
+            // Create task with agent (using startBackground if available)
+            if ('startBackground' in context && typeof (context as any).startBackground === 'function') {
+                addLog('[LogMonitor] Using startBackground');
                 try {
-                    const result = (context as any).createTaskWithAgent(
+                    const result = (context as any).startBackground(
                         logMonitor,
                         message.content,
                         {
@@ -147,6 +148,57 @@ export function getDriverManifest(): readonly DriverManifestEntry[] {
             return true;
         },
     },
+    {
+        type: 'background_task',
+        id: Driver.STORY,
+        label: 'bg:story',
+        slash: 'bg:story',
+        description: '在后台生成用户故事（创建 Task 标签）',
+        requiresSession: true,
+        handler: async (message: Message, context: DriverRuntimeContext) => {
+            addLog('[bg:story] Handler starting');
+            try {
+                const agent = await createStoryPromptAgent();
+                if ('startBackground' in context && typeof (context as any).startBackground === 'function') {
+                    const result = (context as any).startBackground(
+                        agent,
+                        message.content,
+                        {
+                            sourceTabId: (context as any).sourceTabId || 'Story',
+                            workspacePath: context.workspacePath,
+                            timeoutSec: 600,
+                            session: (context as any).session,
+                        }
+                    );
+                    const systemMsg: Message = {
+                        id: context.nextMessageId(),
+                        role: 'system',
+                        content: `🧵 [Story] 后台任务已创建：${result.task.id}`,
+                    };
+                    context.setFrozenMessages(prev => [...prev, systemMsg]);
+                } else {
+                    const systemMsg: Message = {
+                        id: context.nextMessageId(),
+                        role: 'system',
+                        content: `❌ 当前环境不支持后台任务接口 startBackground` ,
+                        isBoxed: true,
+                    };
+                    context.setFrozenMessages(prev => [...prev, systemMsg]);
+                }
+            } catch (error) {
+                const messageText = error instanceof Error ? error.message : String(error);
+                const systemMsg: Message = {
+                    id: context.nextMessageId(),
+                    role: 'system',
+                    content: `❌ [Story] 后台任务创建失败：${messageText}` ,
+                    isBoxed: true,
+                };
+                context.setFrozenMessages(prev => [...prev, systemMsg]);
+            }
+            addLog('[bg:story] Handler completed');
+            return true;
+        },
+    },
     // View Drivers
     storyDriverEntry,
     uiReviewDriverEntry,
@@ -179,11 +231,7 @@ export const getDriverCommandEntries = (): { name: string; description: string }
 
 // Helper to get a view driver by its label
 export const getDriverByLabel = (label: string): ViewDriverEntry | undefined => {
-    const entry = DRIVER_MANIFEST.find(entry => entry.label === label);
-    if (entry && entry.type === 'view') {
-        return entry;
-    }
-    return undefined;
+    return DRIVER_MANIFEST.find((entry): entry is ViewDriverEntry => entry.type === 'view' && entry.label === label);
 };
 
 // Helper to get a background task driver by its slash command

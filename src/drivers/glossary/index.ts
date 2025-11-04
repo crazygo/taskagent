@@ -1,32 +1,49 @@
-import path from 'path';
-import { fileURLToPath } from 'url';
-
 import { Driver, type ViewDriverEntry } from '../types.js';
 import StackAgentView from '../../components/StackAgentView.js';
-import type { DriverPrepareResult } from '../pipeline.js';
 import type { DriverRuntimeContext } from '../types.js';
-import { loadAgentPipelineConfig } from '../../agent/agentLoader.js';
+import type { Message } from '../../types.js';
+import { createGlossaryPromptAgent } from './agent.js';
 
-async function prepareGlossaryInvocation(
-    rawInput: string,
-    context: DriverRuntimeContext
-): Promise<DriverPrepareResult> {
-    const userPrompt = rawInput.trim();
-    const driverDir = path.dirname(fileURLToPath(import.meta.url));
+// Best-practice runtime: run Glossary as a PromptAgent instance in Foreground by default
+async function handleGlossaryInvocation(message: Message, context: DriverRuntimeContext): Promise<boolean> {
+    const prompt = message.content.trim();
+    if (!prompt) return false;
 
-    const { systemPrompt, agents, allowedTools, disallowedTools } = await loadAgentPipelineConfig(driverDir, {
-        coordinatorFileName: 'coordinator.agent.md',
-    });
+    const agent = await createGlossaryPromptAgent();
 
-    return {
-        prompt: userPrompt,
-        overrides: {
-            systemPrompt,
-            agents,
-            allowedTools,
-            disallowedTools,
-        },
-    };
+    if (!context.startForeground) {
+        throw new Error('startForeground is not available in runtime context');
+    }
+
+    const pendingId = context.nextMessageId();
+    context.setActiveMessages(prev => [...prev, { id: pendingId, role: 'assistant', content: '', isPending: true }]);
+
+    const levelIcons = { info: 'ℹ️', warning: '⚠️', error: '❌' } as const;
+
+    context.startForeground(
+        agent,
+        prompt,
+        { sourceTabId: context.sourceTabId || 'Glossary', workspacePath: context.workspacePath, session: context.session },
+        {
+            onText: (chunk: string) => {
+                context.setActiveMessages(prev => prev.map(m => m.id === pendingId ? { ...m, content: (m.content || '') + chunk } : m));
+            },
+            onEvent: (event) => {
+                const icon = levelIcons[event.level] || '📝';
+                context.setFrozenMessages(prev => [...prev, { id: context.nextMessageId(), role: 'system', content: `${icon} [Glossary] ${event.message}`, isBoxed: event.level === 'error' }]);
+            },
+            onCompleted: () => {
+                context.finalizeMessageById(pendingId);
+            },
+            onFailed: (error: string) => {
+                context.finalizeMessageById(pendingId);
+                context.setFrozenMessages(prev => [...prev, { id: context.nextMessageId(), role: 'system', content: `❌ [Glossary] 失败：${error}`, isBoxed: true }]);
+            },
+            canUseTool: context.canUseTool,
+        }
+    );
+
+    return true;
 }
 
 export const glossaryDriverEntry: ViewDriverEntry = {
@@ -36,9 +53,10 @@ export const glossaryDriverEntry: ViewDriverEntry = {
     description: 'Manage and understand project terminology',
     requiresSession: true,
     component: StackAgentView,
-    useAgentPipeline: true,
-    prepare: prepareGlossaryInvocation,
-    pipelineOptions: {
-        disallowedTools: ['Bash'],
-    },
+    // Best-practice: run via PromptAgent instance, no pipeline overrides
+    handler: handleGlossaryInvocation,
 };
+
+// Re-export a factory that returns a PromptAgent-like instance for Glossary.
+// Supports the migration where Glossary is not a class, just a PromptAgent instance.
+export { createGlossaryPromptAgent } from './agent.js';

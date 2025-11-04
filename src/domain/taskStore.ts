@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { EventEmitter } from 'events';
-import { TaskManager, type Task, type TaskWithEmitter } from '../../task-manager.js';
+import { TaskManager, type Task, type TaskWithEmitter, type ForegroundSinks, type ForegroundHandle } from '../../task-manager.js';
 import type { AtomicAgent } from '../agent/types.js';
 
 interface UseTaskStoreOptions {
@@ -28,9 +28,9 @@ export const useTaskStore = ({ pollIntervalMs = 1000 }: UseTaskStoreOptions = {}
   };
 
   /**
-   * New createTaskWithAgent - supports Agent instances and events
+   * startBackground - create a background Task with Agent instance and events
    */
-  const createTaskWithAgent = (
+  const startBackground = (
     agent: AtomicAgent,
     userPrompt: string,
     context: {
@@ -46,18 +46,27 @@ export const useTaskStore = ({ pollIntervalMs = 1000 }: UseTaskStoreOptions = {}
       timeoutSec: context.timeoutSec,
       session: context.session,
     };
-    const result = taskManager.createTaskWithAgent(agent, userPrompt, finalContext);
+    const result = taskManager.startBackground(agent, userPrompt, finalContext);
     setTasks(taskManager.getAllTasks()); // Immediately update tasks state
     return result;
   };
 
   const waitTask = (taskId: string) => taskManager.waitTask(taskId);
   const cancelTask = (taskId: string) => taskManager.cancelTask(taskId);
+  const startForeground = (
+    agent: AtomicAgent,
+    userPrompt: string,
+    context: { sourceTabId: string; workspacePath?: string; session?: { id: string; initialized: boolean } },
+    sinks: ForegroundSinks,
+  ): ForegroundHandle => {
+    return taskManager.startForeground(agent, userPrompt, context, sinks);
+  };
 
   return {
     tasks,
     createTask,
-    createTaskWithAgent,
+    startBackground,
+    startForeground,
     waitTask,
     cancelTask,
   };
