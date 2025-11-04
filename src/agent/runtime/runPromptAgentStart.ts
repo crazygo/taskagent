@@ -70,6 +70,31 @@ export function buildPromptAgentStart(
           }
         },
         onReasoningDelta: sinks.onReasoning,
+        onToolUse: (event) => {
+          // Forward tool use events to UI as info events
+          if (sinks.onEvent) {
+            try {
+              sinks.onEvent({
+                level: 'info',
+                message: `Tool: ${event.name}${event.description ? ` - ${event.description}` : ''}`,
+                ts: Date.now(),
+              });
+            } catch {}
+          }
+        },
+        onToolResult: (event) => {
+          // Forward tool result events to UI as info events
+          if (sinks.onEvent) {
+            try {
+              const duration = event.durationMs ? ` (${(event.durationMs / 1000).toFixed(1)}s)` : '';
+              sinks.onEvent({
+                level: 'info',
+                message: `Tool ${event.name} completed${duration}`,
+                ts: Date.now(),
+              });
+            } catch {}
+          }
+        },
       },
       log: addLog,
     }).then(() => {

@@ -321,10 +321,19 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
     }, [setActiveMessages, setFrozenMessages]);
 
     const finalizeMessageById = useCallback((messageId: number) => {
+        const timestamp = new Date().toISOString();
+        addLog(`[FinalizeMsg] ${timestamp} - Starting finalization for message #${messageId}`);
+        
         setActiveMessages(prev => {
             const messageToFinalize = prev.find(msg => msg.id === messageId);
             if (messageToFinalize) {
-                setFrozenMessages(frozen => [...frozen, { ...messageToFinalize, isPending: false }]);
+                addLog(`[FinalizeMsg] ${timestamp} - Found message #${messageId} in active, moving to frozen`);
+                setFrozenMessages(frozen => {
+                    addLog(`[FinalizeMsg] ${timestamp} - Adding message #${messageId} to frozenMessages`);
+                    return [...frozen, { ...messageToFinalize, isPending: false }];
+                });
+            } else {
+                addLog(`[FinalizeMsg] ${timestamp} - Message #${messageId} NOT found in activeMessages`);
             }
             return prev.filter(msg => msg.id !== messageId);
         });
@@ -408,6 +417,9 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
 
         // Update placeholder message
         if (request.placeholderMessageId !== undefined) {
+            const timestamp = new Date().toISOString();
+            addLog(`[Permission] ${timestamp} - Updating placeholder #${request.placeholderMessageId} for request #${id}, decision=${decision.kind}`);
+            
             setActiveMessages(prev => prev.map(msg => {
                 if (msg.id !== request.placeholderMessageId) {
                     return msg;
@@ -428,7 +440,10 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
                     content: resultContent,
                 };
             }));
+            
+            addLog(`[Permission] ${timestamp} - Calling finalizeMessageById for placeholder #${request.placeholderMessageId}`);
             finalizeMessageById(request.placeholderMessageId);
+            addLog(`[Permission] ${timestamp} - Finalized placeholder #${request.placeholderMessageId}`);
         }
 
         if (decision.kind === 'allow') {
@@ -493,6 +508,9 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
             const summary = formatToolInputSummary(input);
 
             const placeholderMessageId = nextMessageId();
+            const timestamp = new Date().toISOString();
+            addLog(`[Permission] ${timestamp} - Creating placeholder #${placeholderMessageId} for request #${requestId}, tool=${toolName}`);
+            
             const placeholderMessage: Types.Message = {
                 id: placeholderMessageId,
                 role: 'system',
@@ -500,6 +518,8 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
                 isPending: true,
             };
             setActiveMessages(prev => {
+                const timestamp = new Date().toISOString();
+                addLog(`[Permission] ${timestamp} - Adding placeholder #${placeholderMessageId} to activeMessages`);
                 const newMessages = [...prev];
                 const lastMessage = newMessages.length > 0 ? newMessages[newMessages.length - 1] : null;
                 if (lastMessage && lastMessage.role === 'assistant') {

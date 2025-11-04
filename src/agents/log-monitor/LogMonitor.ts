@@ -30,9 +30,12 @@ export class LogMonitor extends PromptAgent {
          * Provide the monitoring instructions as a system prompt (preset + append).
          * Keep paths generic to avoid coupling to dynamic workspace context at this layer.
          */
-    getSystemPrompt(): { type: 'preset'; preset: 'claude_code'; append: string } {
+    getSystemPrompt(context?: AgentContext): { type: 'preset'; preset: 'claude_code'; append: string } {
+        const cwdNote = context?.workspacePath 
+            ? `\n\nIMPORTANT: You are operating in workspace: ${context.workspacePath}\nUse relative paths or ensure all file operations target this directory.`
+            : '';
         const instructions = `
-You are the Coordinator of a multi-module project health monitor.
+You are the Coordinator of a multi-module project health monitor.${cwdNote}
 
 Sources and sub-agents you can call:
 - tail_debug: tail the last ${this.tailLines} lines of ${this.logFilePath} and extract signals (errors/warnings, notable events, timestamps).
@@ -124,7 +127,7 @@ Begin now.`.trim();
         const sessionId = ctx.session?.id ?? crypto.randomUUID();
         const starter = buildPromptAgentStart({
             getPrompt: (input: string, c: { sourceTabId: string; workspacePath?: string }) => this.getPrompt(input, c as AgentContext),
-            getSystemPrompt: () => this.getSystemPrompt(),
+            getSystemPrompt: () => this.getSystemPrompt(ctx as AgentContext),
             getAgentDefinitions: () => this.getAgentDefinitions?.(),
             getModel: () => this.getModel?.(),
             parseOutput: this.parseOutput?.bind(this),
@@ -136,8 +139,22 @@ Begin now.`.trim();
         const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
 
         const run = async () => {
+            let cycleCount = 0;
             try {
                 while (Date.now() < deadline && !controller.signal.aborted) {
+                    cycleCount++;
+                    const remainingMs = deadline - Date.now();
+                    const remainingMin = (remainingMs / 60000).toFixed(1);
+                    
+                    // Notify cycle start
+                    try {
+                        sinks.onEvent?.({
+                            level: 'info',
+                            message: `[Monitor] Cycle #${cycleCount} started (${remainingMin} min remaining)`,
+                            ts: Date.now(),
+                        });
+                    } catch {}
+
                     // Wrap sinks to know when a cycle ends and to avoid per-cycle completion propagation
                     let resolveCycle: (value?: unknown) => void;
                     const cycleDone = new Promise(r => { resolveCycle = r; });
@@ -166,6 +183,15 @@ Begin now.`.trim();
                     // Wait for this cycle to complete
                     try { await cycleDone; } catch {}
 
+                    // Notify cycle completion
+                    try {
+                        sinks.onEvent?.({
+                            level: 'info',
+                            message: `[Monitor] Cycle #${cycleCount} completed`,
+                            ts: Date.now(),
+                        });
+                    } catch {}
+
                     // Best-effort cancel current cycle if external cancel requested
                     if (controller.signal.aborted) {
                         try { handle.cancel(); } catch {}
@@ -173,7 +199,15 @@ Begin now.`.trim();
                     }
 
                     // Wait interval before next cycle
-                    if (intervalMs > 0) {
+                    if (intervalMs > 0 && Date.now() < deadline) {
+                        try {
+                            sinks.onEvent?.({
+                                level: 'info',
+                                message: `[Monitor] Waiting ${this.intervalSec}s before next cycle...`,
+                                ts: Date.now(),
+                            });
+                        } catch {}
+                        
                         const until = Date.now() + intervalMs;
                         while (Date.now() < until && !controller.signal.aborted) {
                             const remain = until - Date.now();
@@ -183,6 +217,13 @@ Begin now.`.trim();
                 }
             } finally {
                 // Final completion notice after monitoring window ends or cancel occurs
+                try {
+                    sinks.onEvent?.({
+                        level: 'info',
+                        message: `[Monitor] Completed after ${cycleCount} cycles`,
+                        ts: Date.now(),
+                    });
+                } catch {}
                 try { sinks.onCompleted?.('[monitor] completed'); } catch {}
             }
         };

@@ -3,6 +3,7 @@ import StackAgentView from '../../components/StackAgentView.js';
 import type { DriverRuntimeContext } from '../types.js';
 import type { Message } from '../../types.js';
 import { createLogMonitor } from '../../agents/log-monitor/index.js';
+import { addLog } from '../../logger.js';
 
 // Foreground handler: run LogMonitor as a PromptAgent instance in the Monitor tab
 async function handleMonitorInvocation(message: Message, context: DriverRuntimeContext): Promise<boolean> {
@@ -23,6 +24,7 @@ async function handleMonitorInvocation(message: Message, context: DriverRuntimeC
   // Create an assistant message container for streaming output
   const pendingId = context.nextMessageId();
   context.setActiveMessages(prev => [...prev, { id: pendingId, role: 'assistant', content: '', isPending: true }]);
+  let hasFinalizedPending = false;
 
   const levelIcons = { info: 'ℹ️', warning: '⚠️', error: '❌' } as const;
 
@@ -32,19 +34,50 @@ async function handleMonitorInvocation(message: Message, context: DriverRuntimeC
     { sourceTabId: context.sourceTabId || 'Monitor', workspacePath: context.workspacePath, session: context.session },
     {
       onText: (chunk: string) => {
-        context.setActiveMessages(prev => prev.map(m => m.id === pendingId ? { ...m, content: (m.content || '') + chunk } : m));
+        if (!hasFinalizedPending) {
+          context.finalizeMessageById(pendingId);
+          hasFinalizedPending = true;
+        }
+
+        const textMsgId = context.nextMessageId();
+        context.setFrozenMessages(prev => [...prev, { id: textMsgId, role: 'assistant', content: chunk }]);
       },
       onEvent: (event) => {
         const icon = levelIcons[event.level] || '📝';
-        context.setFrozenMessages(prev => [...prev, { id: context.nextMessageId(), role: 'system', content: `${icon} [Monitor] ${event.message}`, isBoxed: event.level === 'error' }]);
+        const eventMsgId = context.nextMessageId();
+        const timestamp = new Date().toISOString();
+        addLog(`[Monitor-onEvent] ${timestamp} - Creating message #${eventMsgId}: ${event.message}`);
+        
+        // Use standard message flow: activeMessages → finalizeMessageById → frozenMessages
+        // This ensures proper ordering with permission placeholders and other system messages
+        context.setActiveMessages(prev => {
+          addLog(`[Monitor-onEvent] ${timestamp} - Adding to activeMessages, id=${eventMsgId}`);
+          return [...prev, { id: eventMsgId, role: 'system', content: `${icon} [Monitor] ${event.message}`, isBoxed: event.level === 'error' }];
+        });
+        
+        addLog(`[Monitor-onEvent] ${timestamp} - Calling finalizeMessageById for id=${eventMsgId}`);
+        context.finalizeMessageById(eventMsgId);
+        addLog(`[Monitor-onEvent] ${timestamp} - Finalized message #${eventMsgId}`);
       },
       onCompleted: () => {
-        context.finalizeMessageById(pendingId);
+        if (!hasFinalizedPending) {
+          context.finalizeMessageById(pendingId);
+          hasFinalizedPending = true;
+        }
         context.session?.markInitialized();
       },
       onFailed: (error: string) => {
-        context.finalizeMessageById(pendingId);
-        context.setFrozenMessages(prev => [...prev, { id: context.nextMessageId(), role: 'system', content: `❌ [Monitor] 失败：${error}`, isBoxed: true }]);
+        const timestamp = new Date().toISOString();
+        if (!hasFinalizedPending) {
+          addLog(`[Monitor-onFailed] ${timestamp} - Finalizing pending message #${pendingId}`);
+          context.finalizeMessageById(pendingId);
+          hasFinalizedPending = true;
+        }
+        
+        const failMsgId = context.nextMessageId();
+        addLog(`[Monitor-onFailed] ${timestamp} - Creating failure message #${failMsgId}: ${error}`);
+        context.setActiveMessages(prev => [...prev, { id: failMsgId, role: 'system', content: `❌ [Monitor] 失败：${error}`, isBoxed: true }]);
+        context.finalizeMessageById(failMsgId);
       },
       canUseTool: context.canUseTool,
     }
