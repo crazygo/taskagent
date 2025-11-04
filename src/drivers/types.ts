@@ -14,7 +14,6 @@ export enum Driver {
     UI = 'UI',
     MONITOR = 'Monitor',
     LOG_MONITOR = 'Log Monitor',
-    LOG_MONITOR_FG = 'Log Monitor (FG)',
 }
 
 export const DRIVER_NAMES = [
@@ -26,7 +25,6 @@ export const DRIVER_NAMES = [
     'ui',
     'monitor',
     'log-monitor',
-    'log-monitor-fg',
 ] as const;
 
 export type DriverName = (typeof DRIVER_NAMES)[number];

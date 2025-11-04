@@ -46,265 +46,188 @@ const createPlaceholderHandler = (label: string): DriverHandler => {
 };
 
 export function getDriverManifest(): readonly DriverManifestEntry[] {
-    return [
-    // Background Task Drivers
-    {
+    // Auto-generate fg/bg slash commands for PromptAgent-based drivers
+    const levelIcons = { info: 'ℹ️', warning: '⚠️', error: '❌' } as const;
+
+    type AgentSlashSpec = {
+        driverId: Driver;
+        name: string; // e.g., 'story', 'glossary', 'log-monitor'
+        requiresSession: boolean;
+        defaultBgTimeout: number;
+        createAgent: () => any | Promise<any>;
+    };
+
+    const agentSlashSpecs: AgentSlashSpec[] = [
+        {
+            driverId: Driver.STORY,
+            name: 'story',
+            requiresSession: true,
+            defaultBgTimeout: 600,
+            createAgent: async () => await createStoryPromptAgent(),
+        },
+        {
+            driverId: Driver.GLOSSARY,
+            name: 'glossary',
+            requiresSession: true,
+            defaultBgTimeout: 600,
+            createAgent: async () => await createGlossaryPromptAgent(),
+        },
+        {
+            driverId: Driver.LOG_MONITOR,
+            name: 'log-monitor',
+            requiresSession: true,
+            defaultBgTimeout: 3600,
+            createAgent: () => createLogMonitor('debug.log', 100, 30),
+        },
+    ];
+
+    const fgEntries: BackgroundTaskDriverEntry[] = agentSlashSpecs.map((spec) => ({
         type: 'background_task',
-        id: Driver.LOG_MONITOR_FG,
-        label: 'log-monitor (fg)',
-        slash: 'log-monitor',
-        description: '在前台监控 debug.log（流式输出到当前标签）',
-        requiresSession: true,
+        id: spec.driverId,
+        label: `fg:${spec.name}`,
+        slash: `fg:${spec.name}`,
+        description: `前台运行 ${spec.driverId}`,
+        requiresSession: spec.requiresSession,
         handler: async (message: Message, context: DriverRuntimeContext) => {
             const prompt = message.content.trim();
             if (!prompt) return false;
-
-            const agent = createLogMonitor('debug.log', 100, 30);
-
             if (!context.startForeground) {
-                const systemMsg: Message = {
-                    id: context.nextMessageId(),
-                    role: 'system',
-                    content: `❌ [Log Monitor] 前台模式不可用（缺少 startForeground）`,
-                    isBoxed: true,
-                };
+                const systemMsg: Message = { id: context.nextMessageId(), role: 'system', content: `❌ [${spec.driverId}] 前台模式不可用（缺少 startForeground）`, isBoxed: true };
                 context.setFrozenMessages(prev => [...prev, systemMsg]);
                 return true;
             }
-
-            // Echo user input (consistent with Story handler UX)
+            const agent = await spec.createAgent();
+            // Show user input then stream assistant
             const userId = context.nextMessageId();
             context.setActiveMessages(prev => [...prev, { id: userId, role: 'user', content: prompt }]);
             context.finalizeMessageById(userId);
-
-            // Pending assistant message container
             const pendingId = context.nextMessageId();
             context.setActiveMessages(prev => [...prev, { id: pendingId, role: 'assistant', content: '', isPending: true }]);
-
-            const levelIcons = { info: 'ℹ️', warning: '⚠️', error: '❌' } as const;
-
             context.startForeground(
                 agent,
                 prompt,
-                { sourceTabId: context.sourceTabId || 'Log Monitor', workspacePath: context.workspacePath, session: context.session },
+                { sourceTabId: context.sourceTabId || String(spec.driverId), workspacePath: context.workspacePath, session: context.session },
                 {
                     onText: (chunk: string) => {
                         context.setActiveMessages(prev => prev.map(m => m.id === pendingId ? { ...m, content: (m.content || '') + chunk } : m));
                     },
                     onEvent: (event) => {
                         const icon = levelIcons[event.level] || '📝';
-                        const sysMsg: Message = { id: context.nextMessageId(), role: 'system', content: `${icon} [Log Monitor] ${event.message}`, isBoxed: event.level === 'error' };
+                        const sysMsg: Message = { id: context.nextMessageId(), role: 'system', content: `${icon} [${spec.driverId}] ${event.message}`, isBoxed: event.level === 'error' };
                         context.setFrozenMessages(prev => [...prev, sysMsg]);
                     },
-                    onCompleted: () => {
-                        context.finalizeMessageById(pendingId);
-                    },
+                    onCompleted: () => context.finalizeMessageById(pendingId),
                     onFailed: (error: string) => {
                         context.finalizeMessageById(pendingId);
-                        const sysMsg: Message = { id: context.nextMessageId(), role: 'system', content: `❌ [Log Monitor] 前台运行失败：${error}`, isBoxed: true };
+                        const sysMsg: Message = { id: context.nextMessageId(), role: 'system', content: `❌ [${spec.driverId}] 前台运行失败：${error}`, isBoxed: true };
                         context.setFrozenMessages(prev => [...prev, sysMsg]);
                     },
                     canUseTool: context.canUseTool,
                 }
             );
+            return true;
+        },
+    }));
 
-            return true;
-        },
-    },
-    {
+    const bgEntries: BackgroundTaskDriverEntry[] = agentSlashSpecs.map((spec) => ({
         type: 'background_task',
-        id: Driver.PLAN_REVIEW_DO,
-        label: Driver.PLAN_REVIEW_DO,
-        slash: 'plan-review-do',
-        description: '执行 Plan-Review-Do 工作流',
-        requiresSession: false,
+        id: spec.driverId,
+        label: `bg:${spec.name}`,
+        slash: `bg:${spec.name}`,
+        description: `后台运行 ${spec.driverId}`,
+        requiresSession: spec.requiresSession,
         handler: async (message: Message, context: DriverRuntimeContext) => {
-            return await handlePlanReviewDo(message, {
-                nextMessageId: context.nextMessageId,
-                setActiveMessages: context.setActiveMessages,
-                setFrozenMessages: context.setFrozenMessages,
-                startTask: (prompt: string, options?: { agents?: Record<string, any> }) => {
-                    // Build a minimal runnable agent that forwards prompt and injects provided sub-agents
-                    const adapter = {
-                        getPrompt: (userInput: string) => userInput,
-                        getAgentDefinitions: () => options?.agents as any,
-                    };
-                    const agent = {
-                        id: 'plan-review-do',
-                        description: 'Ephemeral agent for Plan-Review-Do workflow',
-                        start: buildPromptAgentStart(adapter),
-                    } as any;
-                    const result = context.startBackground(
-                        agent,
-                        prompt,
-                        {
-                            sourceTabId: context.sourceTabId || 'Plan-Review-DO',
-                            workspacePath: context.workspacePath,
-                            timeoutSec: 900,
-                            session: context.session,
-                        }
-                    );
-                    return { id: result.task.id };
-                },
-                waitTask: context.waitTask,
-            });
-        },
-    },
-    {
-        type: 'background_task',
-        id: Driver.LOG_MONITOR,
-        label: Driver.LOG_MONITOR,
-        slash: 'bg:log-monitor',
-        description: '监控 debug.log 文件变化并推送摘要',
-        requiresSession: true,
-        handler: async (message: Message, context: DriverRuntimeContext) => {
-            addLog('[LogMonitor] Handler starting');
-            addLog(`[LogMonitor] Message: ${message.content}`);
-            addLog(`[LogMonitor] Workspace: ${context.workspacePath ?? '(none)'}`);
-            addLog(`[LogMonitor] SourceTab: ${String(context.sourceTabId)}`);
-            addLog(`[LogMonitor] startBackground: ${typeof (context as any).startBackground}`);
-            
-            // Create LogMonitor agent instance
-            const logMonitor = createLogMonitor('debug.log', 100, 30);
-            addLog(`[LogMonitor] Agent created: ${logMonitor.id}`);
-            
-            // Create task with agent (using startBackground if available)
-            if ('startBackground' in context && typeof (context as any).startBackground === 'function') {
-                addLog('[LogMonitor] Using startBackground');
-                try {
-                    const result = (context as any).startBackground(
-                        logMonitor,
-                        message.content,
-                        {
-                            sourceTabId: (context as any).sourceTabId || 'unknown',
-                            workspacePath: context.workspacePath,
-                            timeoutSec: 3600, // 1 hour default
-                            session: (context as any).session, // Pass session from runtime context
-                        }
-                    );
-                    addLog(`[LogMonitor] Task created: ${result.task.id}`);
-                    
-                    const { task, emitter } = result;
-                    
-                    // Subscribe to events and push to source tab
-                    const levelIcons = { info: 'ℹ️', warning: '⚠️', error: '❌' };
-                    emitter.on('event', (event: any) => {
-                        try { addLog(`[LogMonitor] Event: ${JSON.stringify(event)}`); } catch {}
-                        const icon = levelIcons[event.level as keyof typeof levelIcons] || '📝';
-                        const systemMsg: Message = {
-                            id: context.nextMessageId(),
-                            role: 'system',
-                            content: `${icon} [Log Monitor] ${event.message}`,
-                            isBoxed: event.level === 'error',
-                        };
-                        context.setFrozenMessages(prev => [...prev, systemMsg]);
-                    });
-                    
-                    emitter.on('completed', () => {
-                        addLog('[LogMonitor] Task completed');
-                        const systemMsg: Message = {
-                            id: context.nextMessageId(),
-                            role: 'system',
-                            content: `✅ [Log Monitor] 监控任务已完成`,
-                        };
-                        context.setFrozenMessages(prev => [...prev, systemMsg]);
-                    });
-                    
-                    emitter.on('failed', (error: string) => {
-                        addLog(`[LogMonitor] Task failed: ${error}`);
-                        const systemMsg: Message = {
-                            id: context.nextMessageId(),
-                            role: 'system',
-                            content: `❌ [Log Monitor] 监控任务失败: ${error}`,
-                            isBoxed: true,
-                        };
-                        context.setFrozenMessages(prev => [...prev, systemMsg]);
-                    });
-                } catch (error) {
-                    addLog(`[LogMonitor] Error creating task: ${error instanceof Error ? error.stack || error.message : String(error)}`);
-                    throw error;
-                }
-            } else {
-                addLog('[LogMonitor] startBackground not available');
-                const systemMsg: Message = {
-                    id: context.nextMessageId(),
-                    role: 'system',
-                    content: `❌ [Log Monitor] 当前环境不支持后台任务接口 startBackground`,
-                    isBoxed: true,
-                };
+            const prompt = message.content.trim();
+            if (!prompt) return false;
+            const agent = await spec.createAgent();
+            if (!('startBackground' in context) || typeof (context as any).startBackground !== 'function') {
+                const systemMsg: Message = { id: context.nextMessageId(), role: 'system', content: `❌ [${spec.driverId}] 当前环境不支持后台任务接口 startBackground`, isBoxed: true };
                 context.setFrozenMessages(prev => [...prev, systemMsg]);
+                return true;
             }
-            
-            addLog('[LogMonitor] Handler completed');
-            return true;
-        },
-    },
-    {
-        type: 'background_task',
-        id: Driver.STORY,
-        label: 'bg:story',
-        slash: 'bg:story',
-        description: '在后台生成用户故事（创建 Task 标签）',
-        requiresSession: true,
-        handler: async (message: Message, context: DriverRuntimeContext) => {
-            addLog('[bg:story] Handler starting');
             try {
-                const agent = await createStoryPromptAgent();
-                if ('startBackground' in context && typeof (context as any).startBackground === 'function') {
-                    const result = (context as any).startBackground(
-                        agent,
-                        message.content,
-                        {
-                            sourceTabId: (context as any).sourceTabId || 'Story',
-                            workspacePath: context.workspacePath,
-                            timeoutSec: 600,
-                            session: (context as any).session,
-                        }
-                    );
-                    const systemMsg: Message = {
-                        id: context.nextMessageId(),
-                        role: 'system',
-                        content: `🧵 [Story] 后台任务已创建：${result.task.id}`,
-                    };
+                const result = (context as any).startBackground(
+                    agent,
+                    prompt,
+                    { sourceTabId: (context as any).sourceTabId || String(spec.driverId), workspacePath: context.workspacePath, timeoutSec: spec.defaultBgTimeout, session: (context as any).session }
+                );
+                const { emitter } = result;
+                // Acknowledge task creation
+                const ackMsg: Message = { id: context.nextMessageId(), role: 'system', content: `🧵 [${spec.driverId}] 后台任务已创建：${result.task.id}` };
+                context.setFrozenMessages(prev => [...prev, ackMsg]);
+                // Subscribe to task events
+                emitter.on('event', (event: any) => {
+                    try { addLog(`[${spec.name}] Event: ${JSON.stringify(event)}`); } catch {}
+                    const icon = levelIcons[event.level as keyof typeof levelIcons] || '📝';
+                    const systemMsg: Message = { id: context.nextMessageId(), role: 'system', content: `${icon} [${spec.driverId}] ${event.message}`, isBoxed: event.level === 'error' };
                     context.setFrozenMessages(prev => [...prev, systemMsg]);
-                } else {
-                    const systemMsg: Message = {
-                        id: context.nextMessageId(),
-                        role: 'system',
-                        content: `❌ 当前环境不支持后台任务接口 startBackground` ,
-                        isBoxed: true,
-                    };
+                });
+                emitter.on('completed', () => {
+                    const systemMsg: Message = { id: context.nextMessageId(), role: 'system', content: `✅ [${spec.driverId}] 任务已完成` };
                     context.setFrozenMessages(prev => [...prev, systemMsg]);
-                }
+                });
+                emitter.on('failed', (error: string) => {
+                    const systemMsg: Message = { id: context.nextMessageId(), role: 'system', content: `❌ [${spec.driverId}] 任务失败：${error}`, isBoxed: true };
+                    context.setFrozenMessages(prev => [...prev, systemMsg]);
+                });
             } catch (error) {
                 const messageText = error instanceof Error ? error.message : String(error);
-                const systemMsg: Message = {
-                    id: context.nextMessageId(),
-                    role: 'system',
-                    content: `❌ [Story] 后台任务创建失败：${messageText}` ,
-                    isBoxed: true,
-                };
+                const systemMsg: Message = { id: context.nextMessageId(), role: 'system', content: `❌ [${spec.driverId}] 后台任务创建失败：${messageText}`, isBoxed: true };
                 context.setFrozenMessages(prev => [...prev, systemMsg]);
             }
-            addLog('[bg:story] Handler completed');
             return true;
         },
-    },
-    // View Drivers
-    storyDriverEntry,
-    uiReviewDriverEntry,
-    glossaryDriverEntry,
-    {
-        type: 'view',
-        id: Driver.MONITOR,
-        label: Driver.MONITOR,
-        description: 'Monitor · 敬请期待',
-        requiresSession: false,
-        component: StackAgentView,
-        isPlaceholder: true,
-        handler: createPlaceholderHandler(Driver.MONITOR),
-    },
-];
+    }));
+
+    return [
+        // Auto-generated slash entries
+        ...fgEntries,
+        ...bgEntries,
+        // Explicit background workflow (not a simple PromptAgent)
+        {
+            type: 'background_task',
+            id: Driver.PLAN_REVIEW_DO,
+            label: Driver.PLAN_REVIEW_DO,
+            slash: 'plan-review-do',
+            description: '执行 Plan-Review-Do 工作流',
+            requiresSession: false,
+            handler: async (message: Message, context: DriverRuntimeContext) => {
+                return await handlePlanReviewDo(message, {
+                    nextMessageId: context.nextMessageId,
+                    setActiveMessages: context.setActiveMessages,
+                    setFrozenMessages: context.setFrozenMessages,
+                    startTask: (prompt: string, options?: { agents?: Record<string, any> }) => {
+                        const adapter = {
+                            getPrompt: (userInput: string) => userInput,
+                            getAgentDefinitions: () => options?.agents as any,
+                        };
+                        const agent = {
+                            id: 'plan-review-do',
+                            description: 'Ephemeral agent for Plan-Review-Do workflow',
+                            start: buildPromptAgentStart(adapter),
+                        } as any;
+                        const result = context.startBackground(agent, prompt, { sourceTabId: context.sourceTabId || 'Plan-Review-DO', workspacePath: context.workspacePath, timeoutSec: 900, session: context.session });
+                        return { id: result.task.id };
+                    },
+                    waitTask: context.waitTask,
+                });
+            },
+        },
+        // View Drivers
+        storyDriverEntry,
+        uiReviewDriverEntry,
+        glossaryDriverEntry,
+        {
+            type: 'view',
+            id: Driver.MONITOR,
+            label: Driver.MONITOR,
+            description: 'Monitor · 敬请期待',
+            requiresSession: false,
+            component: StackAgentView,
+            isPlaceholder: true,
+            handler: createPlaceholderHandler(Driver.MONITOR),
+        },
+    ];
 }
 
 const DRIVER_MANIFEST = getDriverManifest();
