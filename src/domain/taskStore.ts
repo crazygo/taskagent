@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { EventEmitter } from 'events';
 import { TaskManager, type Task, type TaskWithEmitter, type ForegroundSinks, type ForegroundHandle } from '../../task-manager.js';
-import type { AtomicAgent } from '../agent/types.js';
+import type { PromptAgent } from '../agent/types.js';
 
 interface UseTaskStoreOptions {
   pollIntervalMs?: number;
@@ -31,7 +31,7 @@ export const useTaskStore = ({ pollIntervalMs = 1000 }: UseTaskStoreOptions = {}
    * startBackground - create a background Task with Agent instance and events
    */
   const startBackground = (
-    agent: AtomicAgent,
+    agent: PromptAgent,
     userPrompt: string,
     context: {
       sourceTabId?: string;
@@ -54,7 +54,7 @@ export const useTaskStore = ({ pollIntervalMs = 1000 }: UseTaskStoreOptions = {}
   const waitTask = (taskId: string) => taskManager.waitTask(taskId);
   const cancelTask = (taskId: string) => taskManager.cancelTask(taskId);
   const startForeground = (
-    agent: AtomicAgent,
+    agent: PromptAgent,
     userPrompt: string,
     context: { sourceTabId: string; workspacePath?: string; session?: { id: string; initialized: boolean } },
     sinks: ForegroundSinks,

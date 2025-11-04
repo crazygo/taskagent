@@ -2,6 +2,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import type { AgentDefinition } from '@anthropic-ai/claude-agent-sdk';
 import { loadAgentPipelineConfig } from '../../agent/agentLoader.js';
+import { buildPromptAgentStart } from '../../agent/runtime/runPromptAgentStart.js';
+import type { AgentStartContext, AgentStartSinks } from '../../agent/types.js';
 
 /**
  * createGlossaryPromptAgent
@@ -38,5 +40,17 @@ export async function createGlossaryPromptAgent() {
     // Optional hooks – keep minimal until needed
     getTools(): string[] { return []; },
     getModel(): string | undefined { return undefined; },
+    start(userInput: string, ctx: AgentStartContext, sinks: AgentStartSinks) {
+      const self = {
+        getPrompt: (input: string, c: { sourceTabId: string; workspacePath?: string }) => {
+          return coordinator?.replace(/\{\{USER_INPUT\}\}/g, input) ?? input;
+        },
+        getAgentDefinitions: () => agents,
+        getModel: () => undefined,
+        parseOutput: undefined,
+      };
+      const starter = buildPromptAgentStart(self);
+      return starter(userInput, ctx, sinks);
+    },
   };
 }

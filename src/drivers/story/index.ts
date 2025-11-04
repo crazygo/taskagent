@@ -16,7 +16,12 @@ async function handleStoryInvocation(message: Message, context: DriverRuntimeCon
         throw new Error('startForeground is not available in runtime context');
     }
 
-    // Create a pending assistant message for streaming
+    // First, show the user's message (gray background) and finalize it into history
+    const userId = context.nextMessageId();
+    context.setActiveMessages(prev => [...prev, { id: userId, role: 'user', content: prompt }]);
+    context.finalizeMessageById(userId);
+
+    // Create an assistant message container for streaming (keep current queued behavior unchanged)
     const pendingId = context.nextMessageId();
     context.setActiveMessages(prev => [...prev, { id: pendingId, role: 'assistant', content: '', isPending: true }]);
 

@@ -1,16 +1,11 @@
-
 import crypto from 'crypto';
 import { EventEmitter } from 'events';
 import { query, type PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
-import type {
-  Options,
-  SDKAssistantMessage,
-} from '@anthropic-ai/claude-agent-sdk';
+import type { Options, SDKAssistantMessage } from '@anthropic-ai/claude-agent-sdk';
 import { getTaskLogger } from './src/task-logger.js';
 import { addLog } from './src/logger.js';
-import { AtomicAgent, StackAgent, DefaultAtomicAgent } from './src/agent/types.js';
+import { PromptAgent, DefaultAtomicAgent } from './src/agent/types.js';
 import type { TaskEvent } from './src/types.js';
-import { runClaudeStream } from './src/agent/runtime/runClaudeStream.js';
 
 export interface Task {
   id: string;
@@ -22,7 +17,7 @@ export interface Task {
 }
 
 export interface TaskExtended extends Task {
-  agent?: AtomicAgent;
+  agent?: PromptAgent;
   userPrompt: string;
   sourceTabId?: string;
   workspacePath?: string;
@@ -60,7 +55,7 @@ export class TaskManager {
    * Start a background agent run (creates a Task tab)
    */
   startBackground(
-    agent: AtomicAgent,
+    agent: PromptAgent,
     userPrompt: string,
     context: {
       sourceTabId: string;
@@ -71,19 +66,19 @@ export class TaskManager {
   ): { task: TaskExtended; emitter: EventEmitter } {
     const id = crypto.randomUUID();
     const emitter = new EventEmitter();
-    
-  addLog(`[TaskManager] startBackground agent=${agent.id}`);
+
+    addLog(`[TaskManager] startBackground agent=${agent.id}`);
     addLog(`[TaskManager] User prompt: ${userPrompt}`);
     try { addLog(`[TaskManager] Context: ${JSON.stringify(context)}`); } catch {}
-    
+
     const agentContext = {
       sourceTabId: context.sourceTabId || 'unknown',
       workspacePath: context.workspacePath,
     };
-    
+
     const generatedPrompt = agent.getPrompt(userPrompt, agentContext);
-  addLog(`[TaskManager] Generated prompt:\n${generatedPrompt}`);
-    
+    addLog(`[TaskManager] Generated prompt:\n${generatedPrompt}`);
+
     const task: TaskExtended = {
       id,
       agent,
@@ -99,10 +94,10 @@ export class TaskManager {
       timeoutSec: context.timeoutSec,
       session: context.session,
     };
-    
+
     this.tasks.set(id, task);
     this.eventEmitters.set(id, emitter);
-    
+
     // Set up timeout if specified
     if (context.timeoutSec && context.timeoutSec > 0) {
       const timeout = setTimeout(() => {
@@ -110,7 +105,7 @@ export class TaskManager {
       }, context.timeoutSec * 1000);
       this.timeouts.set(id, timeout);
     }
-    
+
     // Log task creation
     const logger = getTaskLogger();
     logger.logTaskCreated(id, 'ai', userPrompt, {
@@ -118,8 +113,70 @@ export class TaskManager {
       agentId: agent.id,
       agentDescription: agent.description,
     });
-    
-  addLog('[TaskManager] Starting runTaskWithAgent');
+
+    // Prefer agent.start if available; otherwise fallback to legacy path
+    const maybeStart = (agent as unknown as { start?: (userInput: string, ctx: any, sinks: any) => { cancel: () => void; sessionId: string } }).start;
+    if (typeof maybeStart === 'function') {
+      addLog('[BG] Using agent.start()');
+
+      // pending -> in_progress
+      logger.logStatusChange(id, 'pending', 'in_progress');
+      task.status = 'in_progress';
+      this.tasks.set(id, task);
+
+      const sinks: ForegroundSinks = {
+        onText: (chunk: string) => {
+          task.output = (task.output || '') + chunk;
+          this.tasks.set(id, task);
+          logger.logOutputChunk(id, chunk, task.output.length);
+        },
+        onEvent: (e: TaskEvent) => {
+          task.events.push(e);
+          this.tasks.set(id, task);
+          const em = this.eventEmitters.get(id);
+          em?.emit('event', e);
+        },
+        onCompleted: (fullText: string) => {
+          logger.logStatusChange(id, 'in_progress', 'completed');
+          logger.logTaskCompleted(id, fullText, 0);
+          task.status = 'completed';
+          task.exitCode = 0;
+          task.output = fullText;
+          this.tasks.set(id, task);
+          const em = this.eventEmitters.get(id);
+          em?.emit('completed');
+          const timeout = this.timeouts.get(id);
+          if (timeout) { clearTimeout(timeout); this.timeouts.delete(id); }
+        },
+        onFailed: (error: string) => {
+          logger.logStatusChange(id, 'in_progress', 'failed');
+          logger.logTaskFailed(id, error, -1);
+          task.status = 'failed';
+          task.error = error;
+          task.exitCode = -1;
+          this.tasks.set(id, task);
+          const em = this.eventEmitters.get(id);
+          em?.emit('failed', error);
+          const timeout = this.timeouts.get(id);
+          if (timeout) { clearTimeout(timeout); this.timeouts.delete(id); }
+        },
+        onReasoning: undefined,
+        canUseTool: async (toolName: string) => {
+          addLog(`[BG] Auto-approve tool: ${toolName}`);
+          return undefined;
+        },
+      };
+
+      void maybeStart.call(
+        agent,
+        userPrompt,
+        { sourceTabId: context.sourceTabId, workspacePath: context.workspacePath, session: context.session },
+        sinks,
+      );
+      return { task, emitter };
+    }
+
+    addLog('[TaskManager] Starting runTaskWithAgent (fallback)');
     this.runTaskWithAgent(task);
     return { task, emitter };
   }
@@ -129,7 +186,7 @@ export class TaskManager {
    * Does not register a Task in the internal map; lifecycle handled by the caller via the returned handle.
    */
   startForeground(
-    agent: AtomicAgent,
+    agent: PromptAgent,
     userPrompt: string,
     context: {
       sourceTabId: string;
@@ -138,79 +195,17 @@ export class TaskManager {
     },
     sinks: ForegroundSinks,
   ): ForegroundHandle {
-    const agentContext = {
-      sourceTabId: context.sourceTabId || 'unknown',
-      workspacePath: context.workspacePath,
-    };
-    const prompt = agent.getPrompt(userPrompt, agentContext);
-
-    const controller = new AbortController();
-
-    // Build query options similar to runTaskWithAgent but with interactive permissions
-    const options: Record<string, unknown> = {
-      model: agent.getModel?.() || process.env.ANTHROPIC_MODEL,
-      cwd: context.workspacePath,
-      canUseTool: sinks.canUseTool,
-      systemPrompt: { type: 'preset', preset: 'claude_code' } as any,
-    };
-
-    // Inject sub-agent definitions if provided
-    try {
-      const maybeGetDefs = (agent as unknown as { getAgentDefinitions?: () => Record<string, unknown> | undefined })
-        .getAgentDefinitions;
-      if (typeof maybeGetDefs === 'function') {
-        const defs = maybeGetDefs.call(agent);
-        if (defs && Object.keys(defs).length > 0) {
-          (options as any).agents = defs;
-          addLog('[FG] Agent definitions detected, injected');
-        }
-      }
-    } catch (e) {
-      addLog(`[FG] getAgentDefinitions failed: ${e instanceof Error ? e.message : String(e)}`);
+    const maybeStart = (agent as unknown as { start?: (userInput: string, ctx: any, sinks: any) => { cancel: () => void; sessionId: string } }).start;
+    if (typeof maybeStart !== 'function') {
+      throw new Error('[FG] agent.start() is required for foreground runs');
     }
-
-    // Session handling
-    const session = context.session ?? { id: crypto.randomUUID(), initialized: false };
-
-    // Accumulate full text for onCompleted
-    let fullText = '';
-
-    // Kick off stream
-    void runClaudeStream({
-      prompt,
-      session,
-      queryOptions: options as any,
-      callbacks: {
-        onTextDelta: (chunk: string) => {
-          fullText += chunk;
-          try {
-            sinks.onText(chunk);
-          } catch {}
-          // Parse TaskEvents, if supported
-          if (agent.parseOutput) {
-            try {
-              const events = agent.parseOutput(chunk);
-              if (events?.length && sinks.onEvent) {
-                for (const e of events) sinks.onEvent(e);
-              }
-            } catch {}
-          }
-        },
-        onReasoningDelta: sinks.onReasoning,
-      },
-      log: addLog,
-    }).then(() => {
-      try { sinks.onCompleted?.(fullText); } catch {}
-    }).catch((err) => {
-      const message = err instanceof Error ? err.message : String(err);
-      addLog(`[FG] Stream failed: ${message}`);
-      try { sinks.onFailed?.(message); } catch {}
-    });
-
-    return {
-      cancel: () => controller.abort(),
-      sessionId: session.id,
-    };
+    addLog('[FG] Using agent.start()');
+    return maybeStart.call(
+      agent,
+      userPrompt,
+      { sourceTabId: context.sourceTabId, workspacePath: context.workspacePath, session: context.session },
+      sinks,
+    );
   }
 
   /**

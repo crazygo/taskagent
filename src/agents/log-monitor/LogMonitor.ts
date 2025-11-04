@@ -1,11 +1,11 @@
-import { AtomicAgent, type AgentContext } from '../../agent/types.js';
+import { PromptAgent, type AgentContext } from '../../agent/types.js';
 import type { TaskEvent } from '../../types.js';
 
 /**
  * LogMonitor - Atomic agent that monitors a log file for changes
  * Self-manages loop via prompt instructions
  */
-export class LogMonitor extends AtomicAgent {
+export class LogMonitor extends PromptAgent {
     readonly id = 'log-monitor';
     readonly description = 'Monitor log file for changes and emit natural language summaries';
 
