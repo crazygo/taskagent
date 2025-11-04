@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { runClaudeStream } from '../src/agent/runtime/runClaudeStream.js';
+import { runClaudeStream } from '../packages/agents/runtime/runClaudeStream.js';
 
 // Mock the Anthropic Claude Agent SDK's query function to capture options
 vi.mock('@anthropic-ai/claude-agent-sdk', async () => {

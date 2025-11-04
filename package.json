@@ -1,4 +1,10 @@
 {
+  "name": "@askman-dev/task",
+  "version": "1.0.9",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
   "author": "",
   "dependencies": {
     "@ai-sdk/openai": "^2.0.48",
@@ -33,17 +39,15 @@
   },
   "keywords": [],
   "license": "ISC",
-  "name": "@askman-dev/task",
   "packageManager": "yarn@4.9.1",
-  "version": "1.0.9",
   "type": "module",
   "scripts": {
     "start": "tsx ui.tsx --",
     "build": "tsc",
     "prepublishOnly": "yarn build",
     "start:test": "concurrently --raw --kill-others --success first \"yarn start\" \"sleep 10\"",
-    "test:story": "concurrently --raw --kill-others --success first \"yarn start -- --story -p \\\"Hi\\\"\" \"sleep 10\"",
-    "test:glossary": "concurrently --raw --kill-others --success first \"yarn start -- --glossary -p \\\"Hi\\\"\" \"sleep 10\"",
+    "test:story": "yarn start -- --story -p \"Hi\"",
+    "test:glossary": "yarn start -- --glossary -p \"Hi\"",
     "e2e:experiment": "expect scripts/e2e-experiment.expect --",
     "test": "vitest",
     "test:ci": "vitest run",
