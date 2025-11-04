@@ -6,7 +6,7 @@ import { randomUUID } from 'crypto';
 import { inspect } from 'util';
 import { type AgentDefinition, type PermissionUpdate, type PermissionResult } from '@anthropic-ai/claude-agent-sdk';
 
-import { addLog } from '../logger.js';
+import { addLog } from '@taskagent/shared/logger';
 import { createBaseClaudeFlow, type BaseClaudeFlow } from '../agents/runtime/flows/baseClaudeFlow.js';
 import { loadCliConfig } from './cli/config.js';
 import type { Task } from '../task-manager.js';
@@ -35,7 +35,7 @@ import {
     getDriverCommandEntries,
 } from './drivers/registry.js';
 import type { AgentPipelineOverrides } from './drivers/pipeline.js';
-import { closeTaskLogger } from '../task-logger.js';
+import { closeTaskLogger } from '@taskagent/shared/task-logger';
 import { loadWorkspaceSettings, writeWorkspaceSettings, type WorkspaceSettings } from './workspace/settings.js';
 import { DriverView } from './components/DriverView.js';
 

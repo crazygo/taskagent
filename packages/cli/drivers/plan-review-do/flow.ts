@@ -9,7 +9,7 @@
  * 5. Conditional routing: plan exists → execute, no plan → END
  */
 
-import { addLog } from '../../logger.js';
+import { addLog } from '@taskagent/shared/logger';
 import type { Message } from '../../types.js';
 import { agentsConfig } from './agents-config.js';
 

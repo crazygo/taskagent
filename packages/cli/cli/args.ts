@@ -1,6 +1,6 @@
 import minimist from 'minimist';
 
-import { addLog } from '../logger.js';
+import { addLog } from '@taskagent/shared/logger';
 import { DRIVER_NAMES, type DriverName } from '../drivers/types.js';
 
 interface CliArgs {

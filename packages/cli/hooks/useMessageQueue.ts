@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { addLog } from '../logger.js';
+import { addLog } from '@taskagent/shared/logger';
 import type { Message } from '../types.js';
 
 interface UseMessageQueueProps {

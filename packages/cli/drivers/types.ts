@@ -1,7 +1,7 @@
 import type React from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import type { AgentDefinition, PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
-import type { Task, TaskWithEmitter } from '../../task-manager.js';
+import type { Task, TaskWithEmitter } from '@taskagent/shared/task-manager';
 import type { Message } from '../types.js';
 import type { DriverPrepareResult } from './pipeline.js';
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Text, useInput } from 'ink';
-import type { Task } from '../../task-manager.js';
+import type { Task } from '@taskagent/shared/task-manager';
 
 const TASK_PAGE_SIZE = 5;
 

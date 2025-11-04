@@ -1,8 +1,8 @@
 import { Box, Text, useInput } from 'ink';
 import React from 'react';
-import type { Task } from '../../task-manager.js';
+import type { Task } from '@taskagent/shared/task-manager';
 import { Driver } from '../drivers/types.js';
-import { addLog } from '../logger.js';
+import { addLog } from '@taskagent/shared/logger';
 
 
 

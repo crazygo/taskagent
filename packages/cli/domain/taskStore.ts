@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { TaskManager, type Task, type TaskWithEmitter, type ForegroundSinks, type ForegroundHandle } from '../../task-manager.js';
-import type { PromptAgent } from '../agent/types.js';
+import { TaskManager, type Task, type TaskWithEmitter, type ForegroundSinks, type ForegroundHandle } from '@taskagent/shared/task-manager';
+import type { PromptAgent } from '@taskagent/agents/runtime/types.js';
 
 interface UseTaskStoreOptions {
   pollIntervalMs?: number;

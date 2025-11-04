@@ -2,7 +2,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import type { AgentDefinition, PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
 
 import type { Message } from '../types.js';
-import type { Task } from '../../task-manager.js';
+import type { Task } from '@taskagent/shared/task-manager';
 import { 
     Driver, 
     type DriverManifestEntry, 
@@ -23,7 +23,7 @@ import { glossaryDriverEntry } from './glossary/index.js';
 import { createGlossaryPromptAgent } from './glossary/agent.js';
 import { createLogMonitor } from '@taskagent/agents/monitor/index.js';
 import { monitorDriverEntry } from './monitor/index.js';
-import { addLog } from '../logger.js';
+import { addLog } from '@taskagent/shared/logger';
 
 import StackAgentView from '../components/StackAgentView.js';
 

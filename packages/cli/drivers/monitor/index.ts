@@ -3,7 +3,7 @@ import StackAgentView from '../../components/StackAgentView.js';
 import type { DriverRuntimeContext } from '../types.js';
 import type { Message } from '../../types.js';
 import { createLogMonitor } from '@taskagent/agents/monitor/index.js';
-import { addLog } from '../../logger.js';
+import { addLog } from '@taskagent/shared/logger';
 
 // Foreground handler: run LogMonitor as a PromptAgent instance in the Monitor tab
 async function handleMonitorInvocation(message: Message, context: DriverRuntimeContext): Promise<boolean> {
