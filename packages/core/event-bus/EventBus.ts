@@ -3,6 +3,11 @@
  * 
  * All Agent-to-UI communication goes through Event Bus.
  * Agents emit events, CLI subscribes and updates UI accordingly.
+ * 
+ * Features:
+ * - Type-safe event system with Zod validation
+ * - Fixed event version (1.0)
+ * - Wildcard subscription support ('*') for debugging and monitoring
  */
 
 import { EventEmitter } from 'node:events';

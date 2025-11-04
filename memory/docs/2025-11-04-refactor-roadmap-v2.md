@@ -1603,7 +1603,7 @@ for await (const chunk of runChatStream({ prompt: userInput })) {
 - Session 全局共享 + 后台 Fork
 - 不可见 Tab 保留 20 条消息（可配置）
 - 构建使用 `tsc`，不引入 Turbo
-- Event 固定 1.0 版本，不支持通配符
+- Event 固定 1.0 版本，支持通配符订阅 '*' (用于调试)
 - 命令全局化，与当前保持一致
 
 **下一步**: 开始 Phase 0 - 建立测试基准

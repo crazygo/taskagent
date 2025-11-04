@@ -7,7 +7,7 @@
 
 import type { EventBus } from '@taskagent/core/event-bus/index.js';
 import type { AgentStartContext, AgentStartSinks, ExecutionHandle } from '../runtime/types.js';
-import { createEventBusAdapter } from '../runtime/eventBusAdapter.js';
+import { MessageAdapter } from '@taskagent/execution/MessageAdapter.js';
 
 /**
  * Agent Factory - creates agent instances
@@ -118,14 +118,12 @@ export class AgentRegistry {
         }
 
         // Create EventBus adapter for agent callbacks
-        const sinks = createEventBusAdapter(
-            {
-                eventBus,
-                agentId: agent.id,
-                tabId: context.sourceTabId,
-            },
-            canUseTool
+        const adapter = new MessageAdapter(
+            context.sourceTabId,
+            agent.id,
+            eventBus
         );
+        const sinks = adapter.createSinks(canUseTool);
 
         try {
             return await agent.start(userInput, context, sinks);
