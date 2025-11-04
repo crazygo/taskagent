@@ -48,35 +48,24 @@ import { monitorTabConfig } from '@taskagent/tabs/configs/monitor';
 // Guard to prevent double submission in dev double-mount scenarios
 let __nonInteractiveSubmittedOnce = false;
 
-// Initialize TabRegistry with all tab configurations
+// Initialize TabRegistry - tabs will be registered based on preset in App component
 const tabRegistry = getGlobalTabRegistry();
-try {
-    tabRegistry.registerMany([
-        chatTabConfig,
-        agentTabConfig,
-        storyTabConfig,
-        glossaryTabConfig,
-        uiReviewTabConfig,
-        monitorTabConfig,
-    ]);
-} catch (error) {
-    // Tabs may already be registered in tests
-    if (!(error instanceof Error && error.message.includes('already registered'))) {
-        throw error;
+
+// STATIC_TABS will be populated dynamically after tabs are registered
+function getStaticTabs(): string[] {
+    const allTabs = tabRegistry.getAll();
+    
+    // If tabs are registered, use them directly (respects preset)
+    if (allTabs.length > 0) {
+        return [
+            ...allTabs.map(tab => tab.label),
+            ...DRIVER_TABS, // Keep for backward compatibility (empty now)
+        ];
     }
+    
+    // Fallback for when no tabs registered yet
+    return [Driver.CHAT, Driver.AGENT];
 }
-
-// Get tab IDs from TabRegistry (excluding Chat and Agent which are handled separately)
-const TAB_REGISTRY_TABS = tabRegistry.getAll()
-    .filter(tab => tab.id !== 'Chat' && tab.id !== 'Agent')
-    .map(tab => tab.label);
-
-const STATIC_TABS: readonly string[] = [
-    Driver.CHAT,
-    Driver.AGENT,
-    ...TAB_REGISTRY_TABS,
-    ...DRIVER_TABS, // Keep for backward compatibility (empty now)
-];
 
 const BASE_COMMANDS: readonly { name: string; description: string }[] = [
     { name: 'newsession', description: 'Start a fresh Claude agent session' },
@@ -299,6 +288,57 @@ const App = () => {
         );
     }
 
+    // Register tabs based on preset and set default tab (runs once)
+    const [tabsInitialized, setTabsInitialized] = useState(false);
+    
+    useEffect(() => {
+        if (tabsInitialized) {
+            return; // Already initialized
+        }
+        
+        const preset = bootstrapConfig.preset || 'default';
+        addLog(`[Preset] Initializing with preset: ${preset}`);
+        
+        try {
+            // Check if tabs already registered (e.g., in test environment)
+            const existingTabs = tabRegistry.getAll();
+            if (existingTabs.length > 0) {
+                addLog(`[Preset] Using ${existingTabs.length} already registered tabs`);
+                setTabsInitialized(true);
+                return;
+            }
+
+            if (preset === 'monitor') {
+                // Monitor-only preset
+                tabRegistry.registerMany([monitorTabConfig]);
+                addLog('[Preset] Registered monitor preset (1 tab)');
+                // Set default tab to Monitor for monitor preset
+                setSelectedTab('Monitor');
+            } else {
+                // Default preset - all tabs
+                tabRegistry.registerMany([
+                    chatTabConfig,
+                    agentTabConfig,
+                    storyTabConfig,
+                    glossaryTabConfig,
+                    uiReviewTabConfig,
+                    monitorTabConfig,
+                ]);
+                addLog('[Preset] Registered default preset (6 tabs)');
+                // Default tab is already Chat (set in useState)
+            }
+            
+            setTabsInitialized(true);
+        } catch (error) {
+            if (error instanceof Error && error.message.includes('already registered')) {
+                addLog('[Preset] Tabs already registered (test environment)');
+                setTabsInitialized(true);
+            } else {
+                throw error;
+            }
+        }
+    }, [bootstrapConfig.preset, tabsInitialized]);
+
     const nonInteractiveInput = bootstrapConfig.prompt;
     const e2eSteps = useMemo<E2EAutomationStep[] | null>(() => {
         const raw = process.env.E2E_AUTOMATION_STEPS;
@@ -443,7 +483,8 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
     }, [finalizeActiveMessages, nextMessageId, setFrozenMessages, setActiveMessages]);
 
     useEffect(() => {
-        if (!STATIC_TABS.includes(selectedTab) || selectedTab === Driver.CHAT || selectedTab === Driver.AGENT) {
+        const staticTabs = getStaticTabs();
+        if (!staticTabs.includes(selectedTab) || selectedTab === Driver.CHAT || selectedTab === Driver.AGENT) {
             lastAnnouncedDriverRef.current = null;
             return;
         }
@@ -1102,7 +1143,7 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
             }
             return false;
         };
-        const getAllTabs = () => [...STATIC_TABS, ...(tasksRef.current ?? []).map((_, i) => `Task ${i + 1}`)];
+        const getAllTabs = () => [...getStaticTabs(), ...(tasksRef.current ?? []).map((_, i) => `Task ${i + 1}`)];
 
         (async () => {
             addLog(`[E2E] Automation starting with ${e2eSteps.length} steps.`);
@@ -1150,7 +1191,16 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
     }, [e2eSteps, nonInteractiveInput]);
 
     // --- RENDER ---
-    const staticTabs = STATIC_TABS;
+    // Wait for tabs to be initialized before rendering
+    if (!tabsInitialized) {
+        return (
+            <Box padding={1}>
+                <Text color="gray">Loading...</Text>
+            </Box>
+        );
+    }
+    
+    const staticTabs = getStaticTabs();
     const taskTabs = tasks.map((_: Task, index: number) => `Task ${index + 1}`);
     
     let activeTask: Task | null = null;

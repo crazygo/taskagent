@@ -9,7 +9,8 @@ interface CliArgs {
   workspace?: string;
   newSession?: boolean;
   help?: boolean;
-  ignoredPositionalPrompt?: string; // New field
+  ignoredPositionalPrompt?: string;
+  preset?: string;
 }
 
 export const parseCliArgs = (): CliArgs => {
@@ -105,18 +106,27 @@ export const parseCliArgs = (): CliArgs => {
     ignoredPositionalPrompt = argv._[0];
   }
 
+  const coercePreset = (): string | undefined => {
+    const rawPreset = argv.preset;
+    if (typeof rawPreset === 'string' && rawPreset.trim().length > 0) {
+      return rawPreset.trim().toLowerCase();
+    }
+    return undefined;
+  };
+
   const result: CliArgs = {
     prompt: coercePrompt(),
     driver: coerceDriver(),
     workspace: coerceWorkspace(),
     newSession: rawNewSession,
     help: rawHelp,
-    ignoredPositionalPrompt, // Add new field to result
+    ignoredPositionalPrompt,
+    preset: coercePreset(),
   };
 
   try {
     addLog(
-      `[CLI] Parsed args -> driver: ${result.driver ?? 'undefined'}, prompt: ${result.prompt ?? 'undefined'}, ignoredPositionalPrompt: ${result.ignoredPositionalPrompt ?? 'undefined'}, workspace: ${result.workspace ?? 'undefined'}, newSession: ${result.newSession ?? 'undefined'}, help: ${result.help ?? 'undefined'}`
+      `[CLI] Parsed args -> driver: ${result.driver ?? 'undefined'}, prompt: ${result.prompt ?? 'undefined'}, ignoredPositionalPrompt: ${result.ignoredPositionalPrompt ?? 'undefined'}, workspace: ${result.workspace ?? 'undefined'}, newSession: ${result.newSession ?? 'undefined'}, help: ${result.help ?? 'undefined'}, preset: ${result.preset ?? 'undefined'}`
     );
   } catch {}
 
