@@ -14,18 +14,11 @@ import {
 } from './types.js';
 import { handlePlanReviewDo } from './plan-review-do/index.js';
 import { buildPromptAgentStart } from '@taskagent/agents/runtime/runPromptAgentStart.js';
-import { uiReviewDriverEntry } from './ui-review/index.js';
-
-// import { buildUiReviewSystemPrompt } from './ui-review/prompt.js'; // No longer needed here
-import { storyDriverEntry } from './story/index.js';
-import { createStoryPromptAgent } from './story/agent.js';
-import { glossaryDriverEntry } from './glossary/index.js';
-import { createGlossaryPromptAgent } from './glossary/agent.js';
+import { createStoryPromptAgent } from '@taskagent/agents/story/index.js';
+import { createGlossaryPromptAgent } from '@taskagent/agents/glossary/index.js';
+import { createUiReviewAgent } from '@taskagent/agents/ui-review/index.js';
 import { createLogMonitor } from '@taskagent/agents/monitor/index.js';
-import { monitorDriverEntry } from './monitor/index.js';
 import { addLog } from '@taskagent/shared/logger';
-
-import StackAgentView from '../components/StackAgentView.js';
 
 // Import placeholder views
 // import StoryView from '../views/StoryView.js'; // Will be replaced by StackAgentView
@@ -202,7 +195,7 @@ export function getDriverManifest(): readonly DriverManifestEntry[] {
     }));
 
     return [
-        // Auto-generated slash entries
+        // Auto-generated slash entries for background/foreground execution
         ...fgEntries,
         ...bgEntries,
         // Explicit background workflow (not a simple PromptAgent)
@@ -235,11 +228,8 @@ export function getDriverManifest(): readonly DriverManifestEntry[] {
                 });
             },
         },
-        // View Drivers
-        storyDriverEntry,
-        uiReviewDriverEntry,
-        glossaryDriverEntry,
-        monitorDriverEntry,
+        // NOTE: View Drivers (tabs) are now managed by TabRegistry in packages/tabs/
+        // This registry only handles slash commands for background/foreground execution
     ];
 }
 

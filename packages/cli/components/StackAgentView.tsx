@@ -1,6 +1,12 @@
+/**
+ * DEPRECATED: This component is a temporary placeholder for backward compatibility
+ * All tabs should now use ChatPanel (MessageView) instead
+ * This file will be deleted in Phase 5.4
+ */
+
 import React from 'react';
-import type { ViewDriverProps } from '../drivers/types.js';
 
-const StackAgentView: React.FC<ViewDriverProps> = () => null;
+export default function StackAgentView() {
+    return null;
+}
 
-export default StackAgentView;

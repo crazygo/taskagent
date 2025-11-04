@@ -37,20 +37,106 @@ import {
 import type { AgentPipelineOverrides } from './drivers/pipeline.js';
 import { closeTaskLogger } from '@taskagent/shared/task-logger';
 import { loadWorkspaceSettings, writeWorkspaceSettings, type WorkspaceSettings } from './workspace/settings.js';
-import { DriverView } from './components/DriverView.js';
+import { getGlobalTabRegistry, type TabConfig } from '@taskagent/tabs';
+import { chatTabConfig } from '@taskagent/tabs/configs/chat';
+import { agentTabConfig } from '@taskagent/tabs/configs/agent';
+import { storyTabConfig } from '@taskagent/tabs/configs/story';
+import { glossaryTabConfig } from '@taskagent/tabs/configs/glossary';
+import { uiReviewTabConfig } from '@taskagent/tabs/configs/ui-review';
+import { monitorTabConfig } from '@taskagent/tabs/configs/monitor';
 
 // Guard to prevent double submission in dev double-mount scenarios
 let __nonInteractiveSubmittedOnce = false;
 
+// Initialize TabRegistry with all tab configurations
+const tabRegistry = getGlobalTabRegistry();
+try {
+    tabRegistry.registerMany([
+        chatTabConfig,
+        agentTabConfig,
+        storyTabConfig,
+        glossaryTabConfig,
+        uiReviewTabConfig,
+        monitorTabConfig,
+    ]);
+} catch (error) {
+    // Tabs may already be registered in tests
+    if (!(error instanceof Error && error.message.includes('already registered'))) {
+        throw error;
+    }
+}
+
+// Get tab IDs from TabRegistry (excluding Chat and Agent which are handled separately)
+const TAB_REGISTRY_TABS = tabRegistry.getAll()
+    .filter(tab => tab.id !== 'Chat' && tab.id !== 'Agent')
+    .map(tab => tab.label);
+
 const STATIC_TABS: readonly string[] = [
     Driver.CHAT,
     Driver.AGENT,
-    ...DRIVER_TABS,
+    ...TAB_REGISTRY_TABS,
+    ...DRIVER_TABS, // Keep for backward compatibility (empty now)
 ];
 
 const BASE_COMMANDS: readonly { name: string; description: string }[] = [
     { name: 'newsession', description: 'Start a fresh Claude agent session' },
 ];
+
+/**
+ * Get tab information by label - bridges TabRegistry and old Driver system
+ * @param label Tab label (e.g., 'Story', 'Glossary')
+ * @returns Tab config with requiresSession and description
+ */
+function getTabInfoByLabel(label: string): { requiresSession: boolean; description: string; label: string } | null {
+    // Try new TabRegistry first
+    const tabConfig = tabRegistry.get(label);
+    if (tabConfig) {
+        return {
+            requiresSession: tabConfig.requiresSession,
+            description: tabConfig.description,
+            label: tabConfig.label,
+        };
+    }
+    
+    // Fallback to old Driver system
+    const driverEntry = getDriverByLabel(label);
+    if (driverEntry) {
+        return {
+            requiresSession: driverEntry.requiresSession,
+            description: driverEntry.description,
+            label: driverEntry.label,
+        };
+    }
+    
+    return null;
+}
+
+/**
+ * Get tab by CLI name - bridges TabRegistry and old Driver system
+ * @param cliName CLI name (e.g., 'story', 'glossary')
+ * @returns Tab info with label
+ */
+function getTabByCliName(cliName: string): { label: string } | null {
+    const normalizedCliName = cliName.toLowerCase();
+    
+    // Try new TabRegistry first
+    const tabs = tabRegistry.getAll();
+    for (const tab of tabs) {
+        if (tab.id.toLowerCase() === normalizedCliName || 
+            tab.label.toLowerCase().replace(/\s/g, '-') === normalizedCliName ||
+            tab.cliFlag === `--${normalizedCliName}`) {
+            return { label: tab.label };
+        }
+    }
+    
+    // Fallback to old Driver system
+    const driverEntry = getDriverByCliName(normalizedCliName);
+    if (driverEntry) {
+        return { label: driverEntry.label };
+    }
+    
+    return null;
+}
 
 type AgentTurnOverrides = AgentPipelineOverrides;
 
@@ -255,10 +341,10 @@ const App = () => {
 
     useEffect(() => {
         if (bootstrapConfig?.driver) {
-            const driver = getDriverByCliName(bootstrapConfig.driver);
-            if (driver) {
-                addLog(`[Driver Init] Setting driver from CLI: ${driver.label}`);
-                setSelectedTab(driver.label);
+            const tab = getTabByCliName(bootstrapConfig.driver);
+            if (tab) {
+                addLog(`[Driver Init] Setting tab from CLI: ${tab.label}`);
+                setSelectedTab(tab.label);
             }
         }
     }, [bootstrapConfig?.driver]);
@@ -362,15 +448,15 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
             return;
         }
 
-        const driverEntry = getDriverByLabel(selectedTab);
-        if (!driverEntry) {
+        const tabInfo = getTabInfoByLabel(selectedTab);
+        if (!tabInfo) {
             lastAnnouncedDriverRef.current = null;
             return;
         }
 
-        if (lastAnnouncedDriverRef.current !== driverEntry.label) {
-            appendSystemMessage(`[${driverEntry.label}] view is active.`);
-            lastAnnouncedDriverRef.current = driverEntry.label;
+        if (lastAnnouncedDriverRef.current !== tabInfo.label) {
+            appendSystemMessage(`[${tabInfo.label}] view is active.`);
+            lastAnnouncedDriverRef.current = tabInfo.label;
         }
     }, [appendSystemMessage, selectedTab]);
 
@@ -622,8 +708,8 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
     }, [tasks]);
 
     useEffect(() => {
-        const driverEntry = getDriverByLabel(selectedTab);
-        const needsSession = selectedTab === Driver.AGENT || (driverEntry?.requiresSession ?? false);
+        const tabInfo = getTabInfoByLabel(selectedTab);
+        const needsSession = selectedTab === Driver.AGENT || (tabInfo?.requiresSession ?? false);
 
         if (!needsSession) return;
         if (agentSessionId) return;
@@ -974,8 +1060,8 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
 
     useEffect(() => {
         if (!nonInteractiveInput || hasProcessedNonInteractiveRef.current || __nonInteractiveSubmittedOnce) return;
-        const desiredDriver = bootstrapConfig?.driver ? getDriverByCliName(bootstrapConfig.driver) : null;
-        if (desiredDriver && selectedTab !== desiredDriver.label) return;
+        const desiredTab = bootstrapConfig?.driver ? getTabByCliName(bootstrapConfig.driver) : null;
+        if (desiredTab && selectedTab !== desiredTab.label) return;
         hasProcessedNonInteractiveRef.current = true;
         __nonInteractiveSubmittedOnce = true;
         addLog(`Non-interactive mode: Processing input "${nonInteractiveInput}"`);
@@ -1077,8 +1163,6 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
         }
     }
 
-    const isDriverViewActive = STATIC_TABS.includes(selectedTab) && selectedTab !== Driver.CHAT && selectedTab !== Driver.AGENT;
-
     return (
         <Box flexDirection="column" height="100%">
             <ChatPanel
@@ -1088,8 +1172,6 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
                 workspacePath={bootstrapConfig.workspacePath}
                 positionalPromptWarning={positionalPromptWarning}
             />
-
-            {isDriverViewActive && <DriverView selectedTab={selectedTab} />}
 
             {!nonInteractiveInput && (
                 <>

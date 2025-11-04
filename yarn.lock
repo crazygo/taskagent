@@ -843,6 +843,7 @@ __metadata:
     "@taskagent/agents": "workspace:*"
     "@taskagent/core": "workspace:*"
     "@taskagent/shared": "workspace:*"
+    "@taskagent/tabs": "workspace:*"
     "@types/ink": "npm:^2.0.3"
     "@types/ink-text-input": "npm:^2.0.2"
     "@types/minimist": "npm:^1.2.0"
@@ -880,6 +881,15 @@ __metadata:
   dependencies:
     "@types/node": "npm:^24.7.1"
     dotenv: "npm:^17.2.3"
+    typescript: "npm:^5.9.3"
+  languageName: unknown
+  linkType: soft
+
+"@taskagent/tabs@workspace:*, @taskagent/tabs@workspace:packages/tabs":
+  version: 0.0.0-use.local
+  resolution: "@taskagent/tabs@workspace:packages/tabs"
+  dependencies:
+    "@types/node": "npm:^24.7.1"
     typescript: "npm:^5.9.3"
   languageName: unknown
   linkType: soft

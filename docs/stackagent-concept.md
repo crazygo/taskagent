@@ -1,4 +1,13 @@
-# StackAgent Concept
+# ⚠️ DEPRECATED - StackAgent Concept
+
+**⚠️ THIS DOCUMENT IS OBSOLETE ⚠️**  
+**Date Deprecated**: 2025-11-05  
+**Reason**: Violated architecture layering principles  
+**See**: `docs/DEPRECATED-stackagent-concept.md` for details  
+
+---
+
+## Original Content (For Historical Reference Only)
 
 To streamline the creation of drivers that primarily rely on an agent pipeline and a generic UI, we introduce the `StackAgent` abstraction. This concept aims to reduce boilerplate and improve consistency across drivers that do not require highly custom user interfaces.
 

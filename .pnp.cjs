@@ -29,6 +29,10 @@ const RAW_RUNTIME_STATE =
     {\
       "name": "@taskagent/shared",\
       "reference": "workspace:packages/shared"\
+    },\
+    {\
+      "name": "@taskagent/tabs",\
+      "reference": "workspace:packages/tabs"\
     }\
   ],\
   "enableTopLevelFallback": true,\
@@ -39,7 +43,8 @@ const RAW_RUNTIME_STATE =
     ["@taskagent/agents", ["workspace:packages/agents"]],\
     ["@taskagent/cli", ["workspace:packages/cli"]],\
     ["@taskagent/core", ["workspace:packages/core"]],\
-    ["@taskagent/shared", ["workspace:packages/shared"]]\
+    ["@taskagent/shared", ["workspace:packages/shared"]],\
+    ["@taskagent/tabs", ["workspace:packages/tabs"]]\
   ],\
   "fallbackPool": [\
   ],\
@@ -1149,6 +1154,7 @@ const RAW_RUNTIME_STATE =
           ["@taskagent/cli", "workspace:packages/cli"],\
           ["@taskagent/core", "workspace:packages/core"],\
           ["@taskagent/shared", "workspace:packages/shared"],\
+          ["@taskagent/tabs", "workspace:packages/tabs"],\
           ["@types/ink", "npm:2.0.3"],\
           ["@types/ink-text-input", "npm:2.0.5"],\
           ["@types/minimist", "npm:1.2.5"],\
@@ -1188,6 +1194,17 @@ const RAW_RUNTIME_STATE =
           ["@taskagent/shared", "workspace:packages/shared"],\
           ["@types/node", "npm:24.10.0"],\
           ["dotenv", "npm:17.2.3"],\
+          ["typescript", "patch:typescript@npm%3A5.9.3#optional!builtin<compat/typescript>::version=5.9.3&hash=5786d5"]\
+        ],\
+        "linkType": "SOFT"\
+      }]\
+    ]],\
+    ["@taskagent/tabs", [\
+      ["workspace:packages/tabs", {\
+        "packageLocation": "./packages/tabs/",\
+        "packageDependencies": [\
+          ["@taskagent/tabs", "workspace:packages/tabs"],\
+          ["@types/node", "npm:24.10.0"],\
           ["typescript", "patch:typescript@npm%3A5.9.3#optional!builtin<compat/typescript>::version=5.9.3&hash=5786d5"]\
         ],\
         "linkType": "SOFT"\
