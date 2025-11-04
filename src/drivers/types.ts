@@ -53,12 +53,12 @@ export interface DriverRuntimeContext {
     startBackground: (
         agent: any,
         userPrompt: string,
-        context: { sourceTabId?: string; workspacePath?: string; timeoutSec?: number; session?: { id: string; initialized: boolean } }
+        context: { sourceTabId?: string; workspacePath?: string; timeoutSec?: number; session?: { id: string; initialized: boolean }; forkSession?: boolean }
     ) => TaskWithEmitter;
     startForeground: (
         agent: any,
         userPrompt: string,
-        context: { sourceTabId: string; workspacePath?: string; session?: { id: string; initialized: boolean } },
+        context: { sourceTabId: string; workspacePath?: string; session?: { id: string; initialized: boolean }; forkSession?: boolean },
         sinks: {
             onText: (chunk: string) => void;
             onReasoning?: (chunk: string) => void;

@@ -21,6 +21,7 @@ import { storyDriverEntry } from './story/index.js';
 import { createStoryPromptAgent } from './story/agent.js';
 import { glossaryDriverEntry } from './glossary/index.js';
 import { createLogMonitor } from '../agents/log-monitor/index.js';
+import { monitorDriverEntry } from './monitor/index.js';
 import { addLog } from '../logger.js';
 
 import StackAgentView from '../components/StackAgentView.js';
@@ -149,7 +150,7 @@ export function getDriverManifest(): readonly DriverManifestEntry[] {
                 const result = (context as any).startBackground(
                     agent,
                     prompt,
-                    { sourceTabId: (context as any).sourceTabId || String(spec.driverId), workspacePath: context.workspacePath, timeoutSec: spec.defaultBgTimeout, session: (context as any).session }
+                    { sourceTabId: (context as any).sourceTabId || String(spec.driverId), workspacePath: context.workspacePath, timeoutSec: spec.defaultBgTimeout, session: (context as any).session, forkSession: true }
                 );
                 const { emitter } = result;
                 // Acknowledge task creation
@@ -206,7 +207,7 @@ export function getDriverManifest(): readonly DriverManifestEntry[] {
                             description: 'Ephemeral agent for Plan-Review-Do workflow',
                             start: buildPromptAgentStart(adapter),
                         } as any;
-                        const result = context.startBackground(agent, prompt, { sourceTabId: context.sourceTabId || 'Plan-Review-DO', workspacePath: context.workspacePath, timeoutSec: 900, session: context.session });
+                        const result = context.startBackground(agent, prompt, { sourceTabId: context.sourceTabId || 'Plan-Review-DO', workspacePath: context.workspacePath, timeoutSec: 900, session: context.session, forkSession: true });
                         return { id: result.task.id };
                     },
                     waitTask: context.waitTask,
@@ -217,16 +218,7 @@ export function getDriverManifest(): readonly DriverManifestEntry[] {
         storyDriverEntry,
         uiReviewDriverEntry,
         glossaryDriverEntry,
-        {
-            type: 'view',
-            id: Driver.MONITOR,
-            label: Driver.MONITOR,
-            description: 'Monitor · 敬请期待',
-            requiresSession: false,
-            component: StackAgentView,
-            isPlaceholder: true,
-            handler: createPlaceholderHandler(Driver.MONITOR),
-        },
+        monitorDriverEntry,
     ];
 }
 

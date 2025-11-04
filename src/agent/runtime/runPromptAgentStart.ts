@@ -35,6 +35,11 @@ export function buildPromptAgentStart(
       systemPrompt: (adapter.getSystemPrompt?.() ?? { type: 'preset', preset: 'claude_code' }) as any,
     };
 
+    // Request forking when resuming if asked by the caller (background runs)
+    if (context.forkSession) {
+      (options as any).forkSession = true;
+    }
+
     // Inject sub-agents if present
     try {
       const defs = adapter.getAgentDefinitions?.();

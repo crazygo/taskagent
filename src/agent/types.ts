@@ -19,6 +19,12 @@ export type AgentStartContext = {
     sourceTabId: string;
     workspacePath?: string;
     session?: { id: string; initialized: boolean };
+    /**
+     * When resuming an initialized session, request the SDK to fork
+     * into a new session instead of continuing the original.
+     * Default: false. Set to true for background (/bg) runs.
+     */
+    forkSession?: boolean;
 };
 
 export type AgentStartSinks = {

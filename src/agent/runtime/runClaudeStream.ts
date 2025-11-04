@@ -42,6 +42,7 @@ export type RunClaudeStreamParams = {
         allowedTools?: string[];
         disallowedTools?: string[];
         permissionMode?: string;
+        forkSession?: boolean;
     };
     log?: (message: string) => void;
     callbacks?: RunClaudeStreamCallbacks;
@@ -95,6 +96,12 @@ export const runClaudeStream = async ({
     }
     if (queryOptions.permissionMode) {
         (options as Record<string, unknown>).permissionMode = queryOptions.permissionMode;
+    }
+
+    // If caller requested forking on resume, propagate flag to SDK options
+    if (queryOptions.forkSession) {
+        (options as Record<string, unknown>).forkSession = true;
+        log('[Agent-RunClaudeStream] forkSession=true enabled for resume');
     }
 
     // A.) Log full options and prompt similarly to TaskManager for Story/Agent runs

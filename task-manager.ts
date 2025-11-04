@@ -62,6 +62,7 @@ export class TaskManager {
       workspacePath?: string;
       timeoutSec?: number;
       session?: { id: string; initialized: boolean };
+      forkSession?: boolean;
     }
   ): { task: TaskExtended; emitter: EventEmitter } {
     const id = crypto.randomUUID();
@@ -175,7 +176,7 @@ export class TaskManager {
     const handle = maybeStart.call(
       agent,
       userPrompt,
-      { sourceTabId: context.sourceTabId, workspacePath: context.workspacePath, session: context.session },
+      { sourceTabId: context.sourceTabId, workspacePath: context.workspacePath, session: context.session, forkSession: context.forkSession },
       sinks,
     );
     if (handle && typeof handle.cancel === 'function') {
@@ -195,6 +196,7 @@ export class TaskManager {
       sourceTabId: string;
       workspacePath?: string;
       session?: { id: string; initialized: boolean };
+      forkSession?: boolean;
     },
     sinks: ForegroundSinks,
   ): ForegroundHandle {
@@ -207,7 +209,7 @@ export class TaskManager {
     return maybeStart.call(
       agent,
       userPrompt,
-      { sourceTabId: context.sourceTabId, workspacePath: context.workspacePath, session: context.session },
+      { sourceTabId: context.sourceTabId, workspacePath: context.workspacePath, session: context.session, forkSession: context.forkSession },
       sinks,
     );
   }
