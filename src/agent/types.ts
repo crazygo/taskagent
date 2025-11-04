@@ -85,8 +85,8 @@ export interface RunnableAgent {
 }
 
 /**
- * StackAgent - Orchestrates multiple AtomicAgents
- * Inherits from AtomicAgent but adds coordinator capabilities
+ * StackAgent - Orchestrates multiple PromptAgents
+ * Inherits from PromptAgent but adds coordinator capabilities
  */
 export abstract class StackAgent extends PromptAgent {
     abstract readonly subAgents: Record<string, PromptAgent>;

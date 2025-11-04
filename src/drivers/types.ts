@@ -50,13 +50,12 @@ export interface DriverRuntimeContext {
     canUseTool: (toolName: string, input: Record<string, unknown>, options: { signal: AbortSignal; suggestions?: PermissionUpdate[] }) => Promise<unknown>;
     workspacePath?: string;
     sourceTabId?: string;
-    createTask: (prompt: string, queryOptions?: { agents?: Record<string, any> }) => Task;
-    startBackground?: (
+    startBackground: (
         agent: any,
         userPrompt: string,
         context: { sourceTabId?: string; workspacePath?: string; timeoutSec?: number; session?: { id: string; initialized: boolean } }
     ) => TaskWithEmitter;
-    startForeground?: (
+    startForeground: (
         agent: any,
         userPrompt: string,
         context: { sourceTabId: string; workspacePath?: string; session?: { id: string; initialized: boolean } },

@@ -4,8 +4,8 @@ Good direction. I'll tighten the concepts and show what this means for naming, l
 
 ## Quick glossary
 
-- **Agent**: An execution scheme (Atomic or Stack). It defines "how" to do work.
-  - `AtomicAgent`: Base class with `getPrompt()`, `getTools()`, `getModel()`, `parseOutput()`
+- **Agent**: An execution scheme (Prompt or Stack). It defines "how" to do work.
+  - `PromptAgent`: Base class with `getPrompt()`, `getTools()`, `getModel()`, `parseOutput()`
   - `StackAgent`: Extended class supporting sub-agent orchestration
   - `DefaultAtomicAgent`: Pass-through implementation for direct Chat/Agent tab usage
 - **Task**: A runtime instance of an Agent execution. It defines "this concrete run".
@@ -15,7 +15,7 @@ Good direction. I'll tighten the concepts and show what this means for naming, l
 - **Background Task**: Runs detached. Has EventEmitter; permissionMode=auto; emits events to source tab.
   - **Implemented**: `/bg:log-monitor` - monitors debug.log, emits TaskEvents
 
-Implication: "/task" is a user interaction to spawn a Task in background mode. Renaming to "/bg" matches intent; keep "/task" as an alias for backwards compatibility.
+Background tasks are invoked via /bg:* commands. The legacy /task alias has been removed.
 
 ## Commands and naming
 
@@ -25,7 +25,7 @@ Implication: "/task" is a user interaction to spawn a Task in background mode. R
   - Emits events (ℹ️ info, ⚠️ warning, ❌ error) to source tab
   - Uses session support (`requiresSession: true`)
   
-- `/bg <description>` (future: alias: /task)
+- `/bg <description>`
   - Start a generic background task from any tab
   - Options:
     - `--stay`: don't auto-switch to the Task tab (current behavior auto-switches; this flag prevents it)
@@ -35,17 +35,17 @@ Implication: "/task" is a user interaction to spawn a Task in background mode. R
   - Explicitly run a foreground task in the current tab (clarifies intent vs. background)
   
 - Natural language integrations:
-  - "看看监控状态" in the source tab should route to an Atomic-Agent that reads the task log and summarizes
+  - "看看监控状态" in the source tab should route to a PromptAgent that reads the task log and summarizes
 
 ## Lifecycle and contracts (concise)
 
-> **Implementation Note**: TaskManager.createTaskWithAgent() and runTaskWithAgent() implement these contracts.
+> **Implementation Note**: TaskManager.startForeground()/startBackground() call agent.start() to implement these contracts.
 
 - **Task states**: pending → in_progress → completed | failed | cancelled
 - **Create**
-  - Input: `{ agent: AtomicAgent, userPrompt: string, context: { sourceTabId, workspacePath?, timeoutSec?, session? } }`
+  - Input: `{ agent: PromptAgent, userPrompt: string, context: { sourceTabId, workspacePath?, timeoutSec?, session? } }`
   - Output: `{ task: TaskExtended, emitter: EventEmitter }`
-  - Implementation: `TaskManager.createTaskWithAgent()`
+  - Implementation: `TaskManager.startBackground()` (for background tasks) and `TaskManager.startForeground()` (for in-tab streaming)
 - **Observe**
   - Event: `{ level: 'info'|'warning'|'error', message: string, ts: number }`
   - EventEmitter events: 'event', 'completed', 'failed', 'cancelled'
@@ -59,11 +59,11 @@ Implication: "/task" is a user interaction to spawn a Task in background mode. R
 
 ## Orchestration: tying Agent to Task
 
-> **Implementation**: LogMonitor demonstrates the Atomic-Agent pattern with self-managed loops.
+> **Implementation**: LogMonitor demonstrates the PromptAgent pattern with self-managed loops.
 
 - **Agent Selection**
   - Driver registry maps slash commands to agents (e.g., `/bg:log-monitor` → LogMonitor agent)
-  - Orchestrator in driver handler creates agent instance and calls `createTaskWithAgent()`
+  - Orchestrator in driver handler creates agent instance and calls `startBackground()`
   
 - **Background Context**
   - Isolated sessionId per task; bind taskId ↔ sourceTabId
@@ -71,7 +71,7 @@ Implication: "/task" is a user interaction to spawn a Task in background mode. R
   - Pass workspacePath to agent context for absolute paths
   
 - **LogMonitor Implementation** ✅ **Working**
-  - Type: Atomic-Agent (self-managed loop via prompt)
+  - Type: PromptAgent (self-managed loop via prompt)
   - Loop cycle: Every 30 seconds, read last 100 lines of debug.log
   - Tools: `['Read', 'Glob']` (exact SDK tool names)
   - Output parsing: `/^\[EVENT:(info|warning|error)\]\s*(.+)$/i`
@@ -97,10 +97,10 @@ Implication: "/task" is a user interaction to spawn a Task in background mode. R
 ## ✅ Implementation Achievements (2025-11-04)
 
 ### Core Architecture
-- **Agent Type System**: `AtomicAgent`, `StackAgent`, `DefaultAtomicAgent` defined in `src/agent/types.ts`
+- **Agent Type System**: `PromptAgent`, `StackAgent`, `DefaultAtomicAgent` defined in `src/agent/types.ts`
 - **Task Extensions**: `TaskExtended` interface with agent, session, events, timeoutSec
 - **EventEmitter Integration**: Each task gets EventEmitter with 'event', 'completed', 'failed', 'cancelled'
-- **TaskManager Methods**: `createTaskWithAgent()`, `runTaskWithAgent()` fully functional
+- **TaskManager Methods**: `startForeground()`, `startBackground()`, `waitTask()`, `cancelTask()` fully functional
 
 ### LogMonitor Agent
 - **Location**: `src/agents/log-monitor/LogMonitor.ts`
@@ -134,7 +134,7 @@ Event model
 
 ### Scenario 1 — Log-tail → summary (Atomic, BG)
 - Purpose: Periodically read the last N lines of a log file and push concise NL summaries only.
-- Agent type: Atomic-Agent (self-managed loop via prompt). Task mode: Background.
+- Agent type: PromptAgent (self-managed loop via prompt). Task mode: Background.
 - Data to read:
   - Target file path (e.g., logs/app.log)
   - Tail size N (e.g., 100–500 lines)
@@ -155,7 +155,7 @@ Event model
 
 ### Scenario 2 — Project health monitor (Atomic, BG, long-live)
 - Purpose: Assess progress/health from task.md + git diff + related task logs; push periodic updates; escalate risks.
-- Agent type: Atomic-Agent (self-managed loop via prompt). Task mode: Background.
+- Agent type: PromptAgent (self-managed loop via prompt). Task mode: Background.
 - Data to read:
   - Task list file (task.md) with items and statuses.
   - Git diff window (since last cycle or since baseline branch).
@@ -176,7 +176,7 @@ Event model
 
 ### Scenario 3 — Deep research cycle (Stack, BG or FG)
 - Purpose: Research → review → decide; iterate if continuation criteria met.
-- Agent type: Stack-Agent (coordinator + sub-Atomic agents). Task mode: Background preferred (can be FG for interactive checkpoints).
+- Agent type: Stack-Agent (coordinator + sub-Prompt agents). Task mode: Background preferred (can be FG for interactive checkpoints).
 - Sub-agents (Atomic):
   - @research: gather findings with citations and source notes.
   - @review: critique coverage, identify gaps, remove duplication.
@@ -213,7 +213,7 @@ export type TaskEvent = { level: TaskEventLevel; message: string; ts: number };
 
 // Start a Task (Foreground or Background)
 export type StartTaskInput = {
-  agent: unknown; // AtomicAgent | StackAgent instance (resolved by registry/driver)
+  agent: unknown; // PromptAgent | StackAgent instance (resolved by registry/driver)
   prompt: string; // Natural-language instruction
   context: {
     sourceTabId: string;         // Originating tab
@@ -255,7 +255,7 @@ Notes
 ### CLI mapping (illustrative)
 
 ```
-# Background tasks (alias: /task)
+# Background tasks
 /bg:log-monitor   --timeout=3600 "每 30 秒监控 debug.log 最后 100 行"
 /bg:health        --timeout=7200 "监控 task.md 执行进度和健康度"
 /bg:research      --timeout=1800 "调研与 Claude 有关的竞品"
@@ -268,7 +268,7 @@ Below snippets demonstrate startTask + event handling. Replace agent resolution 
 #### Scenario 1 — Log-tail → summary (Atomic, BG)
 
 ```ts
-const agent = registry.get('log-monitor'); // AtomicAgent instance
+const agent = registry.get('log-monitor'); // PromptAgent instance
 const { taskId, emitter } = startTask({
   agent,
   prompt: '每 30 秒读取 debug.log 最后 100 行，对比上次变化，仅用自然语言总结变化，按 info/warning/error 分级',
@@ -284,7 +284,7 @@ emitter.on('failed', (error) => ui.pushSystemMessage(sourceTabId, 'error', `日�
 #### Scenario 2 — Project health monitor (Atomic, BG, long-live)
 
 ```ts
-const agent = registry.get('project-health'); // AtomicAgent instance
+const agent = registry.get('project-health'); // PromptAgent instance
 const { taskId, emitter } = startTask({
   agent,
   prompt: '每 60 秒读取 task.md、最新 git diff 与相关任务日志，输出进度与健康度（自然语言），必要时发出告警',
@@ -342,10 +342,10 @@ This plan turns the blueprint into shippable increments. Each phase lists target
 - Acceptance
   - Type-check passes. No UI change. Creating and reading dummy entries in the store works in unit tests.
 
-### Phase 1 — CLI surface and routing (/bg and alias)
+### Phase 1 — CLI surface and routing (/bg)
 
 - Files
-  - `src/cli/args.ts`: parse `/bg` and alias `/task` with options: `--stay`, `--name "<label>"`, `--timeout=<sec>`
+  - `src/cli/args.ts`: parse `/bg` with options: `--stay`, `--name "<label>"`, `--timeout=<sec>`
   - `src/cli/help.ts`: add usage docs
   - `src/cli/config.ts` (if applicable): wire defaults
 - Behavior
@@ -373,13 +373,13 @@ This plan turns the blueprint into shippable increments. Each phase lists target
 
 - Files
   - `src/drivers/registry.ts`: register three new entries
-  - `src/drivers/monitor/agents/log_tail.agent.md`: Atomic agent prompt for Scenario 1
-  - `src/drivers/health/agents/project_health.agent.md`: Atomic agent prompt for Scenario 2
+  - `src/drivers/monitor/agents/log_tail.agent.md`: PromptAgent prompt for Scenario 1
+  - `src/drivers/health/agents/project_health.agent.md`: PromptAgent prompt for Scenario 2
   - `src/drivers/research/coordinator.agent.md` + `agents/*.agent.md`: Stack agent skeleton for Scenario 3
   - `src/drivers/*/index.ts`: export driver metadata for selection
 - Behavior
-  - `/bg:log-monitor` resolves Atomic agent instance and calls `startTask`
-  - `/bg:health` resolves Atomic agent instance and calls `startTask`
+  - `/bg:log-monitor` resolves a PromptAgent instance and calls `startBackground`
+  - `/bg:health` resolves a PromptAgent instance and calls `startBackground`
   - `/bg:research` resolves Stack coordinator instance and calls `startTask`
 - Acceptance
   - Each command kicks off a task and emits at least one info-level event in < 5s (use short timeouts in dev)
@@ -414,7 +414,7 @@ This plan turns the blueprint into shippable increments. Each phase lists target
 ### Phase 7 — Tests (unit + e2e)
 
 - Files
-  - `tests/e2e/cli.test.ts`: new cases for `/bg:log-monitor`, alias `/task`, `--stay`
+  - `tests/e2e/cli.test.ts`: new cases for `/bg:log-monitor` and `--stay`
   - `tests/e2e/automation.test.ts`: assert Task tab creation and event message presence
   - `tests/helpers/run-command.ts`: minor helpers if needed
 - Behavior
@@ -434,7 +434,7 @@ This plan turns the blueprint into shippable increments. Each phase lists target
 ### Phase 9 — Backwards compatibility and cleanup
 
 - Behavior
-  - `/task` remains as alias of `/bg`
+  - The `/task` alias has been removed in favor of explicit `/bg:*` commands
   - Story/Glossary unaffected
 - Acceptance
   - Regression tests for Story/Glossary still PASS
@@ -448,7 +448,7 @@ This plan turns the blueprint into shippable increments. Each phase lists target
 - `src/task-logger.ts`
   - Ensure: `append(taskId, line)` writes to `logs/{taskId}.log`
 - `src/cli/args.ts`
-  - Add: parse `/bg:*` and alias `/task`; options `--stay`, `--name`, `--timeout`
+  - Add: parse `/bg:*`; options `--stay`, `--name`, `--timeout`
 - `src/cli/help.ts`
   - Add usage for new commands
 - `ui.tsx`

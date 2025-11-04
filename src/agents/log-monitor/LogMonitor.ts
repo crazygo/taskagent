@@ -1,8 +1,9 @@
-import { PromptAgent, type AgentContext } from '../../agent/types.js';
+import { PromptAgent, type AgentContext, type AgentStartContext, type AgentStartSinks } from '../../agent/types.js';
+import { buildPromptAgentStart } from '../../agent/runtime/runPromptAgentStart.js';
 import type { TaskEvent } from '../../types.js';
 
 /**
- * LogMonitor - Atomic agent that monitors a log file for changes
+ * LogMonitor - Prompt-driven agent that monitors a log file for changes
  * Self-manages loop via prompt instructions
  */
 export class LogMonitor extends PromptAgent {
@@ -48,6 +49,19 @@ Start monitoring now. When you detect changes, emit event lines and continue the
 
     getTools(): string[] {
         return ['Read', 'Glob'];
+    }
+
+    /**
+     * Provide a unified start() using the default PromptAgent streaming wrapper.
+     */
+    start(userInput: string, ctx: AgentStartContext, sinks: AgentStartSinks) {
+        const starter = buildPromptAgentStart({
+            getPrompt: (input: string, c: { sourceTabId: string; workspacePath?: string }) => this.getPrompt(input, c as AgentContext),
+            getModel: () => this.getModel?.(),
+            // Reuse parseOutput for streaming event emission if available
+            parseOutput: this.parseOutput?.bind(this),
+        });
+        return starter(userInput, ctx, sinks);
     }
 
     /**

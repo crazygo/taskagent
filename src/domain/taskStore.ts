@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { EventEmitter } from 'events';
 import { TaskManager, type Task, type TaskWithEmitter, type ForegroundSinks, type ForegroundHandle } from '../../task-manager.js';
 import type { PromptAgent } from '../agent/types.js';
 
@@ -17,15 +16,6 @@ export const useTaskStore = ({ pollIntervalMs = 1000 }: UseTaskStoreOptions = {}
     }, pollIntervalMs);
     return () => clearInterval(interval);
   }, [pollIntervalMs, taskManager]);
-
-  /**
-   * Legacy createTask - backward compatible
-   */
-  const createTask = (prompt: string, queryOptions?: { agents?: Record<string, any> }): Task => {
-    const newTask = taskManager.createTask(prompt, queryOptions);
-    setTasks(taskManager.getAllTasks()); // Immediately update tasks state
-    return newTask;
-  };
 
   /**
    * startBackground - create a background Task with Agent instance and events
@@ -64,7 +54,6 @@ export const useTaskStore = ({ pollIntervalMs = 1000 }: UseTaskStoreOptions = {}
 
   return {
     tasks,
-    createTask,
     startBackground,
     startForeground,
     waitTask,

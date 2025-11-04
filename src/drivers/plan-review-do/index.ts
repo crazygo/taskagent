@@ -21,7 +21,7 @@ export async function handleTaskFlow(
     nextMessageId: () => number;
     setActiveMessages: (updater: (prev: Message[]) => Message[]) => void;
     setFrozenMessages: (updater: (prev: Message[]) => Message[]) => void;
-    createTask: (prompt: string, queryOptions?: { agents?: Record<string, any> }) => { id: string };
+    startTask: (prompt: string, queryOptions?: { agents?: Record<string, any> }) => { id: string };
     waitTask: (taskId: string) => Promise<{ id: string; status: string; output: string; error?: string | null }>;
   }
 ): Promise<boolean> {
@@ -42,7 +42,7 @@ export async function handleTaskFlow(
   // No need to push system messages for workflow start/end
 
   const result: TaskRunState = await runTask(userMessage.content, {
-    createTask: callbacks.createTask,
+    startTask: callbacks.startTask,
     waitTask: callbacks.waitTask,
   });
 

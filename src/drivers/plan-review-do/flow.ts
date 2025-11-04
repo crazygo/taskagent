@@ -16,7 +16,7 @@ import { agentsConfig } from './agents-config.js';
 // ------------- Types -------------
 
 export type TaskRunHooks = {
-  createTask: (prompt: string, options?: { agents?: Record<string, any> }) => { id: string };
+  startTask: (prompt: string, options?: { agents?: Record<string, any> }) => { id: string };
   waitTask: (taskId: string) => Promise<{ id: string; status: string; output: string; error?: string | null }>;
 };
 
@@ -117,7 +117,7 @@ export async function planWithReview(
     addLog(`[Node: planWithReview] Calling query with planner+reviewer agents`);
     
     // 5. Create task and wait for completion
-    const task = hooks.createTask(prompt, { agents: agentsParam });
+  const task = hooks.startTask(prompt, { agents: agentsParam });
     addLog(`[Node: planWithReview] Created task ${task.id}`);
     
     const completed = await hooks.waitTask(task.id);
@@ -230,7 +230,7 @@ export async function execute(
     addLog(`[Node: execute] Calling query with executor agent`);
     
     // 5. Create task and wait for completion
-    const task = hooks.createTask(prompt, { agents: agentsParam });
+  const task = hooks.startTask(prompt, { agents: agentsParam });
     addLog(`[Node: execute] Created task ${task.id}`);
     
     const completed = await hooks.waitTask(task.id);

@@ -49,7 +49,6 @@ const STATIC_TABS: readonly string[] = [
 ];
 
 const BASE_COMMANDS: readonly { name: string; description: string }[] = [
-    { name: 'task', description: 'Create a background task' },
     { name: 'newsession', description: 'Start a fresh Claude agent session' },
 ];
 
@@ -244,7 +243,7 @@ const App = () => {
     const [agentSessionId, setAgentSessionId] = useState<string | null>(null);
     const [, setWorkspaceSettings] = useState<WorkspaceSettings | null>(null);
     const [isAgentStreaming, setIsAgentStreaming] = useState(false);
-    const { tasks, createTask, startBackground, waitTask, cancelTask, startForeground } = useTaskStore();
+    const { tasks, startBackground, waitTask, cancelTask, startForeground } = useTaskStore();
     const [positionalPromptWarning, setPositionalPromptWarning] = useState<string | null>(null);
 
     const automationRanRef = useRef(false);
@@ -821,7 +820,6 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
             canUseTool: handleAgentPermissionRequest,
             workspacePath: bootstrapConfig?.workspacePath,
             sourceTabId: selectedTab,
-            createTask,
             startBackground: (agent, userPrompt, ctx) => startBackground(agent, userPrompt, ctx),
             startForeground: (agent, userPrompt, ctx, sinks) => startForeground(agent, userPrompt, ctx, sinks),
             waitTask,
@@ -866,7 +864,7 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
             appendSystemMessage(`[${entry.label}] Error: ${message}`, true);
             return false;
         }
-    }, [agentSessionId, appendSystemMessage, bootstrapConfig?.workspacePath, createTask, ensureAgentSession, finalizeMessageById, handleAgentPermissionRequest, runAgentTurn, nextMessageId, setActiveMessages, setFrozenMessages, waitTask, startForeground, selectedTab]);
+    }, [agentSessionId, appendSystemMessage, bootstrapConfig?.workspacePath, ensureAgentSession, finalizeMessageById, handleAgentPermissionRequest, runAgentTurn, nextMessageId, setActiveMessages, setFrozenMessages, waitTask, startForeground, selectedTab]);
 
     const handleSubmit = useCallback(async (userInput: string): Promise<boolean> => {
         addLog('--- New Submission ---');
@@ -888,16 +886,6 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
         if (slashMatch) {
             const command = slashMatch[1]?.toLowerCase() ?? '';
             const rest = slashMatch[2] ?? '';
-
-            if (command === 'task') {
-                if (!rest) {
-                    addLog('[Command] /task requires a prompt');
-                    return false;
-                }
-                createTask(rest);
-                setInputValue('');
-                return true;
-            }
 
             const driverEntry = getDriverBySlash(command);
             if (driverEntry) {
@@ -957,7 +945,7 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
             }
         }
         return succeeded && !flushFailed;
-    }, [appendSystemMessage, createNewAgentSession, createTask, flushPendingQueue, handleAgentPermissionCommand, isProcessingQueueRef, isStreaming, nextMessageId, pendingUserInputsRef, runAgentTurn, runDriverEntry, runStreamForUserMessage, selectedTab, setInputValue]);
+    }, [appendSystemMessage, createNewAgentSession, flushPendingQueue, handleAgentPermissionCommand, isProcessingQueueRef, isStreaming, nextMessageId, pendingUserInputsRef, runAgentTurn, runDriverEntry, runStreamForUserMessage, selectedTab, setInputValue]);
 
     useEffect(() => { handleSubmitRef.current = handleSubmit; }, [handleSubmit]);
 

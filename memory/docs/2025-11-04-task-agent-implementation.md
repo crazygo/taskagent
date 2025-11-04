@@ -21,7 +21,7 @@
 **Given** that we need to distinguish between different agent execution patterns  
 **When** defining agent types  
 **Then** the system should provide:
-- `AtomicAgent`: Base abstract class with `getPrompt()`, `getTools()`, `getModel()`, `parseOutput()`
+- `PromptAgent`: Base abstract class with `getPrompt()`, `getTools()`, `getModel()`, `parseOutput()`
 - `StackAgent`: Extended class supporting sub-agent orchestration
 - `DefaultAtomicAgent`: Pass-through implementation for direct Chat/Agent tab usage
 
@@ -96,14 +96,14 @@
 
 ### Created Files
 1. **`src/agent/types.ts`** (156 lines)
-   - `AtomicAgent` abstract class
-   - `StackAgent extends AtomicAgent`
+   - `PromptAgent` abstract class
+   - `StackAgent extends PromptAgent`
    - `DefaultAtomicAgent` implementation
    - `GenericAtomicAgent` implementation
    - `AgentContext` interface
 
 2. **`src/agents/log-monitor/LogMonitor.ts`** (89 lines)
-   - LogMonitor class implementing AtomicAgent
+   - LogMonitor class implementing PromptAgent
    - `getPrompt()`: Self-managed loop instructions
    - `parseOutput()`: Regex for `[EVENT:level] message`
    - `getTools()`: Returns ['Read', 'Glob']
@@ -276,7 +276,7 @@ When a feature works in one flow (Story) but fails in another (Background), comp
 
 ## ✅ Completion Checklist
 
-- [x] Phase 0: Agent type system (AtomicAgent, StackAgent, DefaultAtomicAgent)
+- [x] Phase 0: Agent type system (PromptAgent, StackAgent, DefaultAtomicAgent)
 - [x] Phase 1: LogMonitor implementation with parseOutput
 - [x] Phase 2: TaskManager refactor (createTaskWithAgent, runTaskWithAgent)
 - [x] Phase 3: EventEmitter system integration

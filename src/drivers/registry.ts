@@ -13,6 +13,7 @@ import {
     type DriverPrepareFn 
 } from './types.js';
 import { handlePlanReviewDo } from './plan-review-do/index.js';
+import { buildPromptAgentStart } from '../agent/runtime/runPromptAgentStart.js';
 import { uiReviewDriverEntry } from './ui-review/index.js';
 
 // import { buildUiReviewSystemPrompt } from './ui-review/prompt.js'; // No longer needed here
@@ -59,7 +60,29 @@ export function getDriverManifest(): readonly DriverManifestEntry[] {
                 nextMessageId: context.nextMessageId,
                 setActiveMessages: context.setActiveMessages,
                 setFrozenMessages: context.setFrozenMessages,
-                createTask: context.createTask,
+                startTask: (prompt: string, options?: { agents?: Record<string, any> }) => {
+                    // Build a minimal runnable agent that forwards prompt and injects provided sub-agents
+                    const adapter = {
+                        getPrompt: (userInput: string) => userInput,
+                        getAgentDefinitions: () => options?.agents as any,
+                    };
+                    const agent = {
+                        id: 'plan-review-do',
+                        description: 'Ephemeral agent for Plan-Review-Do workflow',
+                        start: buildPromptAgentStart(adapter),
+                    } as any;
+                    const result = context.startBackground(
+                        agent,
+                        prompt,
+                        {
+                            sourceTabId: context.sourceTabId || 'Plan-Review-DO',
+                            workspacePath: context.workspacePath,
+                            timeoutSec: 900,
+                            session: context.session,
+                        }
+                    );
+                    return { id: result.task.id };
+                },
                 waitTask: context.waitTask,
             });
         },
@@ -139,9 +162,14 @@ export function getDriverManifest(): readonly DriverManifestEntry[] {
                     throw error;
                 }
             } else {
-                addLog('[LogMonitor] Fallback to legacy createTask');
-                // Fallback to legacy createTask
-                context.createTask(message.content);
+                addLog('[LogMonitor] startBackground not available');
+                const systemMsg: Message = {
+                    id: context.nextMessageId(),
+                    role: 'system',
+                    content: `❌ [Log Monitor] 当前环境不支持后台任务接口 startBackground`,
+                    isBoxed: true,
+                };
+                context.setFrozenMessages(prev => [...prev, systemMsg]);
             }
             
             addLog('[LogMonitor] Handler completed');
