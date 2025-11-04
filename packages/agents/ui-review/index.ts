@@ -1,8 +1,8 @@
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { loadAgentPipelineConfig } from '../../agent/agentLoader.js';
+import { loadAgentPipelineConfig } from '../runtime/agentLoader.js';
 import { buildUiReviewSystemPrompt } from './prompt.js';
-import type { AgentStartContext, AgentStartSinks } from '../../agent/types.js';
+import type { AgentStartContext, AgentStartSinks } from '../runtime/types.js';
 
 /**
  * createUiReviewAgent

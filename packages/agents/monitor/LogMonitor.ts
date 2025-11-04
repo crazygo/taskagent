@@ -1,8 +1,8 @@
-import { PromptAgent, type AgentContext, type AgentStartContext, type AgentStartSinks } from '../../agent/types.js';
-import { buildPromptAgentStart } from '../../agent/runtime/runPromptAgentStart.js';
+import { PromptAgent, type AgentContext, type AgentStartContext, type AgentStartSinks } from '../runtime/types.js';
+import { buildPromptAgentStart } from '../runtime/runPromptAgentStart.js';
 import crypto from 'crypto';
 import type { AgentDefinition } from '@anthropic-ai/claude-agent-sdk';
-import type { TaskEvent } from '../../types.js';
+import type { TaskEvent } from '@taskagent/core/types/TaskEvent.js';
 
 /**
  * LogMonitor - Prompt-driven agent that monitors project signals for changes

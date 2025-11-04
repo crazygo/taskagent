@@ -2,7 +2,7 @@ import { Driver, type ViewDriverEntry } from '../types.js';
 import StackAgentView from '../../components/StackAgentView.js';
 import type { DriverRuntimeContext } from '../types.js';
 import type { Message } from '../../types.js';
-import { createGlossaryPromptAgent } from './agent.js';
+import { createGlossaryPromptAgent } from '@taskagent/agents/glossary/index.js';
 
 // Best-practice runtime: run Glossary as a PromptAgent instance in Foreground by default
 async function handleGlossaryInvocation(message: Message, context: DriverRuntimeContext): Promise<boolean> {
@@ -77,4 +77,4 @@ export const glossaryDriverEntry: ViewDriverEntry = {
 
 // Re-export a factory that returns a PromptAgent-like instance for Glossary.
 // Supports the migration where Glossary is not a class, just a PromptAgent instance.
-export { createGlossaryPromptAgent } from './agent.js';
+export { createGlossaryPromptAgent } from '@taskagent/agents/glossary/index.js';

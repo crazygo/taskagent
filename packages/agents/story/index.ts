@@ -1,9 +1,9 @@
 import path from 'path';
 import { fileURLToPath } from 'url';
 import type { AgentDefinition } from '@anthropic-ai/claude-agent-sdk';
-import { loadAgentPipelineConfig } from '../../agent/agentLoader.js';
-import { buildPromptAgentStart } from '../../agent/runtime/runPromptAgentStart.js';
-import type { AgentStartContext, AgentStartSinks } from '../../agent/types.js';
+import { loadAgentPipelineConfig } from '../runtime/agentLoader.js';
+import { buildPromptAgentStart } from '../runtime/runPromptAgentStart.js';
+import type { AgentStartContext, AgentStartSinks } from '../runtime/types.js';
 
 /**
  * createStoryPromptAgent

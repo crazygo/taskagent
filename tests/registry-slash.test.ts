@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { getDriverBySlash } from '../src/drivers/registry.js';
-import { Driver } from '../src/drivers/types.js';
+import { getDriverBySlash } from '../packages/cli/drivers/registry.js';
+import { Driver } from '../packages/cli/drivers/types.js';
 import { EventEmitter } from 'node:events';
 
 describe('slash command registry wiring', () => {

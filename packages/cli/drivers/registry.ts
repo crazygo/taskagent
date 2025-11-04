@@ -13,15 +13,15 @@ import {
     type DriverPrepareFn 
 } from './types.js';
 import { handlePlanReviewDo } from './plan-review-do/index.js';
-import { buildPromptAgentStart } from '../agent/runtime/runPromptAgentStart.js';
+import { buildPromptAgentStart } from '@taskagent/agents/runtime/runPromptAgentStart.js';
 import { uiReviewDriverEntry } from './ui-review/index.js';
 
 // import { buildUiReviewSystemPrompt } from './ui-review/prompt.js'; // No longer needed here
 import { storyDriverEntry } from './story/index.js';
-import { createStoryPromptAgent } from './story/agent.js';
+import { createStoryPromptAgent } from '@taskagent/agents/story/index.js';
 import { glossaryDriverEntry } from './glossary/index.js';
-import { createGlossaryPromptAgent } from './glossary/agent.js';
-import { createLogMonitor } from '../agents/log-monitor/index.js';
+import { createGlossaryPromptAgent } from '@taskagent/agents/glossary/index.js';
+import { createLogMonitor } from '@taskagent/agents/monitor/LogMonitor.js';
 import { monitorDriverEntry } from './monitor/index.js';
 import { addLog } from '../logger.js';
 

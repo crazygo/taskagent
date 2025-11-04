@@ -6,38 +6,38 @@ import { randomUUID } from 'crypto';
 import { inspect } from 'util';
 import { type AgentDefinition, type PermissionUpdate, type PermissionResult } from '@anthropic-ai/claude-agent-sdk';
 
-import { addLog } from './src/logger.js';
-import { createBaseClaudeFlow, type BaseClaudeFlow } from './src/agent/flows/baseClaudeFlow.js';
-import { loadCliConfig } from './src/cli/config.js';
+import { addLog } from './logger.js';
+import { createBaseClaudeFlow, type BaseClaudeFlow } from '@taskagent/agents/runtime/flows/baseClaudeFlow.js';
+import { loadCliConfig } from './cli/config.js';
 import type { Task } from './task-manager.js';
-import { ensureAiProvider, type AiChatProvider } from './src/config/ai-provider.js';
-import * as Types from './src/types.js';
-import { ChatPanel } from './src/components/ChatPanel.js';
-import { TabView } from './src/components/StatusControls.js';
-import { TaskSpecificView } from './src/components/TaskSpecificView.js';
-import { InputBar } from './src/components/InputBar.js';
-import type { AgentPermissionPromptState, AgentPermissionOption } from './src/components/AgentPermissionPrompt.types.js';
-import { AgentPermissionPromptComponent } from './src/components/AgentPermissionPrompt.js';
-import { useTaskStore } from './src/domain/taskStore.js';
-import { useConversationStore } from './src/domain/conversationStore.js';
+import { ensureAiProvider, type AiChatProvider } from './config/ai-provider.js';
+import * as Types from './types.js';
+import { ChatPanel } from './components/ChatPanel.js';
+import { TabView } from './components/StatusControls.js';
+import { TaskSpecificView } from './components/TaskSpecificView.js';
+import { InputBar } from './components/InputBar.js';
+import type { AgentPermissionPromptState, AgentPermissionOption } from './components/AgentPermissionPrompt.types.js';
+import { AgentPermissionPromptComponent } from './components/AgentPermissionPrompt.js';
+import { useTaskStore } from './domain/taskStore.js';
+import { useConversationStore } from './domain/conversationStore.js';
 import {
     Driver,
     type DriverManifestEntry,
     type ViewDriverEntry,
     type BackgroundTaskDriverEntry,
     type DriverRuntimeContext,
-} from './src/drivers/types.js';
+} from './drivers/types.js';
 import {
     DRIVER_TABS,
     getDriverBySlash,
     getDriverByLabel,
     getDriverByCliName,
     getDriverCommandEntries,
-} from './src/drivers/registry.js';
-import type { AgentPipelineOverrides } from './src/drivers/pipeline.js';
-import { closeTaskLogger } from './src/task-logger.js';
-import { loadWorkspaceSettings, writeWorkspaceSettings, type WorkspaceSettings } from './src/workspace/settings.js';
-import { DriverView } from './src/components/DriverView.js';
+} from './drivers/registry.js';
+import type { AgentPipelineOverrides } from './drivers/pipeline.js';
+import { closeTaskLogger } from './task-logger.js';
+import { loadWorkspaceSettings, writeWorkspaceSettings, type WorkspaceSettings } from './workspace/settings.js';
+import { DriverView } from './components/DriverView.js';
 
 // Guard to prevent double submission in dev double-mount scenarios
 let __nonInteractiveSubmittedOnce = false;

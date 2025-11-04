@@ -1,5 +1,6 @@
 import type { AgentDefinition } from '@anthropic-ai/claude-agent-sdk';
-import type { Message, TaskEvent } from '../types.js';
+import type { Message } from '@taskagent/core/types/Message.js';
+import type { TaskEvent } from '@taskagent/core/types/TaskEvent.js';
 import type { PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
 
 /**

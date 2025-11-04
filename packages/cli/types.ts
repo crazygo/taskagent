@@ -14,11 +14,5 @@ export type LogMessage = {
     content: string;
 };
 
-// Task event types for background tasks
-export type TaskEventLevel = 'info' | 'warning' | 'error';
-
-export interface TaskEvent {
-    level: TaskEventLevel;
-    message: string;
-    ts: number;
-}
+// Task event types for background tasks - re-exported from @taskagent/core
+export type { TaskEvent, TaskEventLevel } from '@taskagent/core/types/TaskEvent.js';

@@ -2,7 +2,7 @@ import { Driver, type ViewDriverEntry } from '../types.js';
 import StackAgentView from '../../components/StackAgentView.js';
 import type { DriverRuntimeContext } from '../types.js';
 import type { Message } from '../../types.js';
-import { createLogMonitor } from '../../agents/log-monitor/index.js';
+import { createLogMonitor } from '@taskagent/agents/monitor/index.js';
 import { addLog } from '../../logger.js';
 
 // Foreground handler: run LogMonitor as a PromptAgent instance in the Monitor tab
@@ -96,4 +96,4 @@ export const monitorDriverEntry: ViewDriverEntry = {
   handler: handleMonitorInvocation,
 };
 
-export { createLogMonitor } from '../../agents/log-monitor/index.js';
+export { createLogMonitor } from '@taskagent/agents/monitor/index.js';
