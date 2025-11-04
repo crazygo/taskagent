@@ -188,7 +188,7 @@ export const InputBar: React.FC<InputBarProps> = ({
           value={value}
           onChange={handleChange}
           onSubmit={handleTextInputSubmit}
-          placeholder="Type your message... or use /task <prompt>"
+          placeholder="Type your message... or use /<command> <prompt>"
           focus={isFocused}
         />
       </Box>

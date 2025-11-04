@@ -81,7 +81,9 @@ export const TaskSpecificView: React.FC<TaskSpecificViewProps> = ({ task, taskNu
       flexDirection="column"
     >
       <Text>
-        Task {taskNumber}: {task.id} | Status: {task.status} | Prompt: {formatPrompt(task.prompt)}
+        Task {taskNumber}: {task.id}
+        {task.sdkSessionId ? ` | SDK Session: ${task.sdkSessionId}` : ''}
+        {` | Status: ${task.status} | Prompt: ${formatPrompt(task.prompt)}`}
       </Text>
       <Text color="gray">{`─`.repeat(80)}</Text>
       {visibleLines.length > 0 ? (

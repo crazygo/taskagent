@@ -1,161 +1,308 @@
-
 import crypto from 'crypto';
-import { query } from '@anthropic-ai/claude-agent-sdk';
-import type {
-  Options,
-  SDKAssistantMessage,
-} from '@anthropic-ai/claude-agent-sdk';
+import { EventEmitter } from 'events';
+import { type PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
 import { getTaskLogger } from './src/task-logger.js';
 import { addLog } from './src/logger.js';
+import { PromptAgent } from './src/agent/types.js';
+import type { TaskEvent } from './src/types.js';
 
 export interface Task {
   id: string;
   prompt: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'cancelled';
   output: string;
   exitCode?: number | null;
   error?: string | null;
+  /** Actual SDK session id (may differ from internal task id), if available */
+  sdkSessionId?: string;
+}
+
+export interface TaskExtended extends Task {
+  agent?: PromptAgent;
+  userPrompt: string;
+  sourceTabId?: string;
+  workspacePath?: string;
+  events: TaskEvent[];
+  timeoutSec?: number;
+  session?: { id: string; initialized: boolean };
+}
+
+export interface TaskWithEmitter {
+  task: TaskExtended;
+  emitter: EventEmitter;
+}
+
+// Foreground streaming API Types
+export type ForegroundSinks = {
+  onText: (chunk: string) => void;
+  onReasoning?: (chunk: string) => void;
+  onEvent?: (e: TaskEvent) => void;
+  onCompleted?: (fullText: string) => void;
+  onFailed?: (error: string) => void;
+  canUseTool: (toolName: string, input: Record<string, unknown>, options: { signal: AbortSignal; suggestions?: PermissionUpdate[] }) => Promise<unknown>;
+};
+
+export interface ForegroundHandle {
+  cancel: () => void;
+  sessionId: string;
 }
 
 export class TaskManager {
-  private tasks: Map<string, Task> = new Map();
+  private tasks: Map<string, TaskExtended> = new Map();
+  private eventEmitters: Map<string, EventEmitter> = new Map();
+  private handles: Map<string, { cancel: () => void; sessionId: string }> = new Map();
+  private timeouts: Map<string, NodeJS.Timeout> = new Map();
 
-  createTask(prompt: string, queryOptions?: { agents?: Record<string, any> }): Task {
+  /**
+   * Start a background agent run (creates a Task tab)
+   */
+  startBackground(
+    agent: PromptAgent,
+    userPrompt: string,
+    context: {
+      sourceTabId: string;
+      workspacePath?: string;
+      timeoutSec?: number;
+      session?: { id: string; initialized: boolean };
+      forkSession?: boolean;
+    }
+  ): { task: TaskExtended; emitter: EventEmitter } {
     const id = crypto.randomUUID();
-    
-    // Log received agents config - RAW DUMP
-    // console.log(`[TaskManager.createTask] Task ${id.substring(0, 8)}... queryOptions RAW:`, queryOptions);
-    
-    const task: Task = {
+    const emitter = new EventEmitter();
+
+    addLog(`[TaskManager] startBackground agent=${agent.id}`);
+    addLog(`[TaskManager] User prompt: ${userPrompt}`);
+    try { addLog(`[TaskManager] Context: ${JSON.stringify(context)}`); } catch {}
+  try { addLog(`[TaskManager] forkSession flag: ${context.forkSession === true ? 'true' : 'false'}`); } catch {}
+
+    const agentContext = {
+      sourceTabId: context.sourceTabId || 'unknown',
+      workspacePath: context.workspacePath,
+    };
+
+    const generatedPrompt = agent.getPrompt(userPrompt, agentContext);
+    addLog(`[TaskManager] Generated prompt:\n${generatedPrompt}`);
+
+    const task: TaskExtended = {
       id,
-      prompt,
+      agent,
+      userPrompt,
+      prompt: generatedPrompt,
       status: 'pending',
       output: '',
       exitCode: null,
       error: null,
+      sourceTabId: context.sourceTabId,
+      workspacePath: context.workspacePath,
+      events: [],
+      timeoutSec: context.timeoutSec,
+      session: context.session,
     };
+
     this.tasks.set(id, task);
-    
-    // 记录任务创建
+    this.eventEmitters.set(id, emitter);
+
+    // Set up timeout if specified
+    if (context.timeoutSec && context.timeoutSec > 0) {
+      const timeout = setTimeout(() => {
+        this.cancelTask(id);
+      }, context.timeoutSec * 1000);
+      this.timeouts.set(id, timeout);
+    }
+
+    // Log task creation
     const logger = getTaskLogger();
-    logger.logTaskCreated(id, 'ai', prompt, {
+    logger.logTaskCreated(id, 'ai', userPrompt, {
       model: process.env.ANTHROPIC_MODEL,
-      agents: queryOptions?.agents
+      agentId: agent.id,
+      agentDescription: agent.description,
     });
+
+    // Always use agent.start() in background path
+    const maybeStart = (agent as unknown as { start?: (userInput: string, ctx: any, sinks: any) => { cancel: () => void; sessionId: string } }).start;
+    if (typeof maybeStart !== 'function') {
+      throw new Error('[BG] agent.start() is required for background runs');
+    }
+
+    addLog('[BG] Using agent.start()');
+
+    // pending -> in_progress
+    logger.logStatusChange(id, 'pending', 'in_progress');
+    task.status = 'in_progress';
+    this.tasks.set(id, task);
+
+    const sinks: ForegroundSinks = {
+      onText: (chunk: string) => {
+        task.output = (task.output || '') + chunk;
+        this.tasks.set(id, task);
+        logger.logOutputChunk(id, chunk, task.output.length);
+      },
+      onEvent: (e: TaskEvent) => {
+        task.events.push(e);
+        this.tasks.set(id, task);
+        const em = this.eventEmitters.get(id);
+        em?.emit('event', e);
+      },
+  onCompleted: (fullText: string) => {
+        logger.logStatusChange(id, 'in_progress', 'completed');
+        logger.logTaskCompleted(id, fullText, 0);
+        task.status = 'completed';
+        task.exitCode = 0;
+        task.output = fullText;
+        this.tasks.set(id, task);
+        const em = this.eventEmitters.get(id);
+        em?.emit('completed');
+        const timeout = this.timeouts.get(id);
+        if (timeout) { clearTimeout(timeout); this.timeouts.delete(id); }
+        this.handles.delete(id);
+      },
+      onFailed: (error: string) => {
+        logger.logStatusChange(id, 'in_progress', 'failed');
+        logger.logTaskFailed(id, error, -1);
+        task.status = 'failed';
+        task.error = error;
+        task.exitCode = -1;
+        this.tasks.set(id, task);
+        const em = this.eventEmitters.get(id);
+        em?.emit('failed', error);
+        const timeout = this.timeouts.get(id);
+        if (timeout) { clearTimeout(timeout); this.timeouts.delete(id); }
+        this.handles.delete(id);
+      },
+      onReasoning: undefined,
+      canUseTool: async (toolName: string) => {
+        addLog(`[BG] Auto-approve tool: ${toolName}`);
+        return undefined;
+      },
+    };
+
+    const handle = maybeStart.call(
+      agent,
+      userPrompt,
+      { sourceTabId: context.sourceTabId, workspacePath: context.workspacePath, session: context.session, forkSession: context.forkSession },
+      {
+        ...sinks,
+        onSessionId: (sid: string) => {
+          try {
+            addLog(`[TaskManager] SDK session resolved: ${sid}`);
+          } catch {}
+          task.sdkSessionId = sid;
+          this.tasks.set(id, task);
+          const em = this.eventEmitters.get(id);
+          em?.emit('event', { level: 'info', message: `SDK session: ${sid}`, ts: Date.now() });
+        },
+      },
+    );
+    if (handle && typeof handle.cancel === 'function') {
+      this.handles.set(id, handle);
+    }
+    return { task, emitter };
+  }
+
+  /**
+   * Start a foreground agent run with streaming into provided sinks (no Task tab)
+   * Does not register a Task in the internal map; lifecycle handled by the caller via the returned handle.
+   */
+  startForeground(
+    agent: PromptAgent,
+    userPrompt: string,
+    context: {
+      sourceTabId: string;
+      workspacePath?: string;
+      session?: { id: string; initialized: boolean };
+      forkSession?: boolean;
+    },
+    sinks: ForegroundSinks,
+  ): ForegroundHandle {
+    const maybeStart = (agent as unknown as { start?: (userInput: string, ctx: any, sinks: any) => { cancel: () => void; sessionId: string } }).start;
+    if (typeof maybeStart !== 'function') {
+      throw new Error('[FG] agent.start() is required for foreground runs');
+    }
+    addLog('[FG] Using agent.start()');
+    try { addLog(`[TaskManager-FG] Context session received: ${JSON.stringify(context.session)}`); } catch {}
+    return maybeStart.call(
+      agent,
+      userPrompt,
+      { sourceTabId: context.sourceTabId, workspacePath: context.workspacePath, session: context.session, forkSession: context.forkSession },
+      sinks,
+    );
+  }
+
+  // Legacy createTask removed – use startBackground with a PromptAgent
+
+  /**
+   * Cancel a running task
+   */
+  cancelTask(taskId: string): { ok: boolean } {
+    const task = this.tasks.get(taskId);
+    if (!task) {
+      return { ok: false };
+    }
     
-    this.runTask(task, queryOptions);
-    return task;
+    if (task.status === 'pending' || task.status === 'in_progress') {
+      const h = this.handles.get(taskId);
+      try { h?.cancel(); } catch {}
+      this.handles.delete(taskId);
+      task.status = 'cancelled';
+      this.tasks.set(taskId, task);
+      
+      const emitter = this.eventEmitters.get(taskId);
+      if (emitter) {
+        emitter.emit('cancelled');
+      }
+      
+      const timeout = this.timeouts.get(taskId);
+      if (timeout) {
+        clearTimeout(timeout);
+        this.timeouts.delete(taskId);
+      }
+      
+      const logger = getTaskLogger();
+      logger.logStatusChange(taskId, task.status, 'cancelled');
+      
+      return { ok: true };
+    }
+    
+    return { ok: false };
   }
 
   // CLI task creation removed as part of cleanup (createCliTask)
 
   async waitTask(taskId: string): Promise<Task> {
-    // Simple polling; UI already polls, this provides a programmatic await
-    // to be used by flows.
-    // Poll every 200ms until completed/failed.
-    const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
-    // Fast path
-    let t = this.tasks.get(taskId);
-    while (t && (t.status === 'pending' || t.status === 'in_progress')) {
-      await sleep(200);
-      t = this.tasks.get(taskId);
+    const current = this.tasks.get(taskId);
+    if (!current) {
+      return { id: taskId, prompt: '', status: 'failed', output: '', exitCode: -1, error: 'Task not found' };
     }
-    if (!t) throw new Error(`Task not found: ${taskId}`);
-    return t;
-  }
+    if (current.status === 'completed' || current.status === 'failed' || current.status === 'cancelled') {
+      const { id, prompt, status, output, exitCode, error } = current;
+      return { id, prompt, status, output, exitCode, error };
+    }
 
-  getTask(id: string): Task | undefined {
-    return this.tasks.get(id);
-  }
-
-  getAllTasks(): Task[] {
-    return Array.from(this.tasks.values());
-  }
-
-  private async runTask(task: Task, queryOptions?: { agents?: Record<string, any> }) {
-    const logger = getTaskLogger();
-    
-    // console.log(`[TaskManager.runTask] Task ${task.id.substring(0, 8)}... queryOptions RAW:`, queryOptions);
-    // if (queryOptions?.agents) {
-    //   console.log(`[TaskManager.runTask] queryOptions.agents RAW:`, queryOptions.agents);
-    // }
-    
-    // 状态变更：pending → in_progress
-    logger.logStatusChange(task.id, 'pending', 'in_progress');
-    this.tasks.set(task.id, { ...task, status: 'in_progress' });
-
-    try {
-      const options: Options = {
-        model: process.env.ANTHROPIC_MODEL,
+    return new Promise<Task>((resolve) => {
+      const emitter = this.eventEmitters.get(taskId);
+      const finalize = () => {
+        const t = this.tasks.get(taskId)!;
+        resolve({ id: t.id, prompt: t.prompt, status: t.status, output: t.output, exitCode: t.exitCode, error: t.error });
       };
-
-      // console.log(`[TaskManager.runTask] options BEFORE adding agents:`, options);
-
-      // Add agents configuration if provided
-      if (queryOptions?.agents) {
-        (options as any).agents = queryOptions.agents;
-        // console.log(`[TaskManager.runTask] options AFTER adding agents:`, options);
-        // console.log(`[TaskManager.runTask] options.agents RAW:`, (options as any).agents);
-      } else {
-        addLog(`[TaskManager.runTask] No agents in queryOptions`);
+      if (!emitter) {
+        finalize();
+        return;
       }
-
-      // addLog(`[TaskManager.runTask] Final options object to pass to query(): ${JSON.stringify(options)}`);
-
-      logger.logEvent(task.id, 'Starting LLM query', { 
-        model: options.model,
-        agents: queryOptions?.agents ? Object.keys(queryOptions.agents) : undefined
-      });
-
-      addLog(`[TaskManager.runTask] About to call query() with prompt (first 100 chars): ${task.prompt.substring(0, 100)}`);
-      // addLog(`  - options object: ${JSON.stringify(options)}`);
-
-      const result = await query({
-        prompt: task.prompt,
-        options: options,
-      });
-
-      // addLog(`[TaskManager.runTask] query() call completed, result: ${JSON.stringify(result)}`);
-      addLog(`[TaskManager.runTask] Starting to process messages...`);
-
-      let fullOutput = '';
-      let messageCount = 0;
-      for await (const message of result) {
-        messageCount++;
-        // addLog(`[TaskManager.runTask] Message ${messageCount}: ${JSON.stringify(message)}`);
-        
-        if (message.type === 'assistant') {
-          const assistantMessage = message as SDKAssistantMessage;
-          for (const block of assistantMessage.message.content) {
-            if (block.type === 'text') {
-              const previousLength = fullOutput.length;
-              fullOutput += block.text;
-              
-              // 记录输出增量
-              logger.logOutputChunk(task.id, block.text, fullOutput.length);
-              
-              this.tasks.set(task.id, { ...task, status: 'in_progress', output: fullOutput });
-            }
-          }
-        }
-      }
-
-      addLog(`[TaskManager.runTask] All messages processed. Total: ${messageCount}, Output length: ${fullOutput.length}`);
-
-      // 任务完成
-      logger.logStatusChange(task.id, 'in_progress', 'completed');
-      logger.logTaskCompleted(task.id, fullOutput, 0);
-      this.tasks.set(task.id, { ...task, status: 'completed', output: fullOutput, exitCode: 0 });
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      
-      // 任务失败
-      logger.logStatusChange(task.id, 'in_progress', 'failed');
-      logger.logTaskFailed(task.id, errorMessage, -1);
-      
-      this.tasks.set(task.id, { ...task, status: 'failed', output: errorMessage, error: errorMessage, exitCode: -1 });
-    }
+      const onDone = () => { cleanup(); finalize(); };
+      const cleanup = () => {
+        emitter.off('completed', onDone);
+        emitter.off('failed', onDone);
+        emitter.off('cancelled', onDone);
+      };
+      emitter.on('completed', onDone);
+      emitter.on('failed', onDone);
+      emitter.on('cancelled', onDone);
+    });
   }
 
   // CLI task runner removed as part of cleanup (runCliTask)
+
+  getAllTasks(): Task[] {
+    return Array.from(this.tasks.values()).map(t => ({ id: t.id, prompt: t.prompt, status: t.status, output: t.output, exitCode: t.exitCode ?? null, error: t.error ?? null, sdkSessionId: t.sdkSessionId }));
+  }
 }

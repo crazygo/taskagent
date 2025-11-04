@@ -25,6 +25,7 @@ export type RunClaudeStreamCallbacks = {
     onToolUse?: (event: ToolUseEvent) => void;
     onToolResult?: (event: ToolResultEvent) => void;
     onNonAssistantEvent?: (event: unknown) => void;
+    onSessionId?: (sessionId: string) => void;
 };
 
 export type RunClaudeStreamParams = {
@@ -42,6 +43,7 @@ export type RunClaudeStreamParams = {
         allowedTools?: string[];
         disallowedTools?: string[];
         permissionMode?: string;
+        forkSession?: boolean;
     };
     log?: (message: string) => void;
     callbacks?: RunClaudeStreamCallbacks;
@@ -74,8 +76,10 @@ export const runClaudeStream = async ({
 
     if (session.initialized) {
         options.resume = session.id;
+        log(`[Agent-RunClaudeStream] Using RESUME logic for session: ${session.id}`);
     } else {
         options.extraArgs = { 'session-id': session.id };
+        log(`[Agent-RunClaudeStream] Using EXTRA_ARGS (new session) logic for session: ${session.id}`);
     }
 
     if (queryOptions.agents) {
@@ -94,6 +98,23 @@ export const runClaudeStream = async ({
     if (queryOptions.permissionMode) {
         (options as Record<string, unknown>).permissionMode = queryOptions.permissionMode;
     }
+
+    // If caller requested forking on resume, propagate flag to SDK options
+    if (queryOptions.forkSession) {
+        (options as Record<string, unknown>).forkSession = true;
+        log('[Agent-RunClaudeStream] forkSession=true enabled for resume');
+    }
+
+    // A.) Log full options and prompt similarly to TaskManager for Story/Agent runs
+    // B.) Add additional logging for query parameters as requested by the user.
+    try {
+        log(`[Agent-PreQuery] Full Options for query: ${inspect(options, { depth: 5 })}`); // Increased depth for more detail
+        log(`[Agent-PreQuery] Prompt (len=${prompt.length}):\n${truncate(prompt, 5000)}`);
+    } catch {}
+
+    try {
+        log(`[Agent-FinalQueryOptions] Final options passed to SDK: ${inspect(options, { depth: 5 })}`);
+    } catch {}
 
     const result = query({
         prompt,
@@ -201,6 +222,11 @@ export const runClaudeStream = async ({
                     log(`[Agent] Event full (type=${String(kind)}): ${JSON.stringify(m)}`);
                 } catch (error) {
                     log(`[Agent] Event full (inspect) type=${String(kind)}: ${inspect(m, { depth: 6 })}`);
+                }
+
+                // Detect first system event carrying session_id and notify
+                if (kind === 'system' && typeof m?.session_id === 'string' && m.session_id.trim()) {
+                    cb.onSessionId?.(String(m.session_id));
                 }
             } catch (error) {
                 log(`[Agent] Non-assistant event (logging failed): ${String(error)}`);

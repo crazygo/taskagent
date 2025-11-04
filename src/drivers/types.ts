@@ -1,7 +1,7 @@
 import type React from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import type { AgentDefinition, PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
-import type { Task } from '../../task-manager.js';
+import type { Task, TaskWithEmitter } from '../../task-manager.js';
 import type { Message } from '../types.js';
 import type { DriverPrepareResult } from './pipeline.js';
 
@@ -13,6 +13,7 @@ export enum Driver {
     STORY = 'Story',
     UI = 'UI',
     MONITOR = 'Monitor',
+    LOG_MONITOR = 'Log Monitor',
 }
 
 export const DRIVER_NAMES = [
@@ -23,6 +24,7 @@ export const DRIVER_NAMES = [
     'story',
     'ui',
     'monitor',
+    'log-monitor',
 ] as const;
 
 export type DriverName = (typeof DRIVER_NAMES)[number];
@@ -47,7 +49,25 @@ export interface DriverRuntimeContext {
     finalizeMessageById: (messageId: number) => void;
     canUseTool: (toolName: string, input: Record<string, unknown>, options: { signal: AbortSignal; suggestions?: PermissionUpdate[] }) => Promise<unknown>;
     workspacePath?: string;
-    createTask: (prompt: string, queryOptions?: { agents?: Record<string, any> }) => Task;
+    sourceTabId?: string;
+    startBackground: (
+        agent: any,
+        userPrompt: string,
+        context: { sourceTabId?: string; workspacePath?: string; timeoutSec?: number; session?: { id: string; initialized: boolean }; forkSession?: boolean }
+    ) => TaskWithEmitter;
+    startForeground: (
+        agent: any,
+        userPrompt: string,
+        context: { sourceTabId: string; workspacePath?: string; session?: { id: string; initialized: boolean }; forkSession?: boolean },
+        sinks: {
+            onText: (chunk: string) => void;
+            onReasoning?: (chunk: string) => void;
+            onEvent?: (e: { level: 'info'|'warning'|'error'; message: string; ts: number }) => void;
+            onCompleted?: (fullText: string) => void;
+            onFailed?: (error: string) => void;
+            canUseTool: (toolName: string, input: Record<string, unknown>, options: { signal: AbortSignal; suggestions?: PermissionUpdate[] }) => Promise<unknown>;
+        }
+    ) => { cancel: () => void; sessionId: string };
     waitTask: (taskId: string) => Promise<Task>;
     session?: DriverSessionContext;
 }

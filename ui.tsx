@@ -49,7 +49,6 @@ const STATIC_TABS: readonly string[] = [
 ];
 
 const BASE_COMMANDS: readonly { name: string; description: string }[] = [
-    { name: 'task', description: 'Create a background task' },
     { name: 'newsession', description: 'Start a fresh Claude agent session' },
 ];
 
@@ -244,7 +243,7 @@ const App = () => {
     const [agentSessionId, setAgentSessionId] = useState<string | null>(null);
     const [, setWorkspaceSettings] = useState<WorkspaceSettings | null>(null);
     const [isAgentStreaming, setIsAgentStreaming] = useState(false);
-    const { tasks, createTask, waitTask } = useTaskStore();
+    const { tasks, startBackground, waitTask, cancelTask, startForeground } = useTaskStore();
     const [positionalPromptWarning, setPositionalPromptWarning] = useState<string | null>(null);
 
     const automationRanRef = useRef(false);
@@ -322,10 +321,19 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
     }, [setActiveMessages, setFrozenMessages]);
 
     const finalizeMessageById = useCallback((messageId: number) => {
+        const timestamp = new Date().toISOString();
+        addLog(`[FinalizeMsg] ${timestamp} - Starting finalization for message #${messageId}`);
+        
         setActiveMessages(prev => {
             const messageToFinalize = prev.find(msg => msg.id === messageId);
             if (messageToFinalize) {
-                setFrozenMessages(frozen => [...frozen, { ...messageToFinalize, isPending: false }]);
+                addLog(`[FinalizeMsg] ${timestamp} - Found message #${messageId} in active, moving to frozen`);
+                setFrozenMessages(frozen => {
+                    addLog(`[FinalizeMsg] ${timestamp} - Adding message #${messageId} to frozenMessages`);
+                    return [...frozen, { ...messageToFinalize, isPending: false }];
+                });
+            } else {
+                addLog(`[FinalizeMsg] ${timestamp} - Message #${messageId} NOT found in activeMessages`);
             }
             return prev.filter(msg => msg.id !== messageId);
         });
@@ -409,6 +417,9 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
 
         // Update placeholder message
         if (request.placeholderMessageId !== undefined) {
+            const timestamp = new Date().toISOString();
+            addLog(`[Permission] ${timestamp} - Updating placeholder #${request.placeholderMessageId} for request #${id}, decision=${decision.kind}`);
+            
             setActiveMessages(prev => prev.map(msg => {
                 if (msg.id !== request.placeholderMessageId) {
                     return msg;
@@ -429,7 +440,10 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
                     content: resultContent,
                 };
             }));
+            
+            addLog(`[Permission] ${timestamp} - Calling finalizeMessageById for placeholder #${request.placeholderMessageId}`);
             finalizeMessageById(request.placeholderMessageId);
+            addLog(`[Permission] ${timestamp} - Finalized placeholder #${request.placeholderMessageId}`);
         }
 
         if (decision.kind === 'allow') {
@@ -494,6 +508,9 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
             const summary = formatToolInputSummary(input);
 
             const placeholderMessageId = nextMessageId();
+            const timestamp = new Date().toISOString();
+            addLog(`[Permission] ${timestamp} - Creating placeholder #${placeholderMessageId} for request #${requestId}, tool=${toolName}`);
+            
             const placeholderMessage: Types.Message = {
                 id: placeholderMessageId,
                 role: 'system',
@@ -501,6 +518,8 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
                 isPending: true,
             };
             setActiveMessages(prev => {
+                const timestamp = new Date().toISOString();
+                addLog(`[Permission] ${timestamp} - Adding placeholder #${placeholderMessageId} to activeMessages`);
                 const newMessages = [...prev];
                 const lastMessage = newMessages.length > 0 ? newMessages[newMessages.length - 1] : null;
                 if (lastMessage && lastMessage.role === 'assistant') {
@@ -603,7 +622,10 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
     }, [tasks]);
 
     useEffect(() => {
-        if (selectedTab !== Driver.AGENT) return;
+        const driverEntry = getDriverByLabel(selectedTab);
+        const needsSession = selectedTab === Driver.AGENT || (driverEntry?.requiresSession ?? false);
+
+        if (!needsSession) return;
         if (agentSessionId) return;
         const workspacePath = bootstrapConfig?.workspacePath;
         if (!workspacePath) {
@@ -820,7 +842,9 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
             finalizeMessageById,
             canUseTool: handleAgentPermissionRequest,
             workspacePath: bootstrapConfig?.workspacePath,
-            createTask,
+            sourceTabId: selectedTab,
+            startBackground: (agent, userPrompt, ctx) => startBackground(agent, userPrompt, ctx),
+            startForeground: (agent, userPrompt, ctx, sinks) => startForeground(agent, userPrompt, ctx, sinks),
             waitTask,
             session: sessionContext,
         };
@@ -863,7 +887,7 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
             appendSystemMessage(`[${entry.label}] Error: ${message}`, true);
             return false;
         }
-    }, [agentSessionId, appendSystemMessage, bootstrapConfig?.workspacePath, createTask, ensureAgentSession, finalizeMessageById, handleAgentPermissionRequest, runAgentTurn, nextMessageId, setActiveMessages, setFrozenMessages, waitTask]);
+    }, [agentSessionId, appendSystemMessage, bootstrapConfig?.workspacePath, ensureAgentSession, finalizeMessageById, handleAgentPermissionRequest, runAgentTurn, nextMessageId, setActiveMessages, setFrozenMessages, waitTask, startForeground, selectedTab]);
 
     const handleSubmit = useCallback(async (userInput: string): Promise<boolean> => {
         addLog('--- New Submission ---');
@@ -885,16 +909,6 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
         if (slashMatch) {
             const command = slashMatch[1]?.toLowerCase() ?? '';
             const rest = slashMatch[2] ?? '';
-
-            if (command === 'task') {
-                if (!rest) {
-                    addLog('[Command] /task requires a prompt');
-                    return false;
-                }
-                createTask(rest);
-                setInputValue('');
-                return true;
-            }
 
             const driverEntry = getDriverBySlash(command);
             if (driverEntry) {
@@ -954,7 +968,7 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
             }
         }
         return succeeded && !flushFailed;
-    }, [appendSystemMessage, createNewAgentSession, createTask, flushPendingQueue, handleAgentPermissionCommand, isProcessingQueueRef, isStreaming, nextMessageId, pendingUserInputsRef, runAgentTurn, runDriverEntry, runStreamForUserMessage, selectedTab, setInputValue]);
+    }, [appendSystemMessage, createNewAgentSession, flushPendingQueue, handleAgentPermissionCommand, isProcessingQueueRef, isStreaming, nextMessageId, pendingUserInputsRef, runAgentTurn, runDriverEntry, runStreamForUserMessage, selectedTab, setInputValue]);
 
     useEffect(() => { handleSubmitRef.current = handleSubmit; }, [handleSubmit]);
 
@@ -965,9 +979,20 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
         hasProcessedNonInteractiveRef.current = true;
         __nonInteractiveSubmittedOnce = true;
         addLog(`Non-interactive mode: Processing input "${nonInteractiveInput}"`);
+        // Safety: ensure process exits even if provider keeps streaming
+        const safetyTimer = setTimeout(() => {
+            addLog('[NonInteractive] Safety timeout reached, exiting with code 0');
+            try { process.exit(0); } catch {}
+        }, 15000);
         handleSubmit(nonInteractiveInput)
-            .then(success => setTimeout(() => process.exit(success ? 0 : 1), 100))
-            .catch(() => setTimeout(() => process.exit(1), 100));
+            .then(success => {
+                clearTimeout(safetyTimer);
+                setTimeout(() => process.exit(success ? 0 : 1), 100);
+            })
+            .catch(() => {
+                clearTimeout(safetyTimer);
+                setTimeout(() => process.exit(1), 100);
+            });
     }, [handleSubmit, nonInteractiveInput, selectedTab, bootstrapConfig?.driver]);
 
     useEffect(() => {
