@@ -8,14 +8,14 @@ describe('CLI tab entrypoints', () => {
   ];
 
   test.each(cases)('$slug tab bootstraps via CLI flag', async ({ slug, expectation }) => {
-    const { exitCode, stdout } = await runCommand('yarn', ['test:' + slug], {testName: slug});
+    const { exitCode, stdout } = await runCommand('yarn', ['test:' + slug, '--newsession'], {testName: slug});
     expect(exitCode).toBe(0);
     expect(stdout).toMatch(expectation);
   });
 
   test('application bootstraps with a prompt via -p flag', async () => {
     const prompt = 'Hello, world!';
-    const { exitCode, stdout } = await runCommand('yarn', ['start', '--', '-p', prompt], { testName: 'p-flag' });
+    const { exitCode, stdout } = await runCommand('yarn', ['start', '--', '-p', prompt, '--newsession'], { testName: 'p-flag' });
     expect(exitCode).toBe(0);
     expect(stdout).toContain(prompt);
   });
