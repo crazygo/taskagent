@@ -10,7 +10,7 @@ import type { AgentStartContext, AgentStartSinks } from '../runtime/types.js';
  * Returns a simplified agent for UI Review with custom system prompt.
  * Uses loadAgentPipelineConfig for tool configurations.
  */
-export async function createUiReviewAgent() {
+export async function createAgent() {
   const agentDir = path.dirname(fileURLToPath(import.meta.url));
   
   const { systemPrompt: _, allowedTools, disallowedTools } = await loadAgentPipelineConfig(agentDir, {

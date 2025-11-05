@@ -2,6 +2,23 @@ import React from 'react';
 import { Box, Newline, Static, Text, useStdout } from 'ink';
 import * as Types from '../types.js';
 
+/**
+ * Thinking animation component - displays walking dots
+ */
+const ThinkingAnimation: React.FC = () => {
+  const [frame, setFrame] = React.useState(0);
+  const frames = ['Thinking   ', 'Thinking.  ', 'Thinking.. ', 'Thinking...'];
+  
+  React.useEffect(() => {
+    const timer = setInterval(() => {
+      setFrame(f => (f + 1) % frames.length);
+    }, 300);
+    return () => clearInterval(timer);
+  }, []);
+
+  return <Text color="gray" dimColor>{frames[frame]}</Text>;
+};
+
 interface MessageProps {
   message: Types.Message;
 }
@@ -23,6 +40,11 @@ const MessageComponent: React.FC<MessageProps> = ({ message }) => {
     ? (message.content ?? '').replace(/^\s+/, '').replace(/\s+$/, '')
     : (message.content ?? '').replace(/\s+$/, '');
   const contentLines = normalizedContent.split(/\r?\n/);
+
+  // Skip rendering empty assistant placeholders
+  if (message.role === 'assistant' && normalizedContent.length === 0 && reasoningLines.length === 0) {
+    return null;
+  }
 
   if (message.role === 'user') {
     const renderLine = (line: string, index: number) => {
@@ -88,7 +110,7 @@ const MessageComponent: React.FC<MessageProps> = ({ message }) => {
     prefix = '✦ ';
     textColor = undefined;
   } else if (message.role === 'system') {
-    prefix = '[i] ';
+    prefix = 'i ';
     textColor = 'yellow';
     if (message.isBoxed) {
       boxProps.borderStyle = 'round';
@@ -98,7 +120,7 @@ const MessageComponent: React.FC<MessageProps> = ({ message }) => {
   }
 
   return (
-    <Box {...boxProps} flexDirection="column" paddingY={1}>
+    <Box {...boxProps} flexDirection="column" paddingTop={1} paddingBottom={0}>
       {reasoningLines.length > 0 && (
         <Text color="gray" italic>{'✦ Thoughts:'}</Text>
       )}
@@ -169,13 +191,14 @@ const WelcomeScreen = React.memo<WelcomeScreenProps>(({ modelName, workspacePath
 interface ChatPanelProps {
   frozenMessages: Types.Message[];
   activeMessages: Types.Message[];
+  queuedPrompts: Array<{ id: number; prompt: string }>;
   modelName: string;
   workspacePath?: string | null;
   positionalPromptWarning?: string | null;
   sessionLabel?: string | null;
 }
 
-export const ChatPanel: React.FC<ChatPanelProps> = ({ frozenMessages, activeMessages, modelName, workspacePath, positionalPromptWarning, sessionLabel }) => {
+export const ChatPanel: React.FC<ChatPanelProps> = ({ frozenMessages, activeMessages, queuedPrompts, modelName, workspacePath, positionalPromptWarning, sessionLabel }) => {
   const staticItems = [
     <Box key="welcome-screen-wrapper" flexDirection="column">
       <WelcomeScreen modelName={modelName} workspacePath={workspacePath} sessionLabel={sessionLabel} />
@@ -199,7 +222,31 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ frozenMessages, activeMess
       <Static items={staticItems}>
         {item => item}
       </Static>
-      <ActiveHistory messages={activeMessages} />
+      {(activeMessages.length > 0 || queuedPrompts.length > 0) && (
+        <Box borderStyle="round" borderColor="cyan" paddingX={1} flexDirection="column">
+          {/* 1. Thinking animation - show when AI is responding */}
+          {activeMessages.length > 0 && (
+            <Box marginBottom={1}>
+              <ThinkingAnimation />
+            </Box>
+          )}
+          
+          {/* 2. Current streaming messages */}
+          <ActiveHistory messages={activeMessages} />
+          
+          {/* 3. Queued prompts list */}
+          {queuedPrompts.length > 0 && (
+            <Box flexDirection="column" marginTop={1}>
+              <Text color="gray" dimColor>Queued:</Text>
+              {queuedPrompts.map((item) => (
+                <Text key={item.id} color="gray" dimColor>
+                  - {item.prompt.substring(0, 60)}{item.prompt.length > 60 ? '...' : ''} (queued)
+                </Text>
+              ))}
+            </Box>
+          )}
+        </Box>
+      )}
     </>
   );
 };

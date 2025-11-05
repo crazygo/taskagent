@@ -5,17 +5,16 @@
  */
 
 // Story Agent
-export { createStoryPromptAgent } from './story/agent.js';
+export { createAgent as createStoryAgent } from './story/index.js';
 
 // Glossary Agent
-export { createGlossaryPromptAgent } from './glossary/agent.js';
+export { createAgent as createGlossaryAgent } from './glossary/index.js';
 
 // UI Review Agent
-export { createUiReviewAgent } from './ui-review/index.js';
+export { createAgent as createUiReviewAgent } from './ui-review/index.js';
 
 // Log Monitor Agent
-export { createLogMonitor } from './monitor/index.js';
+export { createAgent as createMonitorAgent } from './monitor/index.js';
 
 // Agent types for external consumers
 export type { AgentStartContext, AgentStartSinks, RunnableAgent } from './runtime/types.js';
-

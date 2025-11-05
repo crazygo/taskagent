@@ -384,7 +384,7 @@ const App = () => {
     const messageStore = useMemo(() => new MessageStore(), []);
     const tabExecManager = useMemo(() => new TabExecutionManager(), []);
     const tabExecutor = useMemo(() => new TabExecutor(tabExecManager, globalAgentRegistry, eventBus), [tabExecManager, eventBus]);
-    const { registerConversation, getQueueLength } = useAgentEventBridge(eventBus, messageStore);
+    const { registerConversation, getQueueLength, getQueuedPrompts } = useAgentEventBridge(eventBus, messageStore);
     const [inputValue, setInputValue] = useState('');
     const [selectedTab, setSelectedTab] = useState<string>(Driver.CHAT);
     const { frozen: frozenMessages, active: activeMessages } = useMessageStoreTab(messageStore, selectedTab);
@@ -439,6 +439,42 @@ const App = () => {
     useEffect(() => {
         isStreamingRef.current = isStreaming;
     }, [isStreaming]);
+
+    // Track stream lifecycle via events to ensure non-interactive waits do not exit early
+    useEffect(() => {
+        const onCompleted = () => { isStreamingRef.current = false; maybeExitNonInteractive(); };
+        const onFailed = () => { isStreamingRef.current = false; maybeExitNonInteractive(true); };
+        // Mark streaming as true on first incoming text chunk, just in case
+        const onText = () => { isStreamingRef.current = true; };
+        try {
+            eventBus.on('agent:completed', onCompleted);
+            eventBus.on('agent:failed', onFailed);
+            eventBus.on('agent:text', onText);
+        } catch {}
+        return () => {
+            try {
+                eventBus.off('agent:completed', onCompleted);
+                eventBus.off('agent:failed', onFailed);
+                eventBus.off('agent:text', onText);
+            } catch {}
+        };
+    }, [eventBus]);
+
+    // Attempt to exit promptly in non-interactive mode once streams complete
+    const maybeExitNonInteractive = useCallback((failed = false) => {
+        const promptArg = bootstrapConfig?.prompt;
+        if (!promptArg) return; // interactive mode
+        // Defer a tick to allow queue/message mutations to settle
+        setTimeout(() => {
+            const tabId = selectedTabRef.current;
+            const noActive = messageStore.getPartitionedMessages(tabId).active.length === 0;
+            const noQueue = getQueueLength(tabId) === 0;
+            if (noActive && noQueue) {
+                addLog(`[NonInteractive] ${failed ? 'Failed' : 'Completed'} — exiting now`);
+                try { process.exit(failed ? 1 : 0); } catch {}
+            }
+        }, 150);
+    }, [bootstrapConfig?.prompt, getQueueLength, messageStore]);
 
     const prevTasksLengthRef = useRef(tasks.length);
     const agentWorkspaceStatusRef = useRef<{ missingNotified: boolean; errorNotified: boolean }>({
@@ -507,10 +543,11 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
         const start = Date.now();
         const sleep = (ms = 0) => new Promise<void>(resolve => setTimeout(resolve, Math.max(0, ms)));
         while (!isCancelled?.()) {
-            const conversationIdle = !isStreamingRef.current && !isProcessingQueueRef.current;
             const currentTabId = selectedTabRef.current;
-            const agentIdle = tabExecutor.isIdle(currentTabId) && tabExecManager.getQueueLength(currentTabId) === 0;
-            if (conversationIdle && agentIdle) {
+            const conversationQueueIdle = getQueueLength(currentTabId) === 0;
+            const hasPendingMessages = messageStore.getPartitionedMessages(currentTabId).active.length > 0;
+            // Consider idle when no active pending messages and no queued conversations
+            if (!hasPendingMessages && conversationQueueIdle) {
                 return true;
             }
             if (Date.now() - start > limit) {
@@ -520,7 +557,7 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
             await sleep(100);
         }
         return false;
-    }, [addLog, tabExecManager]);
+    }, [addLog, tabExecManager, getQueueLength, messageStore]);
 
     useEffect(() => {
         if (!bootstrapConfig.ignoredPositionalPrompt) {
@@ -933,7 +970,7 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
         };
         messageStore.appendMessage(tabId, assistantPlaceholder);
 
-        const queueIndex = registerConversation(tabId, userMessageId, assistantMessageId);
+        const queueIndex = registerConversation(tabId, userMessageId, assistantMessageId, prompt);
         if (queueIndex > 0) {
             messageStore.mutateMessage(tabId, userMessageId, msg => ({ ...msg, queueState: 'queued' }));
         }
@@ -1374,6 +1411,7 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
             <ChatPanel
                 frozenMessages={frozenMessages}
                 activeMessages={activeMessages}
+                queuedPrompts={getQueuedPrompts(selectedTab)}
                 modelName={modelName}
                 workspacePath={bootstrapConfig.workspacePath}
                 positionalPromptWarning={positionalPromptWarning}

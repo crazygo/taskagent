@@ -10,6 +10,7 @@ type ConversationStatus = 'queued' | 'active';
 interface ConversationEntry {
   userMessageId: number;
   assistantMessageId: number;
+  userPrompt: string;
   status: ConversationStatus;
 }
 
@@ -20,9 +21,11 @@ export interface AgentConversationRegistry {
   registerConversation: (
     tabId: string,
     userMessageId: number,
-    assistantMessageId: number
+    assistantMessageId: number,
+    userPrompt: string
   ) => number;
   getQueueLength: (tabId: string) => number;
+  getQueuedPrompts: (tabId: string) => Array<{ id: number; prompt: string }>;
 }
 
 export function useAgentEventBridge(eventBus: EventBus, messageStore: MessageStore): AgentConversationRegistry {
@@ -232,8 +235,8 @@ export function useAgentEventBridge(eventBus: EventBus, messageStore: MessageSto
     const handleCompleted = (event: AgentEvent) => {
       addLog(`[AgentBridge] handleCompleted called for tab ${event.tabId}, timestamp=${event.timestamp}`);
       finalizeConversation(event.tabId);
-      const ts = new Date((event as any).timestamp ?? Date.now()).toISOString();
-      appendSystemMessage(event.tabId, `◼︎ ${ts}`);
+      // const ts = new Date((event as any).timestamp ?? Date.now()).toISOString();
+      // appendSystemMessage(event.tabId, `◼︎ ${ts}`);
     };
 
     const handleFailed = (event: AgentEvent) => {
@@ -266,11 +269,13 @@ export function useAgentEventBridge(eventBus: EventBus, messageStore: MessageSto
     tabId: string,
     userMessageId: number,
     assistantMessageId: number,
+    userPrompt: string
   ): number => {
     const queue = conversationQueuesRef.current.get(tabId) ?? [];
     const entry: ConversationEntry = {
       userMessageId,
       assistantMessageId,
+      userPrompt,
       status: queue.length === 0 ? 'active' : 'queued',
     };
 
@@ -293,8 +298,22 @@ export function useAgentEventBridge(eventBus: EventBus, messageStore: MessageSto
     return queue ? queue.length : 0;
   }, []);
 
+  const getQueuedPrompts = useCallback((tabId: string): Array<{ id: number; prompt: string }> => {
+    const queue = conversationQueuesRef.current.get(tabId);
+    if (!queue) return [];
+    
+    // Filter out the active item (first in queue), return only queued items
+    return queue
+      .filter(entry => entry.status === 'queued')
+      .map(entry => ({
+        id: entry.assistantMessageId,
+        prompt: entry.userPrompt,
+      }));
+  }, []);
+
   return {
     registerConversation,
     getQueueLength,
+    getQueuedPrompts,
   };
 }
