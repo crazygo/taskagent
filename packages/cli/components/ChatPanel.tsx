@@ -226,7 +226,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ frozenMessages, activeMess
         <Box borderStyle="round" borderColor="cyan" paddingX={1} flexDirection="column">
           {/* 1. Thinking animation - show when AI is responding */}
           {activeMessages.length > 0 && (
-            <Box marginBottom={1}>
+            <Box marginBottom={0}>
               <ThinkingAnimation />
             </Box>
           )}
@@ -239,7 +239,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ frozenMessages, activeMess
             <Box flexDirection="column" marginTop={1}>
               <Text color="gray" dimColor>Queued:</Text>
               {queuedPrompts.map((item) => (
-                <Text key={item.id} color="gray" dimColor>
+                <Text key={item.id} dimColor>
                   - {item.prompt.substring(0, 60)}{item.prompt.length > 60 ? '...' : ''} (queued)
                 </Text>
               ))}

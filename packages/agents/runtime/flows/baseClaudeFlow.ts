@@ -1,6 +1,8 @@
 import type { Dispatch, SetStateAction } from 'react';
-
 import type { AgentDefinition, PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
+
+import { EventBus } from '@taskagent/core/event-bus';
+import type { AgentEvent, AgentTextPayload, AgentReasoningPayload, AgentEventPayload } from '@taskagent/core/types/AgentEvent.js';
 
 import type * as Types from '../../types.js';
 import { runClaudeStream, type ToolResultEvent, type ToolUseEvent } from '../runClaudeStream.js';
@@ -37,61 +39,89 @@ export const createBaseClaudeFlow = ({
     canUseTool,
     workspacePath,
 }: BaseClaudeFlowDependencies): BaseClaudeFlow => {
+    // NEW: Internal EventBus to decouple logic while maintaining the external signature.
+    const localEventBus = new EventBus();
+
+    // NEW: Bridge from internal events to the external (legacy) UI state setters.
+    // This is the key to satisfying the "don't change externals" constraint.
+    localEventBus.on('agent:text', (event) => {
+        const payload = event.payload as AgentTextPayload;
+        if (!payload.chunk) return;
+
+        const textMessageId = nextMessageId();
+        setActiveMessages(prev => [
+            ...prev,
+            {
+                id: textMessageId,
+                role: 'assistant',
+                content: payload.chunk,
+                reasoning: '',
+            },
+        ]);
+        finalizeMessageById(textMessageId);
+    });
+
+    localEventBus.on('agent:reasoning', (event) => {
+        const payload = event.payload as AgentReasoningPayload;
+        if (!payload.reasoning) return;
+
+        const reasoningMessageId = nextMessageId();
+        setActiveMessages(prev => [
+            ...prev,
+            {
+                id: reasoningMessageId,
+                role: 'assistant',
+                content: '',
+                reasoning: payload.reasoning,
+            },
+        ]);
+        finalizeMessageById(reasoningMessageId);
+    });
+
+    localEventBus.on('agent:event', (event) => {
+        const payload = event.payload as AgentEventPayload;
+        if (!payload.message) return;
+
+        const toolMessageId = nextMessageId();
+        setActiveMessages(prev => [
+            ...prev,
+            { id: toolMessageId, role: 'system', content: payload.message },
+        ]);
+        finalizeMessageById(toolMessageId);
+    });
+
+
     const handleUserInput = async ({ prompt, agentSessionId, sessionInitialized, systemPrompt, allowedTools, disallowedTools, permissionMode, agents }: BaseClaudeFlowRunArgs): Promise<boolean> => {
+        
+        const emitEvent = (type: AgentEvent['type'], payload: unknown) => {
+            localEventBus.emit({
+                type,
+                agentId: 'base-claude-flow', // Hardcoded for this context
+                tabId: 'unknown', // This flow doesn't have tab context, a limitation of this legacy component
+                timestamp: Date.now(),
+                payload,
+                version: '1.0',
+            });
+        };
+
+        // REFACTORED: Callbacks now emit events instead of directly setting state.
         const emitAssistantText = (text: string) => {
-            if (!text) {
-                return;
-            }
-            const textMessageId = nextMessageId();
-            setActiveMessages(prev => [
-                ...prev,
-                {
-                    id: textMessageId,
-                    role: 'assistant',
-                    content: text,
-                    reasoning: '',
-                },
-            ]);
-            finalizeMessageById(textMessageId);
+            emitEvent('agent:text', { chunk: text } as AgentTextPayload);
         };
 
         const emitAssistantReasoning = (text: string) => {
-            if (!text) {
-                return;
-            }
-            const reasoningMessageId = nextMessageId();
-            setActiveMessages(prev => [
-                ...prev,
-                {
-                    id: reasoningMessageId,
-                    role: 'assistant',
-                    content: '',
-                    reasoning: text,
-                },
-            ]);
-            finalizeMessageById(reasoningMessageId);
+            emitEvent('agent:reasoning', { reasoning: text } as AgentReasoningPayload);
         };
 
         const emitToolUse = ({ id, name, description }: ToolUseEvent) => {
             const base = `event: tool_use, id=${id}, name=${name}`;
-            const line = description
-                ? `${base}, description: ${description}`
-                : base;
-            const toolUseMessageId = nextMessageId();
-            setActiveMessages(prev => [
-                ...prev,
-                { id: toolUseMessageId, role: 'system', content: line },
-            ]);
-            finalizeMessageById(toolUseMessageId);
+            const line = description ? `${base}, description: ${description}` : base;
+            emitEvent('agent:event', { level: 'info', message: line } as AgentEventPayload);
         };
 
         const emitToolResult = ({ id, name }: ToolResultEvent) => {
-            const toolResultMessageId = nextMessageId();
-            setActiveMessages(prev => [
-                ...prev,
-                { id: toolResultMessageId, role: 'system', content: `event: tool_result, tool_use_id: ${id}, name=${name}` },
-            ]);
-            finalizeMessageById(toolResultMessageId);
+            const line = `event: tool_result, tool_use_id: ${id}, name=${name}`;
+            emitEvent('agent:event', { level: 'info', message: line } as AgentEventPayload);
         };
 
         await runClaudeStream({

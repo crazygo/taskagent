@@ -1264,6 +1264,9 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
                 }
             }
         }
+        if (bootstrapConfig?.prompt) {
+            setTimeout(() => maybeExitNonInteractive(!succeeded || flushFailed), 0);
+        }
         return succeeded && !flushFailed;
     }, [appendSystemMessage, createNewAgentSession, enqueueUserInput, flushPendingQueue, handleAgentPermissionCommand, isProcessingQueueRef, isStreaming, messageStore, nextMessageId, runAgentTurn, runDriverEntry, runStreamForUserMessage, selectedTab, setInputValue]);
 
