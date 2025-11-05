@@ -1,10 +1,14 @@
 import crypto from 'crypto';
 import { EventEmitter } from 'events';
-import { type PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
 import { getTaskLogger } from './task-logger.js';
 import { addLog } from './logger.js';
-import type { PromptAgent } from '@taskagent/agents/runtime/types.js';
-import type { TaskEvent } from '@taskagent/core/types/TaskEvent.js';
+type PromptAgent = {
+  id: string;
+  description: string;
+  getPrompt: (userInput: string, ctx: { sourceTabId: string; workspacePath?: string }) => string;
+  start?: (userInput: string, ctx: any, sinks: any) => { cancel: () => void; sessionId: string; completion: Promise<boolean> };
+};
+import type { TaskEvent } from './types.js';
 
 export interface Task {
   id: string;
@@ -39,7 +43,7 @@ export type ForegroundSinks = {
   onEvent?: (e: TaskEvent) => void;
   onCompleted?: (fullText: string) => void;
   onFailed?: (error: string) => void;
-  canUseTool: (toolName: string, input: Record<string, unknown>, options: { signal: AbortSignal; suggestions?: PermissionUpdate[] }) => Promise<unknown>;
+  canUseTool: (toolName: string, input: Record<string, unknown>, options: { signal: AbortSignal; suggestions?: any[] }) => Promise<unknown>;
 };
 
 export interface ForegroundHandle {

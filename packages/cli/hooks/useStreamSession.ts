@@ -7,6 +7,16 @@ import type { MessageStore } from '../store/MessageStore.js';
 
 const STREAM_TOKEN_TIMEOUT_MS = 30_000;
 
+interface StreamPlaceholders {
+  userId: number;
+  assistantId: number;
+}
+
+export interface RunStreamOptions {
+  placeholders?: StreamPlaceholders;
+  tabId?: string;
+}
+
 interface UseStreamSessionProps {
   aiProvider: AiChatProvider;
   modelName: string;
@@ -103,16 +113,6 @@ export const useStreamSession = ({
     }
     return '';
   };
-
-  interface StreamPlaceholders {
-    userId: number;
-    assistantId: number;
-  }
-
-  interface RunStreamOptions {
-    placeholders?: StreamPlaceholders;
-    tabId?: string;
-  }
 
   const runStreamForUserMessage = async (userMessage: Message, options?: RunStreamOptions): Promise<void> => {
     let streamError: Error | null = null;

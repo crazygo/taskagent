@@ -1,15 +1,17 @@
-import type { Dispatch, SetStateAction } from 'react';
 import type { AgentDefinition, PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
 
 import { EventBus } from '@taskagent/core/event-bus';
 import type { AgentEvent, AgentTextPayload, AgentReasoningPayload, AgentEventPayload } from '@taskagent/core/types/AgentEvent.js';
+import type { Message } from '@taskagent/core/types/Message.js';
 
-import type * as Types from '../../types.js';
 import { runClaudeStream, type ToolResultEvent, type ToolUseEvent } from '../runClaudeStream.js';
+
+// Minimal React-less state setter type
+type SetState<T> = (value: T | ((prev: T) => T)) => void;
 
 export interface BaseClaudeFlowDependencies {
     nextMessageId: () => number;
-    setActiveMessages: Dispatch<SetStateAction<Types.Message[]>>;
+    setActiveMessages: SetState<any>;
     finalizeMessageById: (messageId: number) => void;
     canUseTool: (toolName: string, input: Record<string, unknown>, options: { signal: AbortSignal; suggestions?: PermissionUpdate[] }) => Promise<unknown>;
     workspacePath?: string;
@@ -49,7 +51,7 @@ export const createBaseClaudeFlow = ({
         if (!payload.chunk) return;
 
         const textMessageId = nextMessageId();
-        setActiveMessages(prev => [
+        setActiveMessages(((prev: any[]) => [
             ...prev,
             {
                 id: textMessageId,
@@ -57,7 +59,7 @@ export const createBaseClaudeFlow = ({
                 content: payload.chunk,
                 reasoning: '',
             },
-        ]);
+        ]) as any);
         finalizeMessageById(textMessageId);
     });
 
@@ -66,7 +68,7 @@ export const createBaseClaudeFlow = ({
         if (!payload.reasoning) return;
 
         const reasoningMessageId = nextMessageId();
-        setActiveMessages(prev => [
+        setActiveMessages(((prev: any[]) => [
             ...prev,
             {
                 id: reasoningMessageId,
@@ -74,7 +76,7 @@ export const createBaseClaudeFlow = ({
                 content: '',
                 reasoning: payload.reasoning,
             },
-        ]);
+        ]) as any);
         finalizeMessageById(reasoningMessageId);
     });
 
@@ -83,10 +85,10 @@ export const createBaseClaudeFlow = ({
         if (!payload.message) return;
 
         const toolMessageId = nextMessageId();
-        setActiveMessages(prev => [
+        setActiveMessages(((prev: any[]) => [
             ...prev,
             { id: toolMessageId, role: 'system', content: payload.message },
-        ]);
+        ]) as any);
         finalizeMessageById(toolMessageId);
     });
 

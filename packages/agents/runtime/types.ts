@@ -1,5 +1,6 @@
 import type { AgentDefinition } from '@anthropic-ai/claude-agent-sdk';
-import type { Message, TaskEvent } from '../types.js';
+import type { Message } from '@taskagent/core/types/Message.js';
+import type { TaskEvent } from '@taskagent/core/types/TaskEvent.js';
 import type { PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
 
 /**
@@ -107,6 +108,8 @@ export interface RunnableAgent {
  * DefaultAtomicAgent - Pass-through agent for direct SDK query
  * Used by Chat and Agent tabs to maintain existing behavior
  */
+import { buildPromptAgentStart } from './runPromptAgentStart.js';
+
 export class DefaultAtomicAgent implements RunnableAgent {
     readonly id = 'default';
     readonly description = 'Direct query without agent wrapper';
@@ -123,9 +126,8 @@ export class DefaultAtomicAgent implements RunnableAgent {
         return undefined;
     }
 
-    async start(userInput: string, context: AgentStartContext, sinks: AgentStartSinks): Promise<ExecutionHandle> {
+    start(userInput: string, context: AgentStartContext, sinks: AgentStartSinks): ExecutionHandle {
         // Use the shared builder for standard prompt agent behavior
-        const { buildPromptAgentStart } = await import('./runPromptAgentStart.js');
         const starter = buildPromptAgentStart({
             getPrompt: (input: string) => input,
             getSystemPrompt: () => ({ type: 'preset', preset: 'claude_code' } as const),

@@ -43,7 +43,7 @@ export function getPreset(name: string): PresetConfig | undefined {
  */
 export function getPresetOrDefault(name: string = 'default'): PresetConfig {
     const preset = PRESETS[name];
-    return preset ?? PRESETS.default;
+    return (preset ?? PRESETS.default)!;
 }
 
 /**

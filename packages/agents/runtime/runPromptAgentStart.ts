@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { inspect } from 'util';
 import { addLog } from '@taskagent/shared/logger';
 import { runClaudeStream } from './runClaudeStream.js';
 import type { AgentDefinition } from '@anthropic-ai/claude-agent-sdk';

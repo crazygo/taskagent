@@ -208,11 +208,15 @@ class LogMonitor extends PromptAgent {
             }
         };
 
-        void run();
+        let resolveCompletion: (v: boolean) => void;
+        const completion = new Promise<boolean>(res => { resolveCompletion = res; });
+
+        void run().then(() => { try { resolveCompletion(true); } catch {} });
 
         return {
-            cancel: () => controller.abort(),
+            cancel: () => { try { controller.abort(); } finally { try { resolveCompletion(true); } catch {} } },
             sessionId,
+            completion,
         };
     }
 
@@ -241,6 +245,6 @@ class LogMonitor extends PromptAgent {
     }
 }
 
-export function createAgent() {
+export async function createAgent() {
     return new LogMonitor('debug.log', 100, 30);
 }

@@ -71,9 +71,11 @@ export const useConversationStore = ({
     });
   }, [flushQueuedInputs, runStreamForUserMessage]);
 
+  const runStreamForUserMessagePublic = runStreamForUserMessage as unknown as (message: Message, options?: any) => Promise<void>;
+
   return {
     isStreaming,
-    runStreamForUserMessage,
+    runStreamForUserMessage: runStreamForUserMessagePublic,
     enqueueUserInput,
     isProcessingQueueRef,
     flushPendingQueue,
