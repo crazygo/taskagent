@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { TaskManager, type Task, type TaskWithEmitter, type ForegroundSinks, type ForegroundHandle } from '@taskagent/shared/task-manager';
+import { TaskManager, type Task, type TaskWithEmitter } from '@taskagent/shared/task-manager';
 import type { PromptAgent } from '@taskagent/agents/runtime/types.js';
 
 interface UseTaskStoreOptions {
@@ -45,19 +45,10 @@ export const useTaskStore = ({ pollIntervalMs = 1000 }: UseTaskStoreOptions = {}
 
   const waitTask = (taskId: string) => taskManager.waitTask(taskId);
   const cancelTask = (taskId: string) => taskManager.cancelTask(taskId);
-  const startForeground = (
-    agent: PromptAgent,
-    userPrompt: string,
-    context: { sourceTabId: string; workspacePath?: string; session?: { id: string; initialized: boolean }; forkSession?: boolean },
-    sinks: ForegroundSinks,
-  ): ForegroundHandle => {
-    return taskManager.startForeground(agent, userPrompt, context, sinks);
-  };
 
   return {
     tasks,
     startBackground,
-    startForeground,
     waitTask,
     cancelTask,
   };

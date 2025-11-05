@@ -10,7 +10,11 @@ const MessageComponent: React.FC<MessageProps> = ({ message }) => {
   const { stdout } = useStdout();
   const fullWidth = Math.max(1, stdout?.columns ?? 80);
 
-  const pendingSuffix = message.isPending ? ' (queued)' : '';
+  const pendingSuffix = message.queueState === 'queued'
+    ? ' (queued)'
+    : message.isPending
+      ? ' (pending)'
+      : '';
   const allReasoningLines = (message.reasoning ?? '')
     .split(/\r?\n/)
     .filter(line => line.length > 0);

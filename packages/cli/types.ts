@@ -14,6 +14,7 @@ export interface Message {
     toolId?: string;            // Tool call ID for tracking
     toolDescription?: string;   // Human-readable description of the tool action
     durationMs?: number;        // Execution time (for tool_result)
+    queueState?: 'queued' | 'active' | 'completed';
 }
 
 export type LogMessage = {

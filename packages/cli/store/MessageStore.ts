@@ -8,6 +8,7 @@
  * - Efficient message retrieval for current tab
  */
 
+import { EventEmitter } from 'node:events';
 import type { Message } from '../types.js';
 
 export interface MessageStoreConfig {
@@ -21,6 +22,7 @@ export interface MessageStoreConfig {
 interface TabMessages {
   messages: Message[];
   lastActive: number;
+  version: number;
 }
 
 const SEPARATOR_MESSAGE: Omit<Message, 'id'> = {
@@ -29,11 +31,29 @@ const SEPARATOR_MESSAGE: Omit<Message, 'id'> = {
   isBoxed: false,
 };
 
+type MessagePartition = 'active' | 'frozen';
+
+const normalizeActive = (message: Message): Message => ({
+  ...message,
+  isPending: message.isPending ?? true,
+  queueState: message.queueState ?? (message.isPending === false ? 'completed' : 'active'),
+});
+
+const normalizeFrozen = (message: Message): Message => ({
+  ...message,
+  isPending: false,
+  queueState: message.queueState ?? 'completed',
+});
+
 export class MessageStore {
   private tabMessages: Map<string, TabMessages> = new Map();
   private currentTabId: string = 'Chat';
   private nextMessageId: number = 1;
   private config: Required<MessageStoreConfig>;
+  private emitter = new EventEmitter();
+  private batchDepth = 0;
+  private pendingChange = false;
+  private partitionCache = new Map<string, { version: number; value: { frozen: Message[]; active: Message[] } }>();
 
   constructor(config: MessageStoreConfig = {}) {
     this.config = {
@@ -64,6 +84,7 @@ export class MessageStore {
     const tabData = this.getOrCreateTab(tabId);
     tabData.lastActive = Date.now();
 
+    tabData.version += 1;
     // Add separator to new tab if it has messages
     if (tabData.messages.length > 0) {
       this.appendMessage(tabId, {
@@ -71,6 +92,8 @@ export class MessageStore {
         id: this.nextMessageId++,
       });
     }
+
+    this.markDirty();
 
     // Trim invisible tab messages (previous tab is now invisible)
     this.trimInvisibleTab(previousTabId);
@@ -83,6 +106,10 @@ export class MessageStore {
     const tabData = this.getOrCreateTab(tabId);
     tabData.messages.push(message);
     tabData.lastActive = Date.now();
+    tabData.version += 1;
+    this.partitionCache.delete(tabId);
+
+    this.markDirty();
 
     // If this is not the current tab, trim immediately
     if (tabId !== this.currentTabId) {
@@ -97,6 +124,10 @@ export class MessageStore {
     const tabData = this.getOrCreateTab(tabId);
     tabData.messages.push(...messages);
     tabData.lastActive = Date.now();
+    tabData.version += 1;
+    this.partitionCache.delete(tabId);
+
+    this.markDirty();
 
     if (tabId !== this.currentTabId) {
       this.trimInvisibleTab(tabId);
@@ -131,6 +162,8 @@ export class MessageStore {
    */
   clearTab(tabId: string): void {
     this.tabMessages.delete(tabId);
+    this.partitionCache.delete(tabId);
+    this.markDirty();
   }
 
   /**
@@ -139,6 +172,8 @@ export class MessageStore {
   clearAll(): void {
     this.tabMessages.clear();
     this.nextMessageId = 1;
+    this.partitionCache.clear();
+    this.markDirty();
   }
 
   /**
@@ -164,6 +199,55 @@ export class MessageStore {
   }
 
   /**
+   * Mutate a message within a tab by cloning and applying the provided mutator.
+   * No-op if the message cannot be found.
+   */
+  mutateMessage(tabId: string, messageId: number, mutator: (message: Message) => Message): void {
+    const tabData = this.tabMessages.get(tabId);
+    if (!tabData) return;
+
+    const index = tabData.messages.findIndex(msg => msg.id === messageId);
+    if (index === -1) return;
+
+    const current = tabData.messages[index]!;
+    const updated = mutator({ ...current });
+    tabData.messages[index] = updated;
+    tabData.version += 1;
+    this.partitionCache.delete(tabId);
+    this.markDirty();
+  }
+
+  /**
+   * Remove a message by ID from a tab.
+   */
+  removeMessage(tabId: string, messageId: number): void {
+    const tabData = this.tabMessages.get(tabId);
+    if (!tabData) return;
+
+    const index = tabData.messages.findIndex(msg => msg.id === messageId);
+    if (index === -1) return;
+
+    tabData.messages.splice(index, 1);
+    tabData.version += 1;
+    this.partitionCache.delete(tabId);
+    this.markDirty();
+  }
+
+  /**
+   * Subscribe to message store changes.
+   * Returns an unsubscribe callback.
+   */
+  subscribe(listener: () => void): () => void {
+    this.emitter.on('change', listener);
+    return () => {
+      this.emitter.off('change', listener);
+    };
+  }
+
+  /**
+   * Partition messages for a tab into frozen (completed) and active (pending) lists.
+   */
+  /**
    * Get or create tab data structure
    */
   private getOrCreateTab(tabId: string): TabMessages {
@@ -172,6 +256,7 @@ export class MessageStore {
       tabData = {
         messages: [],
         lastActive: Date.now(),
+        version: 0,
       };
       this.tabMessages.set(tabId, tabData);
     }
@@ -195,7 +280,87 @@ export class MessageStore {
     if (tabData.messages.length > limit) {
       // Keep only the most recent messages
       tabData.messages = tabData.messages.slice(-limit);
+      tabData.version += 1;
+      this.partitionCache.delete(tabId);
+      this.markDirty();
     }
   }
-}
 
+  private markDirty(): void {
+    if (this.batchDepth > 0) {
+      this.pendingChange = true;
+    } else {
+      this.emitter.emit('change');
+    }
+  }
+
+  batchUpdate(fn: () => void): void {
+    this.batchDepth++;
+    try {
+      fn();
+    } finally {
+      this.batchDepth--;
+      if (this.batchDepth === 0 && this.pendingChange) {
+        this.pendingChange = false;
+        this.emitter.emit('change');
+      }
+    }
+  }
+
+  getPartitionedMessages(tabId: string): { frozen: Message[]; active: Message[] } {
+    const tabData = this.getOrCreateTab(tabId);
+
+    const cached = this.partitionCache.get(tabId);
+    if (cached && cached.version === tabData.version) {
+      return cached.value;
+    }
+
+    const value = this.partitionMessages(tabData.messages);
+    this.partitionCache.set(tabId, { version: tabData.version, value });
+    return value;
+  }
+
+  updateActiveMessages(tabId: string, updater: (prev: Message[]) => Message[]): void {
+    this.updatePartition(tabId, 'active', updater);
+  }
+
+  updateFrozenMessages(tabId: string, updater: (prev: Message[]) => Message[]): void {
+    this.updatePartition(tabId, 'frozen', updater);
+  }
+
+  private partitionMessages(messages: Message[]): { frozen: Message[]; active: Message[] } {
+    const frozen: Message[] = [];
+    const active: Message[] = [];
+
+    for (const message of messages) {
+      if (message.isPending) {
+        active.push(message);
+      } else {
+        frozen.push(message);
+      }
+    }
+
+    return { frozen, active };
+  }
+
+  private updatePartition(tabId: string, partition: MessagePartition, updater: (prev: Message[]) => Message[]): void {
+    const tabData = this.getOrCreateTab(tabId);
+    const { frozen, active } = this.partitionMessages(tabData.messages);
+    const current = partition === 'active' ? active : frozen;
+    const next = updater([...current]);
+
+    let newMessages: Message[];
+    if (partition === 'active') {
+      const normalized = next.map(normalizeActive);
+      newMessages = [...frozen, ...normalized];
+    } else {
+      const normalized = next.map(normalizeFrozen);
+      newMessages = [...normalized, ...active];
+    }
+
+    tabData.messages = newMessages;
+    tabData.version += 1;
+    this.partitionCache.delete(tabId);
+    this.markDirty();
+  }
+}

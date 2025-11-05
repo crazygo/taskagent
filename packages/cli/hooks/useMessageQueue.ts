@@ -1,57 +1,87 @@
-import { useRef } from 'react';
+import { useCallback, useRef } from 'react';
 import { addLog } from '@taskagent/shared/logger';
 import type { Message } from '../types.js';
 
-interface UseMessageQueueProps {
-  runStreamForUserMessage: (message: Message) => Promise<void>;
-  setActiveMessages: React.Dispatch<React.SetStateAction<Message[]>>;
-  nextMessageId: () => number;
+export interface QueuedUserInput {
+  tabId: string;
+  message: Message;
+  userPlaceholderId: number;
+  assistantPlaceholderId: number;
 }
 
-export const useMessageQueue = ({ runStreamForUserMessage, setActiveMessages, nextMessageId }: UseMessageQueueProps) => {
-  const pendingUserInputsRef = useRef<Message[]>([]);
-  const isProcessingQueueRef = useRef(false);
+export interface MessageQueueController {
+  enqueue(entry: QueuedUserInput): void;
+  flush(processEntry: (entry: QueuedUserInput) => Promise<void>): Promise<void>;
+  readonly isProcessing: boolean;
+  readonly size: number;
+}
 
-  const flushPendingQueue = async () => {
-    if (pendingUserInputsRef.current.length === 0) {
-      return;
-    }
-
-    isProcessingQueueRef.current = true;
-
-    try {
-      while (pendingUserInputsRef.current.length > 0) {
-        const batch = pendingUserInputsRef.current.splice(0, pendingUserInputsRef.current.length);
-        const batchSummary = batch.map(msg => msg.content.replace(/\s+/g, ' ').trim()).join(' | ');
-        addLog(`[Queue] Flushing ${batch.length} queued input(s): ${batchSummary}`);
-
-        const idsToRemove = new Set(batch.map(msg => msg.id));
-        setActiveMessages(prev => prev.filter(msg => !(msg.isPending && idsToRemove.has(msg.id))));
-
-        const mergedContent = batch.map(msg => msg.content).join('\n');
-        const trimmed = mergedContent.trim();
-
-        if (trimmed.length === 0) {
-          addLog('[Queue] Merged content was empty after trimming; skipping send.');
-          continue;
-        }
-
-        const mergedMessage: Message = {
-          id: nextMessageId(),
-          role: 'user',
-          content: mergedContent,
-        };
-
-        await runStreamForUserMessage(mergedMessage);
-      }
-    } finally {
-      isProcessingQueueRef.current = false;
-    }
-  };
+export const createMessageQueueController = (): MessageQueueController => {
+  const queue: QueuedUserInput[] = [];
+  let processing = false;
 
   return {
-    pendingUserInputsRef,
+    enqueue(entry: QueuedUserInput) {
+      queue.push(entry);
+    },
+    async flush(processEntry: (entry: QueuedUserInput) => Promise<void>) {
+      if (queue.length === 0 || processing) {
+        return;
+      }
+
+      processing = true;
+
+      try {
+        while (queue.length > 0) {
+          const entry = queue.shift()!;
+          const summary = entry.message.content.replace(/\s+/g, ' ').trim();
+          addLog(`[Queue] Flushing queued input: ${summary || '(empty)'}`);
+          try {
+            await processEntry(entry);
+          } catch (error) {
+            throw error;
+          }
+        }
+      } finally {
+        processing = false;
+      }
+    },
+    get isProcessing() {
+      return processing;
+    },
+    get size() {
+      return queue.length;
+    },
+  };
+};
+
+export const useMessageQueue = () => {
+  const controllerRef = useRef<MessageQueueController>(createMessageQueueController());
+  const isProcessingQueueRef = useRef(false);
+
+  const enqueueQueuedInput = useCallback((entry: QueuedUserInput) => {
+    controllerRef.current.enqueue(entry);
+  }, []);
+
+  const flushQueuedInputs = useCallback(
+    async (processEntry: (entry: QueuedUserInput) => Promise<void>) => {
+      if (controllerRef.current.size === 0 || controllerRef.current.isProcessing) {
+        return;
+      }
+
+      isProcessingQueueRef.current = true;
+      try {
+        await controllerRef.current.flush(processEntry);
+      } finally {
+        isProcessingQueueRef.current = false;
+      }
+    },
+    []
+  );
+
+  return {
+    enqueueQueuedInput,
+    flushQueuedInputs,
     isProcessingQueueRef,
-    flushPendingQueue,
   };
 };

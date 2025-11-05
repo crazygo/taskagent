@@ -7,7 +7,6 @@ import { inspect } from 'util';
 import { type AgentDefinition, type PermissionUpdate, type PermissionResult } from '@anthropic-ai/claude-agent-sdk';
 
 import { addLog } from '@taskagent/shared/logger';
-import { createBaseClaudeFlow, type BaseClaudeFlow } from '../agents/runtime/flows/baseClaudeFlow.js';
 import { loadCliConfig } from './cli/config.js';
 import type { Task } from '../task-manager.js';
 import { ensureAiProvider, type AiChatProvider } from './config/ai-provider.js';
@@ -22,6 +21,7 @@ import { useTaskStore } from './domain/taskStore.js';
 import { useConversationStore } from './domain/conversationStore.js';
 import {
     Driver,
+    type AgentPipelineInvocationOptions,
     type DriverManifestEntry,
     type ViewDriverEntry,
     type BackgroundTaskDriverEntry,
@@ -47,6 +47,12 @@ import { monitorTabConfig } from '@taskagent/tabs/configs/monitor';
 import { getPresetOrDefault } from '@taskagent/presets';
 import { globalAgentRegistry, registerAllAgents } from '@taskagent/agents/registry';
 import type { AgentStartContext, AgentStartSinks } from '@taskagent/agents/runtime/types.js';
+import { EventBus } from '@taskagent/core/event-bus';
+import { MessageStore } from './store/MessageStore.js';
+import { useMessageStoreTab } from './hooks/useMessageStoreTab.js';
+import { useAgentEventBridge } from './hooks/useAgentEventBridge.js';
+import { TabExecutionManager, TabExecutor } from '@taskagent/execution';
+import type { ExecutionContext } from '@taskagent/execution/types.js';
 
 // Guard to prevent double submission in dev double-mount scenarios
 let __nonInteractiveSubmittedOnce = false;
@@ -134,15 +140,6 @@ function getTabByCliName(cliName: string): { label: string } | null {
 }
 
 type AgentTurnOverrides = AgentPipelineOverrides;
-
-type AgentPromptJob = {
-    rawInput: string;
-    prompt: string;
-    sessionId: string;
-    pendingMessageIds?: number[];
-    overrides?: AgentTurnOverrides;
-    flowId?: string;
-};
 
 type AgentPermissionRequest = {
     id: number;
@@ -248,10 +245,6 @@ const formatToolInputSummary = (input: Record<string, unknown>, maxLength = 600)
 };
 
 // Agent flow registry type with required default key
-type AgentFlowRegistry = Record<string, BaseClaudeFlow> & {
-    default: BaseClaudeFlow;
-};
-
 // --- Components ---
 
 const App = () => {
@@ -387,17 +380,20 @@ const App = () => {
     }, []);
 
     // --- STATE ---
-    const [frozenMessages, setFrozenMessages] = useState<Types.Message[]>([]);
-    const [activeMessages, setActiveMessages] = useState<Types.Message[]>([]);
+    const eventBus = useMemo(() => new EventBus(), []);
+    const messageStore = useMemo(() => new MessageStore(), []);
+    const tabExecManager = useMemo(() => new TabExecutionManager(), []);
+    const tabExecutor = useMemo(() => new TabExecutor(tabExecManager, globalAgentRegistry, eventBus), [tabExecManager, eventBus]);
+    const { registerConversation, getQueueLength } = useAgentEventBridge(eventBus, messageStore);
     const [inputValue, setInputValue] = useState('');
     const [selectedTab, setSelectedTab] = useState<string>(Driver.CHAT);
+    const { frozen: frozenMessages, active: activeMessages } = useMessageStoreTab(messageStore, selectedTab);
     const [focusedControl, setFocusedControl] = useState<'input' | 'tabs' | 'task' | 'permission'>('input');
     const [isCommandMenuShown, setIsCommandMenuShown] = useState(false);
     const [isEscActive, setIsEscActive] = useState(false);
     const [agentSessionId, setAgentSessionId] = useState<string | null>(null);
     const [, setWorkspaceSettings] = useState<WorkspaceSettings | null>(null);
-    const [isAgentStreaming, setIsAgentStreaming] = useState(false);
-    const { tasks, startBackground, waitTask, cancelTask, startForeground } = useTaskStore();
+    const { tasks, startBackground, waitTask, cancelTask } = useTaskStore();
     const [positionalPromptWarning, setPositionalPromptWarning] = useState<string | null>(null);
 
     const automationRanRef = useRef(false);
@@ -419,10 +415,11 @@ const App = () => {
 
     // --- REFS ---
     const hasProcessedNonInteractiveRef = useRef(false);
+    const selectedTabRef = useRef(selectedTab);
     const {
         isStreaming,
         runStreamForUserMessage,
-        pendingUserInputsRef,
+        enqueueUserInput,
         isProcessingQueueRef,
         flushPendingQueue,
         nextMessageId,
@@ -430,13 +427,12 @@ const App = () => {
         aiProvider: provider,
         modelName,
         reasoningEnabled: reasoningEnabled || false,
-        onActiveMessagesChange: setActiveMessages,
-        onFrozenMessagesChange: setFrozenMessages,
+        messageStore,
+        getActiveTabId: () => selectedTabRef.current,
     });
-
-    const selectedTabRef = useRef(selectedTab);
     useEffect(() => {
         selectedTabRef.current = selectedTab;
+        messageStore.setCurrentTab(selectedTab);
     }, [selectedTab]);
 
     const isStreamingRef = useRef(isStreaming);
@@ -444,19 +440,12 @@ const App = () => {
         isStreamingRef.current = isStreaming;
     }, [isStreaming]);
 
-    const isAgentStreamingRef = useRef(isAgentStreaming);
-    useEffect(() => {
-        isAgentStreamingRef.current = isAgentStreaming;
-    }, [isAgentStreaming]);
-
     const prevTasksLengthRef = useRef(tasks.length);
     const agentWorkspaceStatusRef = useRef<{ missingNotified: boolean; errorNotified: boolean }>({
         missingNotified: false,
         errorNotified: false,
     });
     const lastAnnouncedAgentSessionRef = useRef<string | null>(null);
-    const agentSessionInitializedRef = useRef<boolean>(false);
-    const agentPendingQueueRef = useRef<AgentPromptJob[]>([]);
     const forcedSessionPromiseRef = useRef<Promise<string | null> | null>(null);
     const shouldForceNewSessionRef = useRef<boolean>(bootstrapConfig?.newSession ?? false);
     const bootstrapNewSessionAppliedRef = useRef<boolean>(false);
@@ -466,54 +455,25 @@ const agentPermissionQueueRef = useRef<number[]>([]);
 const [agentPermissionPrompt, setAgentPermissionPrompt] = useState<AgentPermissionPromptState | null>(null);
 const lastAnnouncedDriverRef = useRef<string | null>(null);
 
-    const finalizeActiveMessages = useCallback(() => {
-        setActiveMessages(prev => {
-            if (prev.length === 0) {
-                return prev;
-            }
-            const completed = prev.filter(msg => !msg.isPending);
-            if (completed.length > 0) {
-                setFrozenMessages(frozen => [...frozen, ...completed]);
-            }
-            return prev.filter(msg => msg.isPending);
-        });
-    }, [setActiveMessages, setFrozenMessages]);
-
     const finalizeMessageById = useCallback((messageId: number) => {
-        const timestamp = new Date().toISOString();
-        addLog(`[FinalizeMsg] ${timestamp} - Starting finalization for message #${messageId}`);
-        
-        setActiveMessages(prev => {
-            const messageToFinalize = prev.find(msg => msg.id === messageId);
-            if (messageToFinalize) {
-                addLog(`[FinalizeMsg] ${timestamp} - Found message #${messageId} in active, moving to frozen`);
-                setFrozenMessages(frozen => {
-                    addLog(`[FinalizeMsg] ${timestamp} - Adding message #${messageId} to frozenMessages`);
-                    return [...frozen, { ...messageToFinalize, isPending: false }];
-                });
-            } else {
-                addLog(`[FinalizeMsg] ${timestamp} - Message #${messageId} NOT found in activeMessages`);
-            }
-            return prev.filter(msg => msg.id !== messageId);
-        });
-    }, [setActiveMessages, setFrozenMessages]);
+        const tabId = selectedTabRef.current;
+        messageStore.mutateMessage(tabId, messageId, msg => ({
+            ...msg,
+            isPending: false,
+            queueState: msg.queueState === 'active' ? 'completed' : msg.queueState,
+        }));
+    }, [messageStore]);
 
-    const appendSystemMessage = useCallback((content: string, boxed = false, shouldFinalize = true) => {
-        if (shouldFinalize) {
-            finalizeActiveMessages();
-        }
+    const appendSystemMessage = useCallback((content: string, boxed = false) => {
+        const tabId = selectedTabRef.current;
         const systemMessage: Types.Message = {
             id: nextMessageId(),
             role: 'system',
             content,
             isBoxed: boxed,
         };
-        if (shouldFinalize) {
-            setFrozenMessages(prev => [...prev, systemMessage]);
-        } else {
-            setActiveMessages(prev => [...prev, systemMessage]);
-        }
-    }, [finalizeActiveMessages, nextMessageId, setFrozenMessages, setActiveMessages]);
+        messageStore.appendMessage(tabId, systemMessage);
+    }, [messageStore, nextMessageId]);
 
     useEffect(() => {
         const staticTabs = getStaticTabs();
@@ -548,7 +508,8 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
         const sleep = (ms = 0) => new Promise<void>(resolve => setTimeout(resolve, Math.max(0, ms)));
         while (!isCancelled?.()) {
             const conversationIdle = !isStreamingRef.current && !isProcessingQueueRef.current;
-            const agentIdle = !isAgentStreamingRef.current && agentPendingQueueRef.current.length === 0;
+            const currentTabId = selectedTabRef.current;
+            const agentIdle = tabExecutor.isIdle(currentTabId) && tabExecManager.getQueueLength(currentTabId) === 0;
             if (conversationIdle && agentIdle) {
                 return true;
             }
@@ -559,7 +520,7 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
             await sleep(100);
         }
         return false;
-    }, [addLog]);
+    }, [addLog, tabExecManager]);
 
     useEffect(() => {
         if (!bootstrapConfig.ignoredPositionalPrompt) {
@@ -606,12 +567,8 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
         if (request.placeholderMessageId !== undefined) {
             const timestamp = new Date().toISOString();
             addLog(`[Permission] ${timestamp} - Updating placeholder #${request.placeholderMessageId} for request #${id}, decision=${decision.kind}`);
-            
-            setActiveMessages(prev => prev.map(msg => {
-                if (msg.id !== request.placeholderMessageId) {
-                    return msg;
-                }
-                
+
+            messageStore.mutateMessage(selectedTabRef.current, request.placeholderMessageId, msg => {
                 let resultContent: string;
                 if (decision.kind === 'allow') {
                     const rememberNote = decision.always && hasSuggestions ? ' (remembered for this session)' : '';
@@ -620,14 +577,14 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
                     const reason = decision.reason?.trim().length ? decision.reason.trim() : 'Denied by user';
                     resultContent = `[Agent] Permission #${id} · ${toolName}\n\n${request.summary}\n\n✗ Denied: ${reason}`;
                 }
-                
-                const { isPending, ...msgWithoutPending } = msg;
+
                 return {
-                    ...msgWithoutPending,
+                    ...msg,
                     content: resultContent,
+                    isPending: false,
                 };
-            }));
-            
+            });
+
             addLog(`[Permission] ${timestamp} - Calling finalizeMessageById for placeholder #${request.placeholderMessageId}`);
             finalizeMessageById(request.placeholderMessageId);
             addLog(`[Permission] ${timestamp} - Finalized placeholder #${request.placeholderMessageId}`);
@@ -650,7 +607,7 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
             addLog(`[Agent] Permission #${id} denied for "${toolName}": ${reason}`);
         }
         return true;
-    }, [appendSystemMessage, setActiveMessages, finalizeMessageById]);
+    }, [appendSystemMessage, finalizeMessageById, messageStore]);
 
     const handleAgentPermissionCommand = useCallback((input: string): boolean | null => {
         const trimmed = input.trim();
@@ -704,18 +661,7 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
                 content: `[Agent] Waiting for permission #${requestId} on "${toolName}"…`,
                 isPending: true,
             };
-            setActiveMessages(prev => {
-                const timestamp = new Date().toISOString();
-                addLog(`[Permission] ${timestamp} - Adding placeholder #${placeholderMessageId} to activeMessages`);
-                const newMessages = [...prev];
-                const lastMessage = newMessages.length > 0 ? newMessages[newMessages.length - 1] : null;
-                if (lastMessage && lastMessage.role === 'assistant') {
-                    newMessages.splice(newMessages.length - 1, 0, placeholderMessage);
-                } else {
-                    newMessages.push(placeholderMessage);
-                }
-                return newMessages;
-            });
+            messageStore.appendMessage(selectedTabRef.current, placeholderMessage);
 
             addLog(`[Agent] Permission request #${requestId} pending for tool "${toolName}".`);
 
@@ -734,7 +680,7 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
 
                 const abortHandler = () => {
                     if (!agentPermissionRequestsRef.current.has(requestId)) return;
-                    setActiveMessages(prev => prev.filter(msg => msg.id !== placeholderMessageId));
+                    messageStore.removeMessage(selectedTabRef.current, placeholderMessageId);
                     appendSystemMessage(`[Agent] Permission request #${requestId} was cancelled by the agent.`, true);
                     addLog(`[Agent] Permission request #${requestId} cancelled by agent/runtime.`);
                     finalize({ behavior: 'deny', message: 'Permission request cancelled.', interrupt: false });
@@ -764,7 +710,7 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
                 }
             });
         },
-        [activateNextAgentPermissionPrompt, agentPermissionPrompt, nextMessageId, appendSystemMessage, setActiveMessages, autoAllowPermissions, resolveAgentPermission]
+        [activateNextAgentPermissionPrompt, agentPermissionPrompt, nextMessageId, appendSystemMessage, autoAllowPermissions, resolveAgentPermission, messageStore]
     );
 
     const handlePermissionPromptSubmit = useCallback(
@@ -777,22 +723,6 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
         },
         [agentPermissionPrompt, resolveAgentPermission]
     );
-
-    const baseClaudeFlow = useMemo(
-        () => createBaseClaudeFlow({
-            nextMessageId,
-            setActiveMessages,
-            finalizeMessageById,
-            canUseTool: handleAgentPermissionRequest,
-            workspacePath: bootstrapConfig?.workspacePath,
-        }),
-        [nextMessageId, setActiveMessages, finalizeMessageById, handleAgentPermissionRequest, bootstrapConfig?.workspacePath]
-    );
-
-    const agentFlowRegistry: AgentFlowRegistry = useMemo(() => ({
-        default: baseClaudeFlow,
-        story: baseClaudeFlow,
-    }), [baseClaudeFlow]);
 
     const driverCommandEntries = useMemo(() => getDriverCommandEntries(), []);
     const inputCommands = useMemo(() => [...BASE_COMMANDS, ...driverCommandEntries], [driverCommandEntries]);
@@ -843,15 +773,11 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
                     if (cancelled) return;
                     setWorkspaceSettings(updatedSettings);
                     addLog(`[Agent] Created new session ${sessionId} for workspace ${workspacePath}`);
-                    agentSessionInitializedRef.current = false;
                 }
                 if (cancelled) return;
                 setAgentSessionId(sessionId);
                 lastAnnouncedAgentSessionRef.current = null;
                 agentWorkspaceStatusRef.current.errorNotified = false;
-                if (settings.sessions.length > 0) {
-                    agentSessionInitializedRef.current = true;
-                }
             } catch (error) {
                 if (cancelled) return;
                 const message = error instanceof Error ? error.message : String(error);
@@ -905,7 +831,8 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
             appendSystemMessage('[Agent] Cannot create a new session without --workspace.', true);
             return null;
         }
-        if (isAgentStreaming) {
+        const currentTabId = selectedTabRef.current;
+        if (!tabExecutor.isIdle(currentTabId) || tabExecManager.getQueueLength(currentTabId) > 0) {
             appendSystemMessage('[Agent] Wait for the current response to finish before creating a new session.', true);
             return null;
         }
@@ -919,7 +846,6 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
             lastAnnouncedAgentSessionRef.current = null;
             appendSystemMessage(`[Agent] Started new Claude session ${formatSessionId(newSessionId)}.`);
             addLog(`[Agent] Created new session ${newSessionId} for workspace ${workspacePath}`);
-            agentSessionInitializedRef.current = false;
             return newSessionId;
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
@@ -927,7 +853,7 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
             addLog(`[Agent] Failed to create new session: ${message}`);
             return null;
         }
-    }, [bootstrapConfig?.workspacePath, appendSystemMessage, isAgentStreaming]);
+    }, [bootstrapConfig?.workspacePath, appendSystemMessage, tabExecutor, tabExecManager]);
 
     useEffect(() => {
         if (!bootstrapConfig?.newSession || bootstrapNewSessionAppliedRef.current || !shouldForceNewSessionRef.current) return;
@@ -956,184 +882,101 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
         return agentSessionId ?? await createNewAgentSession();
     }, [agentSessionId, createNewAgentSession]);
 
-    const startAgentPrompt = useCallback(async (job: AgentPromptJob): Promise<boolean> => {
-        const { rawInput, prompt, pendingMessageIds, overrides, sessionId, flowId } = job;
-        const userMessageId = nextMessageId();
-        const userMessage: Types.Message = { id: userMessageId, role: 'user', content: rawInput };
-        setActiveMessages(prev => [...prev.filter(msg => msg.isPending && !(pendingMessageIds?.includes(msg.id))), userMessage]);
-        finalizeMessageById(userMessageId);
-        setIsAgentStreaming(true);
-        addLog(`[Agent] Sending prompt with session ${sessionId}: ${prompt.replace(/\s+/g, ' ').slice(0, 120)}`);
-        
-        try {
-            // Get agentId from current tab
-            const tabConfig = tabRegistry.get(selectedTab);
-            const targetAgentId = tabConfig?.agentId ?? 'default';
-            
-            // Use AgentRegistry for all agents
-            if (globalAgentRegistry.has(targetAgentId)) {
-                addLog(`[Agent] Using AgentRegistry agent: ${targetAgentId}`);
-                const agent = await globalAgentRegistry.createAgent(targetAgentId);
-                if (!agent) {
-                    throw new Error(`Failed to create agent: ${targetAgentId}`);
-                }
-
-                // Prepare context and sinks for agent.start()
-                const context: AgentStartContext = {
-                    sourceTabId: selectedTab,
-                    workspacePath: bootstrapConfig?.workspacePath,
-                    session: { id: sessionId, initialized: agentSessionInitializedRef.current },
-                    forkSession: false,
-                };
-                
-                const sinks: AgentStartSinks = {
-                    onText: (chunk: string) => {
-                        // Each text chunk is a complete sentence - create independent frozen message
-                        if (!chunk.trim()) return;
-                        
-                        const textMessageId = nextMessageId();
-                        const textMessage: Types.Message = {
-                            id: textMessageId,
-                            role: 'assistant',
-                            content: chunk,
-                            timestamp: Date.now(),
-                        };
-                        // Add to frozen immediately to maintain chronological order
-                        setFrozenMessages(prev => [...prev, textMessage]);
-                    },
-                    onReasoning: (chunk: string) => {
-                        // Create independent reasoning message
-                        if (!chunk.trim()) return;
-                        
-                        const reasoningMessageId = nextMessageId();
-                        const reasoningMessage: Types.Message = {
-                            id: reasoningMessageId,
-                            role: 'assistant',
-                            content: '',
-                            reasoning: chunk,
-                            timestamp: Date.now(),
-                        };
-                        setFrozenMessages(prev => [...prev, reasoningMessage]);
-                    },
-                    onEvent: (event: Types.TaskEvent) => {
-                        // Parse tool events from runPromptAgentStart
-                        // Format: "Tool: {name} - {description}" or "Tool {name} completed (Xs)"
-                        const toolUseMatch = event.message.match(/^Tool:\s+(\w+)(?:\s+-\s+(.+))?$/);
-                        const toolResultMatch = event.message.match(/^Tool\s+(\w+)\s+completed(?:\s+\(([^)]+)\))?$/);
-                        
-                        if (toolUseMatch) {
-                            const [, toolName, description] = toolUseMatch;
-                            const toolUseMessageId = nextMessageId();
-                            const toolUseMessage: Types.Message = {
-                                id: toolUseMessageId,
-                                role: 'tool_use',
-                                content: '',
-                                toolName: toolName || 'Unknown',
-                                toolDescription: description,
-                                timestamp: event.ts,
-                            };
-                            setFrozenMessages(prev => [...prev, toolUseMessage]);
-                            addLog(`[ToolUI] Tool use: ${toolName}${description ? ` - ${description}` : ''}`);
-                        } else if (toolResultMatch) {
-                            const [, toolName, durationStr] = toolResultMatch;
-                            const durationMs = durationStr ? parseFloat(durationStr.replace('s', '')) * 1000 : undefined;
-                            const toolResultMessageId = nextMessageId();
-                            const toolResultMessage: Types.Message = {
-                                id: toolResultMessageId,
-                                role: 'tool_result',
-                                content: '',
-                                toolName: toolName || 'Unknown',
-                                durationMs,
-                                timestamp: event.ts,
-                            };
-                            setFrozenMessages(prev => [...prev, toolResultMessage]);
-                            addLog(`[ToolUI] Tool result: ${toolName}${durationMs ? ` (${durationMs}ms)` : ''}`);
-                        }
-                    },
-                    onSessionId: (sid: string) => {
-                        addLog(`[Agent] Resolved session ID: ${sid}`);
-                    },
-                    onCompleted: (fullText: string) => {
-                        // No-op: messages are already frozen incrementally
-                        addLog('[Agent] Stream completed.');
-                    },
-                    onFailed: (error: string) => {
-                        appendSystemMessage(`[Agent] Failed: ${error}`, true);
-                    },
-                    canUseTool: handleAgentPermissionRequest,
-                };
-                
-                const executionHandle = await agent.start(rawInput, context, sinks);
-                agentSessionInitializedRef.current = true;
-                const completed = await executionHandle.completion;
-                return completed;
-            }
-            
-            // Fallback to old flow if agent not in registry
-            addLog(`[Agent] Agent ${targetAgentId} not in registry, using baseClaudeFlow`);
-            const activeAgentFlow: BaseClaudeFlow = (flowId ? agentFlowRegistry[flowId] : undefined) ?? agentFlowRegistry.default;
-            await activeAgentFlow.handleUserInput({
-                prompt,
-                agentSessionId: sessionId,
-                sessionInitialized: agentSessionInitializedRef.current,
-                ...overrides,
-            });
-            agentSessionInitializedRef.current = true;
-            return true;
-        } catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
-            const details = formatErrorForDisplay(error);
-            const combinedMessage = details ? `${message}\n${details}` : message;
-            addLog(`[Agent] Error: ${combinedMessage}`);
-            finalizeMessageById(userMessageId);
-            appendSystemMessage(`[Agent] Error: ${combinedMessage}`, true);
-            return false;
-        } finally {
-            setIsAgentStreaming(false);
-            if (agentPendingQueueRef.current.length > 0) {
-                const nextJob = agentPendingQueueRef.current.shift();
-                if (nextJob) void startAgentPrompt(nextJob);
-            }
-        }
-    }, [agentFlowRegistry, appendSystemMessage, nextMessageId, setActiveMessages, finalizeMessageById, selectedTab, bootstrapConfig?.workspacePath, handleAgentPermissionRequest]);
-
-    const runAgentTurn = useCallback(async (rawInput: string, overrides?: AgentTurnOverrides, sessionIdHint?: string, flowId?: string, agentIdOverride?: string): Promise<boolean> => {
+    const runAgentTurn = useCallback(async (rawInput: string, overrides?: AgentTurnOverrides, sessionIdHint?: string, _flowId?: string, agentIdOverride?: string, tabOverride?: string): Promise<boolean> => {
         const prompt = rawInput.trim();
         if (prompt.length === 0) return false;
-        const activeSessionId = agentSessionId ?? sessionIdHint ?? null;
+
+        const tabId = tabOverride ?? selectedTabRef.current;
+        let targetAgentId = agentIdOverride;
+        if (!targetAgentId) {
+            const tabConfig = tabRegistry.get(tabId);
+            targetAgentId = tabConfig?.agentId ?? 'default';
+        }
+
+        if (!targetAgentId || !globalAgentRegistry.has(targetAgentId)) {
+            appendSystemMessage(`[Agent] Agent '${targetAgentId ?? 'unknown'}' not found in registry. Available agents: ${globalAgentRegistry.getAllIds().join(', ')}`, true);
+            return false;
+        }
+
+        const activeSessionId = sessionIdHint ?? agentSessionId ?? null;
         if (!activeSessionId) {
             appendSystemMessage('[Agent] Session not ready yet. Switch to the Agent tab again to initialize.', true);
             return false;
         }
-        
-        // Determine which agent to use
-        let targetAgentId = agentIdOverride;
-        if (!targetAgentId) {
-            // Get agentId from current tab
-            const tabConfig = tabRegistry.get(selectedTab);
-            targetAgentId = tabConfig?.agentId ?? 'default';
+
+        const userMessageId = messageStore.getNextMessageId();
+        const userMessage: Types.Message = {
+            id: userMessageId,
+            role: 'user',
+            content: rawInput,
+            timestamp: Date.now(),
+            queueState: 'active',
+        };
+        messageStore.appendMessage(tabId, userMessage);
+
+        const assistantMessageId = messageStore.getNextMessageId();
+        const assistantPlaceholder: Types.Message = {
+            id: assistantMessageId,
+            role: 'assistant',
+            content: '',
+            reasoning: '',
+            isPending: true,
+            queueState: 'active',
+            timestamp: Date.now(),
+        };
+        messageStore.appendMessage(tabId, assistantPlaceholder);
+
+        const queueIndex = registerConversation(tabId, userMessageId, assistantMessageId);
+        if (queueIndex > 0) {
+            messageStore.mutateMessage(tabId, userMessageId, msg => ({ ...msg, queueState: 'queued' }));
         }
-        
-        // Check if agent exists in registry (skip for 'default' which uses old flow)
-        if (targetAgentId !== 'default' && !globalAgentRegistry.has(targetAgentId)) {
-            appendSystemMessage(`[Agent] Agent '${targetAgentId}' not found in registry. Available agents: ${globalAgentRegistry.getAllIds().join(', ')}`, true);
+
+        try {
+            let sessionState = tabExecManager.getSession(tabId);
+            if (!sessionState || sessionState.id !== activeSessionId) {
+                sessionState = { id: activeSessionId, initialized: sessionState?.initialized ?? false };
+                tabExecManager.setSession(tabId, sessionState);
+            }
+
+            const context: ExecutionContext = {
+                sourceTabId: tabId,
+                workspacePath: bootstrapConfig?.workspacePath,
+                session: { ...sessionState },
+                canUseTool: handleAgentPermissionRequest,
+            };
+
+            const result = await tabExecutor.execute(tabId, targetAgentId, prompt, context);
+
+            if (result.sessionId) {
+                tabExecManager.setSession(tabId, { id: result.sessionId, initialized: true });
+                if (tabId === Driver.AGENT) {
+                    setAgentSessionId(result.sessionId);
+                }
+            } else {
+                tabExecManager.setSession(tabId, { id: activeSessionId, initialized: true });
+            }
+
+            if (!result.success && result.error) {
+                appendSystemMessage(`[Agent] Error: ${result.error}`, true);
+            }
+
+            return result.success;
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            appendSystemMessage(`[Agent] Error: ${message}`, true);
+            messageStore.mutateMessage(tabId, assistantMessageId, msg => ({
+                ...msg,
+                isPending: false,
+                queueState: 'completed',
+            }));
             return false;
+        } finally {
+            messageStore.mutateMessage(tabId, userMessageId, msg => ({
+                ...msg,
+                queueState: 'completed',
+            }));
         }
-        
-        if (isAgentStreaming || agentPendingQueueRef.current.length > 0) {
-            const pendingUserMessageId = nextMessageId();
-            const pendingAssistantMessageId = nextMessageId();
-            const pendingUserMessage: Types.Message = { id: pendingUserMessageId, role: 'user', content: rawInput, isPending: true };
-            const pendingAssistantMessage: Types.Message = { id: pendingAssistantMessageId, role: 'assistant', content: '', reasoning: '', isPending: true };
-            setActiveMessages(prev => [...prev.filter(msg => msg.isPending), pendingUserMessage, pendingAssistantMessage]);
-            agentPendingQueueRef.current.push({ rawInput, prompt, pendingMessageIds: [pendingUserMessageId, pendingAssistantMessageId], sessionId: activeSessionId, overrides, flowId });
-            appendSystemMessage(`[Agent] Still processing previous request. Your message has been queued (${agentPendingQueueRef.current.length} pending).`);
-            return true;
-        }
-        
-        addLog(`[AgentTurn] Using agent: ${targetAgentId} for tab: ${selectedTab}`);
-        return await startAgentPrompt({ rawInput, prompt, overrides, sessionId: activeSessionId, flowId });
-    }, [agentSessionId, appendSystemMessage, isAgentStreaming, nextMessageId, setActiveMessages, startAgentPrompt, selectedTab]);
+    }, [agentSessionId, appendSystemMessage, bootstrapConfig?.workspacePath, handleAgentPermissionRequest, messageStore, registerConversation, tabExecutor, tabExecManager]);
 
     const runDriverEntry = useCallback(async (entry: DriverManifestEntry, prompt: string): Promise<boolean> => {
         let sessionContext = undefined as { id: string; initialized: boolean; markInitialized: () => void } | undefined;
@@ -1144,25 +987,60 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
                 addLog(`[Driver] Failed to ensure Claude session for ${entry.label}`);
                 return false;
             }
+            const currentTabId = selectedTab;
+            const existingSession = tabExecManager.getSession(currentTabId);
+            if (!existingSession || existingSession.id !== sessionId) {
+                tabExecManager.setSession(currentTabId, { id: sessionId, initialized: existingSession?.initialized ?? false });
+            }
+            const resolvedSession = tabExecManager.getSession(currentTabId) ?? { id: sessionId, initialized: false };
             sessionContext = {
-                id: sessionId,
-                initialized: agentSessionInitializedRef.current,
-                markInitialized: () => { agentSessionInitializedRef.current = true; },
+                id: resolvedSession.id,
+                initialized: resolvedSession.initialized,
+                markInitialized: () => { tabExecManager.setSession(currentTabId, { id: sessionId, initialized: true }); },
             };
         }
 
+        const runAgentPipelineViaExecutor = async (agentId: string, driverPrompt: string, options?: AgentPipelineInvocationOptions) => {
+            const targetTabId = options?.tabId ?? selectedTab;
+            const targetSession = options?.session ?? sessionContext;
+            const flowId = options?.flowId;
+            const overrides = options?.overrides;
+            const success = await runAgentTurn(driverPrompt, overrides, targetSession?.id, flowId, agentId, targetTabId);
+            if (success && targetSession) {
+                targetSession.markInitialized();
+            }
+            return success;
+        };
+
+        const scheduleAgentPipelineViaExecutor = (agentId: string, driverPrompt: string, options?: AgentPipelineInvocationOptions) => {
+            const targetTabId = options?.tabId ?? selectedTab;
+            const targetSession = options?.session ?? sessionContext;
+            const flowId = options?.flowId;
+            const overrides = options?.overrides;
+            void runAgentTurn(driverPrompt, overrides, targetSession?.id, flowId, agentId, targetTabId)
+                .then(success => {
+                    if (success && targetSession) {
+                        targetSession.markInitialized();
+                    }
+                })
+                .catch(error => {
+                    const message = error instanceof Error ? error.message : String(error);
+                    addLog(`[Driver] Background agent ${agentId} failed: ${message}`);
+                });
+        };
+
         const runtimeContext: Omit<DriverRuntimeContext, 'session'> & { session?: typeof sessionContext } = {
             nextMessageId,
-            setActiveMessages,
-            setFrozenMessages,
+            messageStore,
             finalizeMessageById,
             canUseTool: handleAgentPermissionRequest,
             workspacePath: bootstrapConfig?.workspacePath,
             sourceTabId: selectedTab,
             startBackground: (agent, userPrompt, ctx) => startBackground(agent, userPrompt, ctx),
-            startForeground: (agent, userPrompt, ctx, sinks) => startForeground(agent, userPrompt, ctx, sinks),
             waitTask,
             session: sessionContext,
+            runAgentPipeline: runAgentPipelineViaExecutor,
+            scheduleAgentPipeline: scheduleAgentPipelineViaExecutor,
         };
 
         if (entry.type === 'view' && entry.useAgentPipeline) {
@@ -1203,7 +1081,7 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
             appendSystemMessage(`[${entry.label}] Error: ${message}`, true);
             return false;
         }
-    }, [agentSessionId, appendSystemMessage, bootstrapConfig?.workspacePath, ensureAgentSession, finalizeMessageById, handleAgentPermissionRequest, runAgentTurn, nextMessageId, setActiveMessages, setFrozenMessages, waitTask, startForeground, selectedTab]);
+    }, [addLog, agentSessionId, appendSystemMessage, bootstrapConfig?.workspacePath, ensureAgentSession, finalizeMessageById, handleAgentPermissionRequest, runAgentTurn, nextMessageId, startBackground, waitTask, selectedTab, messageStore, tabExecManager]);
 
     const handleSubmit = useCallback(async (userInput: string): Promise<boolean> => {
         addLog('--- New Submission ---');
@@ -1257,7 +1135,9 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
         }
 
         // Fallback to Chat
-        const newUserMessage: Types.Message = { id: nextMessageId(), role: 'user', content: userInput };
+        const messageId = nextMessageId();
+        const baseTimestamp = Date.now();
+        const newUserMessage: Types.Message = { id: messageId, role: 'user', content: userInput, timestamp: baseTimestamp };
         if (selectedTab === Driver.CHAT) {
             addLog('[Driver] Using Chat mode');
         } else {
@@ -1266,8 +1146,31 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
 
         if (isStreaming || isProcessingQueueRef.current) {
             addLog(`Stream in progress. Queuing user input: ${userInput}`);
-            pendingUserInputsRef.current.push({ ...newUserMessage });
-            setActiveMessages(prev => [...prev, { ...newUserMessage, isPending: true }]);
+            const tabId = selectedTab;
+            const userPlaceholder: Types.Message = {
+                ...newUserMessage,
+                isPending: true,
+                queueState: 'queued',
+            };
+            messageStore.appendMessage(tabId, userPlaceholder);
+
+            const assistantPlaceholderId = messageStore.getNextMessageId();
+            messageStore.appendMessage(tabId, {
+                id: assistantPlaceholderId,
+                role: 'assistant',
+                content: '',
+                reasoning: '',
+                isPending: true,
+                queueState: 'queued',
+                timestamp: baseTimestamp,
+            });
+
+            enqueueUserInput({
+                tabId,
+                message: newUserMessage,
+                userPlaceholderId: messageId,
+                assistantPlaceholderId,
+            });
             return true;
         }
 
@@ -1291,12 +1194,9 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
             }
         }
         return succeeded && !flushFailed;
-    }, [appendSystemMessage, createNewAgentSession, flushPendingQueue, handleAgentPermissionCommand, isProcessingQueueRef, isStreaming, nextMessageId, pendingUserInputsRef, runAgentTurn, runDriverEntry, runStreamForUserMessage, selectedTab, setInputValue]);
+    }, [appendSystemMessage, createNewAgentSession, enqueueUserInput, flushPendingQueue, handleAgentPermissionCommand, isProcessingQueueRef, isStreaming, messageStore, nextMessageId, runAgentTurn, runDriverEntry, runStreamForUserMessage, selectedTab, setInputValue]);
 
     useEffect(() => { handleSubmitRef.current = handleSubmit; }, [handleSubmit]);
-
-    const waitForStreamsToIdleRef = useRef(waitForStreamsToIdle);
-    useEffect(() => { waitForStreamsToIdleRef.current = waitForStreamsToIdle; }, [waitForStreamsToIdle]);
 
     useEffect(() => {
         if (!nonInteractiveInput || hasProcessedNonInteractiveRef.current || __nonInteractiveSubmittedOnce) return;
@@ -1321,30 +1221,21 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
         // Use shorter timeout in test environments (7s) vs production (15s)
         const timeoutMs = process.env.E2E_WORKSPACE ? 7000 : 15000;
         let cancelled = false;
-        let finalized = false;
         const safetyTimer = setTimeout(() => {
             addLog(`[NonInteractive] Safety timeout (${timeoutMs}ms) reached, exiting with code 0`);
             try { process.exit(0); } catch {}
         }, timeoutMs);
 
         const finalizeExit = (code: number) => {
-            if (finalized) return;
-            finalized = true;
+            if (cancelled) return;
             clearTimeout(safetyTimer);
             setTimeout(() => process.exit(code), 100);
         };
 
         const runNonInteractive = async () => {
             try {
-                const submit = handleSubmitRef.current;
-                const waitForStreams = waitForStreamsToIdleRef.current;
-                if (!submit) {
-                    finalizeExit(1);
-                    return;
-                }
-
-                const succeeded = await submit(nonInteractiveInput);
-                await waitForStreams({
+                const succeeded = await handleSubmit(nonInteractiveInput);
+                await waitForStreamsToIdle({
                     timeoutMs,
                     isCancelled: () => cancelled,
                     context: 'NonInteractive',
@@ -1359,10 +1250,9 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
 
         return () => {
             cancelled = true;
-            // Safety timer cleared even if we've already finalized
             clearTimeout(safetyTimer);
         };
-    }, [nonInteractiveInput, selectedTab, bootstrapConfig?.driver, agentSessionId]);
+    }, [handleSubmit, nonInteractiveInput, selectedTab, bootstrapConfig?.driver, agentSessionId, waitForStreamsToIdle]);
 
     useEffect(() => {
         if (!e2eSteps || e2eSteps.length === 0 || nonInteractiveInput || automationRanRef.current) return;

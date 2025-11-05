@@ -1,9 +1,9 @@
 import type React from 'react';
-import type { Dispatch, SetStateAction } from 'react';
 import type { AgentDefinition, PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
 import type { Task, TaskWithEmitter } from '@taskagent/shared/task-manager';
 import type { Message } from '../types.js';
 import type { DriverPrepareResult } from './pipeline.js';
+import type { MessageStore } from '../store/MessageStore.js';
 
 export enum Driver {
     CHAT = 'Chat',
@@ -42,10 +42,22 @@ export interface DriverSessionContext {
     markInitialized: () => void;
 }
 
+export interface AgentPipelineInvocationOptions {
+    tabId?: string;
+    session?: DriverSessionContext;
+    overrides?: {
+        systemPromptFactory?: () => string;
+        allowedTools?: string[];
+        disallowedTools?: string[];
+        permissionMode?: string;
+        agents?: Record<string, AgentDefinition>;
+    };
+    flowId?: string;
+}
+
 export interface DriverRuntimeContext {
     nextMessageId: () => number;
-    setActiveMessages: Dispatch<SetStateAction<Message[]>>;
-    setFrozenMessages: Dispatch<SetStateAction<Message[]>>;
+    messageStore: MessageStore;
     finalizeMessageById: (messageId: number) => void;
     canUseTool: (toolName: string, input: Record<string, unknown>, options: { signal: AbortSignal; suggestions?: PermissionUpdate[] }) => Promise<unknown>;
     workspacePath?: string;
@@ -55,21 +67,10 @@ export interface DriverRuntimeContext {
         userPrompt: string,
         context: { sourceTabId?: string; workspacePath?: string; timeoutSec?: number; session?: { id: string; initialized: boolean }; forkSession?: boolean }
     ) => TaskWithEmitter;
-    startForeground: (
-        agent: any,
-        userPrompt: string,
-        context: { sourceTabId: string; workspacePath?: string; session?: { id: string; initialized: boolean }; forkSession?: boolean },
-        sinks: {
-            onText: (chunk: string) => void;
-            onReasoning?: (chunk: string) => void;
-            onEvent?: (e: { level: 'info'|'warning'|'error'; message: string; ts: number }) => void;
-            onCompleted?: (fullText: string) => void;
-            onFailed?: (error: string) => void;
-            canUseTool: (toolName: string, input: Record<string, unknown>, options: { signal: AbortSignal; suggestions?: PermissionUpdate[] }) => Promise<unknown>;
-        }
-    ) => { cancel: () => void; sessionId: string };
     waitTask: (taskId: string) => Promise<Task>;
     session?: DriverSessionContext;
+    runAgentPipeline?: (agentId: string, prompt: string, options?: AgentPipelineInvocationOptions) => Promise<boolean>;
+    scheduleAgentPipeline?: (agentId: string, prompt: string, options?: AgentPipelineInvocationOptions) => void;
 }
 
 export type DriverHandler = (message: Message, context: DriverRuntimeContext) => Promise<boolean>;

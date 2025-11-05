@@ -13,7 +13,7 @@
  * - Errors → agent:failed event
  */
 
-import type { EventBus } from '@taskagent/core/event-bus/index.js';
+import type { EventBus } from '@taskagent/core/event-bus';
 import type { AgentStartSinks } from '@taskagent/agents/runtime/types.js';
 
 export interface MessageAdapterOptions {

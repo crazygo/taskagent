@@ -5,6 +5,7 @@
  */
 
 import type { Message } from '../../types.js';
+import type { MessageStore } from '../../store/MessageStore.js';
 import { addLog } from '@taskagent/shared/logger';
 import { runTask, type TaskRunState } from './flow.js';
 
@@ -19,8 +20,8 @@ export async function handleTaskFlow(
   userMessage: Message,
   callbacks: {
     nextMessageId: () => number;
-    setActiveMessages: (updater: (prev: Message[]) => Message[]) => void;
-    setFrozenMessages: (updater: (prev: Message[]) => Message[]) => void;
+    messageStore: MessageStore;
+    tabId: string;
     startTask: (prompt: string, queryOptions?: { agents?: Record<string, any> }) => { id: string };
     waitTask: (taskId: string) => Promise<{ id: string; status: string; output: string; error?: string | null }>;
   }
@@ -34,8 +35,11 @@ export async function handleTaskFlow(
       role: 'system',
       content,
       isBoxed: boxed,
+      isPending: false,
+      queueState: 'completed',
+      timestamp: Date.now(),
     };
-    callbacks.setFrozenMessages(prev => [...prev, msg]);
+    callbacks.messageStore.appendMessage(callbacks.tabId, msg);
   };
 
   // Note: Workflow progress is logged to console by flow.ts
@@ -77,4 +81,3 @@ export async function handleTaskFlow(
 
 // Legacy alias (to be deprecated)
 export const handlePlanReviewDo = handleTaskFlow;
-

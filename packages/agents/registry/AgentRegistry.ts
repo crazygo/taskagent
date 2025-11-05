@@ -5,7 +5,7 @@
  * Provides unified interface for agent discovery and instantiation.
  */
 
-import type { EventBus } from '@taskagent/core/event-bus/index.js';
+import type { EventBus } from '@taskagent/core/event-bus';
 import type { AgentStartContext, AgentStartSinks, ExecutionHandle } from '../runtime/types.js';
 import { MessageAdapter } from '@taskagent/execution/MessageAdapter.js';
 

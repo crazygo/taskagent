@@ -21,7 +21,7 @@
  * ```
  */
 
-import type { EventBus } from '@taskagent/core/event-bus/index.js';
+import type { EventBus } from '@taskagent/core/event-bus';
 import type { AgentRegistry } from '@taskagent/agents/registry/AgentRegistry.js';
 import { TabExecutionManager } from './TabExecutionManager.js';
 import { MessageAdapter } from './MessageAdapter.js';

@@ -3,6 +3,7 @@ import { streamText } from 'ai';
 import { addLog } from '@taskagent/shared/logger';
 import type { AiChatProvider } from '../config/ai-provider.js';
 import type { Message, LogMessage } from '../types.js';
+import type { MessageStore } from '../store/MessageStore.js';
 
 const STREAM_TOKEN_TIMEOUT_MS = 30_000;
 
@@ -10,22 +11,22 @@ interface UseStreamSessionProps {
   aiProvider: AiChatProvider;
   modelName: string;
   reasoningEnabled: boolean;
-  setActiveMessages: React.Dispatch<React.SetStateAction<Message[]>>;
-  setFrozenMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   pushSystemMessage: (content: string) => void;
   nextMessageId: () => number;
   conversationLogRef: React.MutableRefObject<LogMessage[]>;
+  messageStore: MessageStore;
+  getActiveTabId: () => string;
 }
 
 export const useStreamSession = ({
   aiProvider,
   modelName,
   reasoningEnabled,
-  setActiveMessages,
-  setFrozenMessages,
   pushSystemMessage,
   nextMessageId,
   conversationLogRef,
+  messageStore,
+  getActiveTabId,
 }: UseStreamSessionProps) => {
   const [isStreaming, setIsStreaming] = useState(false);
   const streamAbortControllerRef = useRef<AbortController | null>(null);
@@ -103,29 +104,62 @@ export const useStreamSession = ({
     return '';
   };
 
-  const runStreamForUserMessage = async (userMessage: Message): Promise<void> => {
+  interface StreamPlaceholders {
+    userId: number;
+    assistantId: number;
+  }
+
+  interface RunStreamOptions {
+    placeholders?: StreamPlaceholders;
+    tabId?: string;
+  }
+
+  const runStreamForUserMessage = async (userMessage: Message, options?: RunStreamOptions): Promise<void> => {
     let streamError: Error | null = null;
+    const placeholders = options?.placeholders;
+    const tabId = options?.tabId ?? getActiveTabId();
     const normalizedUserMessage: Message = { ...userMessage, isPending: false };
+
+    let userMessageId = normalizedUserMessage.id;
+    let assistantMessageId: number;
 
     setIsStreaming(true);
 
-    // Render: keep only pending placeholders then append current user message
-    setActiveMessages(prev => {
-      const pendingOnly = prev.filter(msg => msg.isPending);
-      return [...pendingOnly, normalizedUserMessage];
-    });
-
     conversationLogRef.current.push({ role: 'user', content: normalizedUserMessage.content });
 
-    const assistantMessageId = nextMessageId();
-    const assistantPlaceholder: Message = {
-      id: assistantMessageId,
-      role: 'assistant',
-      content: '',
-      reasoning: '',
-    };
+    if (placeholders) {
+      userMessageId = placeholders.userId;
+      assistantMessageId = placeholders.assistantId;
 
-    setActiveMessages(prev => [...prev, { ...assistantPlaceholder, reasoning: '' }]);
+      messageStore.mutateMessage(tabId, userMessageId, msg => ({
+        ...msg,
+        content: normalizedUserMessage.content,
+        isPending: false,
+        queueState: 'active',
+      }));
+
+      messageStore.mutateMessage(tabId, assistantMessageId, msg => ({
+        ...msg,
+        content: '',
+        reasoning: '',
+        isPending: true,
+        queueState: 'active',
+      }));
+    } else {
+      messageStore.appendMessage(tabId, normalizedUserMessage);
+
+      assistantMessageId = nextMessageId();
+      const assistantPlaceholder: Message = {
+        id: assistantMessageId,
+        role: 'assistant',
+        content: '',
+        reasoning: '',
+        isPending: true,
+        queueState: 'active',
+      };
+
+      messageStore.appendMessage(tabId, assistantPlaceholder);
+    }
 
     const assistantLogIndex = conversationLogRef.current.push({ role: 'assistant', content: '' }) - 1;
 
@@ -146,6 +180,16 @@ export const useStreamSession = ({
     }, 1000);
     let assistantSucceeded = false;
 
+    const processAssistantUpdate = () => {
+      messageStore.mutateMessage(tabId, assistantMessageId, msg => ({
+        ...msg,
+        content: assistantContent,
+        reasoning: assistantReasoning,
+        isPending: true,
+        queueState: 'active',
+      }));
+    };
+
     try {
       addLog(`Calling AI API with model: ${modelName}`);
       const messagesPayload = conversationLogRef.current
@@ -156,26 +200,16 @@ export const useStreamSession = ({
         model: aiProvider.chat(modelName),
         messages: messagesPayload,
         abortSignal: abortController.signal,
-        ...reasoningEnabled && { 
+        ...(reasoningEnabled && { 
           providerOptions: {
             openrouter: { reasoning: { effort: 'medium' } },
           }
-        }
+        })
       };
 
       const result: any = await streamText(streamOptions);
 
       addLog('AI stream started.');
-
-      const processAssistantUpdate = () => {
-        setActiveMessages(prev =>
-          prev.map(msg =>
-            msg.id === assistantMessageId
-              ? { ...msg, content: assistantContent, reasoning: assistantReasoning }
-              : msg
-          )
-        );
-      };
 
       if (result && 'fullStream' in result && result.fullStream) {
         for await (const part of result.fullStream as AsyncIterable<any>) {
@@ -274,7 +308,16 @@ export const useStreamSession = ({
       const displayMessage = timedOut ? 'Stream timeout (30s without response).' : rawMessage;
 
       conversationLogRef.current.splice(assistantLogIndex, 1);
-      setActiveMessages(prev => prev.filter(msg => msg.id !== assistantMessageId));
+      if (placeholders) {
+        messageStore.mutateMessage(tabId, assistantMessageId, msg => ({
+          ...msg,
+          content: `Error: ${displayMessage}`,
+          isPending: false,
+          queueState: 'completed',
+        }));
+      } else {
+        messageStore.removeMessage(tabId, assistantMessageId);
+      }
       pushSystemMessage(`Error: ${displayMessage}`);
       if (error instanceof Error) {
         streamError = error;
@@ -288,18 +331,22 @@ export const useStreamSession = ({
       setIsStreaming(false);
     }
 
-    const completedMessages: Message[] = [{ ...normalizedUserMessage, isPending: false }];
     if (assistantSucceeded) {
       conversationLogRef.current[assistantLogIndex] = { role: 'assistant', content: assistantContent };
-      completedMessages.push({
-        id: assistantMessageId,
-        role: 'assistant',
+      messageStore.mutateMessage(tabId, assistantMessageId, msg => ({
+        ...msg,
         content: assistantContent,
         reasoning: assistantReasoning,
-      });
+        isPending: false,
+        queueState: 'completed',
+      }));
     }
-    setFrozenMessages(prev => [...prev, ...completedMessages]);
-    setActiveMessages(prev => prev.filter(msg => msg.isPending));
+
+    messageStore.mutateMessage(tabId, userMessageId, msg => ({
+      ...msg,
+      queueState: 'completed',
+      isPending: false,
+    }));
 
     if (streamError) {
       throw streamError;
