@@ -443,6 +443,11 @@ const App = () => {
         isStreamingRef.current = isStreaming;
     }, [isStreaming]);
 
+    const isAgentStreamingRef = useRef(isAgentStreaming);
+    useEffect(() => {
+        isAgentStreamingRef.current = isAgentStreaming;
+    }, [isAgentStreaming]);
+
     const prevTasksLengthRef = useRef(tasks.length);
     const agentWorkspaceStatusRef = useRef<{ missingNotified: boolean; errorNotified: boolean }>({
         missingNotified: false,
@@ -527,6 +532,33 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
             lastAnnouncedDriverRef.current = tabInfo.label;
         }
     }, [appendSystemMessage, selectedTab]);
+
+    const waitForStreamsToIdle = useCallback(async ({
+        timeoutMs,
+        isCancelled,
+        context = 'Streams',
+    }: {
+        timeoutMs?: number;
+        isCancelled?: () => boolean;
+        context?: string;
+    } = {}): Promise<boolean> => {
+        const limit = timeoutMs ?? 30000;
+        const start = Date.now();
+        const sleep = (ms = 0) => new Promise<void>(resolve => setTimeout(resolve, Math.max(0, ms)));
+        while (!isCancelled?.()) {
+            const conversationIdle = !isStreamingRef.current && !isProcessingQueueRef.current;
+            const agentIdle = !isAgentStreamingRef.current && agentPendingQueueRef.current.length === 0;
+            if (conversationIdle && agentIdle) {
+                return true;
+            }
+            if (Date.now() - start > limit) {
+                addLog(`[${context}] waitForStreamsToIdle timed out after ${limit}ms`);
+                return false;
+            }
+            await sleep(100);
+        }
+        return false;
+    }, [addLog]);
 
     useEffect(() => {
         if (!bootstrapConfig.ignoredPositionalPrompt) {
@@ -1277,39 +1309,45 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
         // Safety: ensure process exits even if provider keeps streaming
         // Use shorter timeout in test environments (7s) vs production (15s)
         const timeoutMs = process.env.E2E_WORKSPACE ? 7000 : 15000;
+        let cancelled = false;
         const safetyTimer = setTimeout(() => {
             addLog(`[NonInteractive] Safety timeout (${timeoutMs}ms) reached, exiting with code 0`);
             try { process.exit(0); } catch {}
         }, timeoutMs);
-        
-        handleSubmit(nonInteractiveInput)
-            .then(success => {
-                clearTimeout(safetyTimer);
-                setTimeout(() => process.exit(success ? 0 : 1), 100);
-            })
-            .catch(() => {
-                clearTimeout(safetyTimer);
-                setTimeout(() => process.exit(1), 100);
-            });
-    }, [handleSubmit, nonInteractiveInput, selectedTab, bootstrapConfig?.driver, agentSessionId]);
+
+        const finalizeExit = (code: number) => {
+            if (cancelled) return;
+            clearTimeout(safetyTimer);
+            setTimeout(() => process.exit(code), 100);
+        };
+
+        const runNonInteractive = async () => {
+            try {
+                const succeeded = await handleSubmit(nonInteractiveInput);
+                await waitForStreamsToIdle({
+                    timeoutMs,
+                    isCancelled: () => cancelled,
+                    context: 'NonInteractive',
+                });
+                finalizeExit(succeeded ? 0 : 1);
+            } catch {
+                finalizeExit(1);
+            }
+        };
+
+        void runNonInteractive();
+
+        return () => {
+            cancelled = true;
+            clearTimeout(safetyTimer);
+        };
+    }, [handleSubmit, nonInteractiveInput, selectedTab, bootstrapConfig?.driver, agentSessionId, waitForStreamsToIdle]);
 
     useEffect(() => {
         if (!e2eSteps || e2eSteps.length === 0 || nonInteractiveInput || automationRanRef.current) return;
         automationRanRef.current = true;
         let cancelled = false;
         const sleep = (ms = 0) => new Promise<void>(resolve => setTimeout(() => !cancelled && resolve(), Math.max(0, ms)));
-        const waitForStreamIdle = async (timeoutMs = 30000) => {
-            const started = Date.now();
-            while (!cancelled) {
-                if (!isStreamingRef.current && !isProcessingQueueRef.current) return true;
-                if (Date.now() - started > timeoutMs) {
-                    addLog(`[E2E] waitForStreamIdle timed out after ${timeoutMs}ms`);
-                    return false;
-                }
-                await sleep(100);
-            }
-            return false;
-        };
         const getAllTabs = () => [...getStaticTabs(), ...(tasksRef.current ?? []).map((_, i) => `Task ${i + 1}`)];
 
         (async () => {
@@ -1343,7 +1381,13 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
                         const submitFn = handleSubmitRef.current;
                         if (submitFn) {
                             await submitFn(step.text ?? '');
-                            if (step.waitForStream !== false) await waitForStreamIdle(step.timeoutMs);
+                            if (step.waitForStream !== false) {
+                                await waitForStreamsToIdle({
+                                    timeoutMs: step.timeoutMs,
+                                    isCancelled: () => cancelled,
+                                    context: 'E2E',
+                                });
+                            }
                         }
                         if (step.postDelayMs) await sleep(step.postDelayMs);
                         break;
@@ -1355,7 +1399,7 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
             }
         })().catch(error => addLog(`[E2E] Automation crashed: ${error instanceof Error ? error.stack ?? error.message : String(error)}`));
         return () => { cancelled = true; };
-    }, [e2eSteps, nonInteractiveInput]);
+    }, [e2eSteps, nonInteractiveInput, waitForStreamsToIdle]);
 
     // --- RENDER ---
     // Wait for tabs to be initialized before rendering
