@@ -103,6 +103,12 @@ export function buildPromptAgentStart(
       return true;
     }).catch((err) => {
       const message = err instanceof Error ? err.message : String(err);
+      try {
+        addLog(`[RunnableAgent] Stream failure detail: ${inspect(err, { depth: 3 })}`);
+      } catch {}
+      if (err instanceof Error && err.stack) {
+        addLog(`[RunnableAgent] Stream failed stack: ${err.stack}`);
+      }
       addLog(`[RunnableAgent] Stream failed: ${message}`);
       try { sinks.onFailed?.(message); } catch {}
       return false;

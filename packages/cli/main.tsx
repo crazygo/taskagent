@@ -52,7 +52,7 @@ import { MessageStore } from './store/MessageStore.js';
 import { useMessageStoreTab } from './hooks/useMessageStoreTab.js';
 import { useAgentEventBridge } from './hooks/useAgentEventBridge.js';
 import { TabExecutionManager, TabExecutor } from '@taskagent/execution';
-import type { ExecutionContext } from '@taskagent/execution/types.js';
+import type { ExecutionContext, ExecutionResult } from '@taskagent/execution/types.js';
 
 // Guard to prevent double submission in dev double-mount scenarios
 let __nonInteractiveSubmittedOnce = false;
@@ -844,6 +844,7 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
             setWorkspaceSettings(updatedSettings);
             setAgentSessionId(newSessionId);
             lastAnnouncedAgentSessionRef.current = null;
+            tabExecManager.setSession(currentTabId, { id: newSessionId, initialized: false });
             appendSystemMessage(`[Agent] Started new Claude session ${formatSessionId(newSessionId)}.`);
             addLog(`[Agent] Created new session ${newSessionId} for workspace ${workspacePath}`);
             return newSessionId;
@@ -856,17 +857,10 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
     }, [bootstrapConfig?.workspacePath, appendSystemMessage, tabExecutor, tabExecManager]);
 
     useEffect(() => {
-        if (!bootstrapConfig?.newSession || bootstrapNewSessionAppliedRef.current || !shouldForceNewSessionRef.current) return;
+        if (!bootstrapConfig?.newSession || bootstrapNewSessionAppliedRef.current) return;
         bootstrapNewSessionAppliedRef.current = true;
-        shouldForceNewSessionRef.current = false;
-        const promise = createNewAgentSession();
-        forcedSessionPromiseRef.current = promise;
-        promise.finally(() => {
-            if (forcedSessionPromiseRef.current === promise) {
-                forcedSessionPromiseRef.current = null;
-            }
-        });
-    }, [bootstrapConfig?.newSession, createNewAgentSession]);
+        shouldForceNewSessionRef.current = true;
+    }, [bootstrapConfig?.newSession]);
 
     const ensureAgentSession = useCallback(async (): Promise<string | null> => {
         if (forcedSessionPromiseRef.current) {
@@ -898,11 +892,24 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
             return false;
         }
 
-        const activeSessionId = sessionIdHint ?? agentSessionId ?? null;
-        if (!activeSessionId) {
-            appendSystemMessage('[Agent] Session not ready yet. Switch to the Agent tab again to initialize.', true);
-            return false;
+        let sessionIdToUse = sessionIdHint ?? agentSessionId ?? null;
+        if (shouldForceNewSessionRef.current || !sessionIdToUse) {
+            shouldForceNewSessionRef.current = false;
+            const fresh = await createNewAgentSession();
+            if (!fresh) {
+                appendSystemMessage('[Agent] Session not ready yet. Switch to the Agent tab again to initialize.', true);
+                return false;
+            }
+            sessionIdToUse = fresh;
+        } else {
+            const currentTabId = selectedTabRef.current;
+            const existing = tabExecManager.getSession(currentTabId);
+            if (!existing || existing.id !== sessionIdToUse) {
+                tabExecManager.setSession(currentTabId, { id: sessionIdToUse, initialized: true });
+            }
         }
+
+        const activeSessionId = sessionIdToUse;
 
         const userMessageId = messageStore.getNextMessageId();
         const userMessage: Types.Message = {
@@ -938,14 +945,22 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
                 tabExecManager.setSession(tabId, sessionState);
             }
 
-            const context: ExecutionContext = {
-                sourceTabId: tabId,
-                workspacePath: bootstrapConfig?.workspacePath,
-                session: { ...sessionState },
-                canUseTool: handleAgentPermissionRequest,
+            const executeOnce = async (overrideSessionId?: string): Promise<ExecutionResult> => {
+                const sessionForRun = overrideSessionId
+                    ? { id: overrideSessionId, initialized: false }
+                    : { ...sessionState };
+
+                const context: ExecutionContext = {
+                    sourceTabId: tabId,
+                    workspacePath: bootstrapConfig?.workspacePath,
+                    session: sessionForRun,
+                    canUseTool: handleAgentPermissionRequest,
+                };
+
+                return await tabExecutor.execute(tabId, targetAgentId, prompt, context);
             };
 
-            const result = await tabExecutor.execute(tabId, targetAgentId, prompt, context);
+            let result = await executeOnce();
 
             if (result.sessionId) {
                 tabExecManager.setSession(tabId, { id: result.sessionId, initialized: true });
@@ -953,11 +968,24 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
                     setAgentSessionId(result.sessionId);
                 }
             } else {
-                tabExecManager.setSession(tabId, { id: activeSessionId, initialized: true });
+                tabExecManager.setSession(tabId, { id: activeSessionId, initialized: result.success });
             }
 
             if (!result.success && result.error) {
-                appendSystemMessage(`[Agent] Error: ${result.error}`, true);
+                const shouldRetrySession = result.error.toLowerCase().includes('claude code process exited with code 1');
+                if (shouldRetrySession) {
+                    shouldForceNewSessionRef.current = true;
+                    if (tabId === Driver.AGENT) {
+                        setAgentSessionId(null);
+                        lastAnnouncedAgentSessionRef.current = null;
+                    }
+                }
+
+                if (shouldRetrySession) {
+                    appendSystemMessage('[Agent] Claude Code crashed; the next prompt will start a fresh session.', true);
+                } else {
+                    appendSystemMessage(`[Agent] Error: ${result.error}`, true);
+                }
             }
 
             return result.success;
@@ -1393,9 +1421,6 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
 
 // --- Render ---
 const { stdin, stdout, stderr } = process;
-if (stdin.isTTY && !stdin.isRaw) {
-    stdin.setRawMode(true);
-}
 if (process.env.E2E_SENTINEL && stdout.isTTY && typeof (stdout as any).setNoDelay === 'function') {
     (stdout as any).setNoDelay(true);
 }
