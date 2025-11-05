@@ -20,8 +20,8 @@ const MessageComponent: React.FC<MessageProps> = ({ message }) => {
     .filter(line => line.length > 0);
   const reasoningLines = allReasoningLines.slice(Math.max(0, allReasoningLines.length - 3));
   const normalizedContent = message.role === 'assistant'
-    ? (message.content ?? '').replace(/^\s+/, '')
-    : (message.content ?? '');
+    ? (message.content ?? '').replace(/^\s+/, '').replace(/\s+$/, '')
+    : (message.content ?? '').replace(/\s+$/, '');
   const contentLines = normalizedContent.split(/\r?\n/);
 
   if (message.role === 'user') {
@@ -58,8 +58,8 @@ const MessageComponent: React.FC<MessageProps> = ({ message }) => {
     const toolIdShort = message.toolId ? ` [${message.toolId.slice(0, 8)}]` : '';
     
     return (
-      <Box flexDirection="row">
-        <Text color="cyan">&gt; {displayName}</Text>
+      <Box flexDirection="row" paddingLeft={2}>
+        <Text color="gray" dimColor>○ {displayName}</Text>
         {description && <Text color="gray"> - {description}</Text>}
         {message.toolId && <Text color="gray" dimColor>{toolIdShort}</Text>}
       </Box>
@@ -74,8 +74,8 @@ const MessageComponent: React.FC<MessageProps> = ({ message }) => {
       : '';
     
     return (
-      <Box>
-        <Text color="green">✓ {displayName} completed{duration}</Text>
+      <Box paddingLeft={2}>
+        <Text color="gray" dimColor>✓ {displayName} completed{duration}</Text>
       </Box>
     );
   }
@@ -98,7 +98,7 @@ const MessageComponent: React.FC<MessageProps> = ({ message }) => {
   }
 
   return (
-    <Box {...boxProps} flexDirection="column">
+    <Box {...boxProps} flexDirection="column" paddingY={1}>
       {reasoningLines.length > 0 && (
         <Text color="gray" italic>{'✦ Thoughts:'}</Text>
       )}
@@ -107,11 +107,25 @@ const MessageComponent: React.FC<MessageProps> = ({ message }) => {
           {'│ '}{line || ' '}
         </Text>
       ))}
-      {contentLines.map((line, index) => (
-        <Text key={`${message.id}-content-${index}`} color={textColor}>
-          {index === 0 ? prefix.replace(/\s*$/, ' ') : ''}{line || ' '}{index === 0 ? pendingSuffix : ''}
-        </Text>
-      ))}
+      {contentLines.map((line, index) => {
+        const isFirstLine = index === 0;
+        return (
+          <Box key={`${message.id}-content-${index}`} flexDirection="row">
+            {isFirstLine ? (
+              <>
+                <Text color={textColor}>{prefix.replace(/\s*$/, ' ')}</Text>
+                <Text color={textColor}>{line || ' '}</Text>
+                {pendingSuffix ? <Text color={textColor}>{pendingSuffix}</Text> : null}
+              </>
+            ) : (
+              <>
+                <Text>{prefix.replace(/./g, ' ')}</Text>
+                <Text color={textColor}>{line || ' '}</Text>
+              </>
+            )}
+          </Box>
+        );
+      })}
     </Box>
   );
 };
@@ -131,9 +145,10 @@ const ActiveHistory: React.FC<HistoryProps> = ({ messages }) => (
 interface WelcomeScreenProps {
   modelName: string;
   workspacePath?: string | null;
+  sessionLabel?: string | null;
 }
 
-const WelcomeScreen = React.memo<WelcomeScreenProps>(({ modelName, workspacePath }) => (
+const WelcomeScreen = React.memo<WelcomeScreenProps>(({ modelName, workspacePath, sessionLabel }) => (
   <Box borderStyle="round" paddingX={2} flexDirection="column">
     <Box>
       <Box flexGrow={1} flexDirection="column">
@@ -142,6 +157,9 @@ const WelcomeScreen = React.memo<WelcomeScreenProps>(({ modelName, workspacePath
         <Text>Coder Model: {modelName || 'Not Set'}</Text>
         <Text>
           Working Directory: {workspacePath?.trim().length ? workspacePath : process.cwd()}
+        </Text>
+        <Text>
+          Claude Session: {sessionLabel ?? 'Not Initialized'}
         </Text>
       </Box>
     </Box>
@@ -154,12 +172,13 @@ interface ChatPanelProps {
   modelName: string;
   workspacePath?: string | null;
   positionalPromptWarning?: string | null;
+  sessionLabel?: string | null;
 }
 
-export const ChatPanel: React.FC<ChatPanelProps> = ({ frozenMessages, activeMessages, modelName, workspacePath, positionalPromptWarning }) => {
+export const ChatPanel: React.FC<ChatPanelProps> = ({ frozenMessages, activeMessages, modelName, workspacePath, positionalPromptWarning, sessionLabel }) => {
   const staticItems = [
     <Box key="welcome-screen-wrapper" flexDirection="column">
-      <WelcomeScreen modelName={modelName} workspacePath={workspacePath} />
+      <WelcomeScreen modelName={modelName} workspacePath={workspacePath} sessionLabel={sessionLabel} />
       {positionalPromptWarning ? (
         <>
           <Newline />

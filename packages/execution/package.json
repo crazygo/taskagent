@@ -10,7 +10,8 @@
     "./MessageAdapter.js": "./MessageAdapter.ts",
     "./TabExecutor": "./TabExecutor.ts",
     "./TabExecutionManager": "./TabExecutionManager.ts",
-    "./types": "./types.ts"
+    "./types": "./types.ts",
+    "./types.js": "./types.ts"
   },
   "dependencies": {
     "@taskagent/agents": "workspace:*",

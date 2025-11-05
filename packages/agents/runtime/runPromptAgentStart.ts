@@ -61,6 +61,7 @@ export function buildPromptAgentStart(
       callbacks: {
         onTextDelta: (chunk: string) => {
           fullText += chunk;
+          addLog(`[RunPromptAgentStart] onTextDelta called, chunk.length=${chunk.length}, fullText.length=${fullText.length}`);
           try { sinks.onText(chunk); } catch {}
           if (adapter.parseOutput && sinks.onEvent) {
             try {
@@ -96,9 +97,32 @@ export function buildPromptAgentStart(
             } catch {}
           }
         },
+        onNonAssistantEvent: (evt: unknown) => {
+          addLog(`[RunPromptAgentStart] onNonAssistantEvent called: ${JSON.stringify(evt).substring(0, 500)}`);
+          try {
+            const evtObj = evt as any;
+            if (evtObj && typeof evtObj === 'object' && evtObj.type === 'result') {
+              const cost = evtObj.total_cost_usd;
+              const dur = evtObj.duration_ms;
+              const turns = evtObj.num_turns;
+              addLog(`[RunPromptAgentStart] RESULT EVENT CAPTURED: cost=${cost}, duration=${dur}ms, turns=${turns}`);
+              // Block forwarding and inject special marker to prove this path displays text
+              sinks.onEvent?.({
+                level: 'info',
+                message: `◼︎ duration=${dur}ms, turns=${turns}, cost=$${cost}`,
+                ts: Date.now(),
+              });
+              return; // Don't forward the original result event
+            }
+            sinks.onEvent?.(evt as any);
+          } catch (err) {
+            addLog(`[RunPromptAgentStart] onNonAssistantEvent error: ${err}`);
+          }
+        },
       },
       log: addLog,
     }).then(() => {
+      addLog(`[RunPromptAgentStart] Stream completed, calling onCompleted with fullText.length=${fullText.length}`);
       try { sinks.onCompleted?.(fullText); } catch {}
       return true;
     }).catch((err) => {

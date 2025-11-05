@@ -8,7 +8,7 @@ import { type AgentDefinition, type PermissionUpdate, type PermissionResult } fr
 
 import { addLog } from '@taskagent/shared/logger';
 import { loadCliConfig } from './cli/config.js';
-import type { Task } from '../task-manager.js';
+import type { Task } from '@taskagent/shared/task-manager';
 import { ensureAiProvider, type AiChatProvider } from './config/ai-provider.js';
 import * as Types from './types.js';
 import { ChatPanel } from './components/ChatPanel.js';
@@ -792,13 +792,13 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
     }, [selectedTab, bootstrapConfig?.workspacePath, agentSessionId, appendSystemMessage]);
 
     useEffect(() => {
-        if (selectedTab !== Driver.AGENT || !agentSessionId || shouldForceNewSessionRef.current || forcedSessionPromiseRef.current || lastAnnouncedAgentSessionRef.current === agentSessionId) {
-            return;
-        }
-        const workspacePath = bootstrapConfig?.workspacePath ?? '(no workspace)';
-        appendSystemMessage(`[Agent] Using Claude session ${formatSessionId(agentSessionId)} for workspace ${workspacePath}.`);
-        lastAnnouncedAgentSessionRef.current = agentSessionId;
-    }, [selectedTab, agentSessionId, bootstrapConfig?.workspacePath, appendSystemMessage]);
+    if (selectedTab !== Driver.AGENT || !agentSessionId || shouldForceNewSessionRef.current || forcedSessionPromiseRef.current || lastAnnouncedAgentSessionRef.current === agentSessionId) {
+        return;
+    }
+    const workspacePath = bootstrapConfig?.workspacePath ?? '(no workspace)';
+    addLog(`[Agent] Using Claude session ${formatSessionId(agentSessionId)} for workspace ${workspacePath}.`);
+    lastAnnouncedAgentSessionRef.current = agentSessionId;
+}, [selectedTab, agentSessionId, bootstrapConfig?.workspacePath]);
 
     useInput((input, key) => {
         if (agentPermissionPrompt || (key.tab && isCommandMenuShown)) return;
@@ -954,7 +954,13 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
                     sourceTabId: tabId,
                     workspacePath: bootstrapConfig?.workspacePath,
                     session: sessionForRun,
-                    canUseTool: handleAgentPermissionRequest,
+                    canUseTool: async (toolName: string, input: Record<string, unknown>) => {
+                        const result = await handleAgentPermissionRequest(toolName, input, { 
+                            signal: new AbortController().signal,
+                            suggestions: []
+                        });
+                        return result.behavior === 'allow';
+                    },
                 };
 
                 return await tabExecutor.execute(tabId, targetAgentId, prompt, context);
@@ -1371,6 +1377,7 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
                 modelName={modelName}
                 workspacePath={bootstrapConfig.workspacePath}
                 positionalPromptWarning={positionalPromptWarning}
+                sessionLabel={agentSessionId ? formatSessionId(agentSessionId) : null}
             />
 
             {!nonInteractiveInput && (

@@ -34,9 +34,11 @@ export function useAgentEventBridge(eventBus: EventBus, messageStore: MessageSto
       role: 'system',
       content,
       isBoxed: boxed,
+      isPending: false,
       timestamp: Date.now(),
     };
     messageStore.appendMessage(tabId, message);
+    addLog(`[AgentBridge] appendSystemMessage completed for msgId=${message.id}`);
   }, [messageStore]);
 
   const ensureActiveEntry = useCallback((tabId: string): ConversationEntry | null => {
@@ -53,6 +55,7 @@ export function useAgentEventBridge(eventBus: EventBus, messageStore: MessageSto
         queueState: 'active',
         isPending: true,
       }));
+      addLog(`[AgentBridge] Activated queued conversation for tab ${tabId} (assistant=${entry.assistantMessageId})`);
     }
     return entry;
   }, [messageStore]);
@@ -64,18 +67,37 @@ export function useAgentEventBridge(eventBus: EventBus, messageStore: MessageSto
     }
 
     const current = queue.shift()!;
-    if (updater) {
-      messageStore.mutateMessage(tabId, current.assistantMessageId, updater);
-    } else {
-      messageStore.mutateMessage(tabId, current.assistantMessageId, msg => ({
-        ...msg,
-        isPending: false,
-        queueState: 'completed',
-      }));
+    addLog(`[AgentBridge] Finalizing conversation for tab ${tabId} (assistant=${current.assistantMessageId})`);
+    
+    // Move message to end to preserve frozen append order
+    const messages = messageStore.getMessagesForTab(tabId);
+    const index = messages.findIndex(m => m.id === current.assistantMessageId);
+    if (index !== -1) {
+      const msg = messages[index];
+      if (!msg) {
+        addLog(`[AgentBridge] Message not found at index ${index} for tab ${tabId}`);
+        return;
+      }
+      if (msg.isPending) {
+        // Remove from current position
+        messageStore.removeMessage(tabId, current.assistantMessageId);
+        
+        // Create finalized version and append to end
+        const finalized = updater ? updater(msg) : {
+          ...msg,
+          isPending: false,
+          queueState: 'completed' as const,
+        };
+        messageStore.appendMessage(tabId, finalized);
+      } else if (updater) {
+        // Already finalized, just mutate in place
+        messageStore.mutateMessage(tabId, current.assistantMessageId, updater);
+      }
     }
 
     if (!queue.length) {
       conversationQueuesRef.current.delete(tabId);
+      addLog(`[AgentBridge] Queue cleared for tab ${tabId}`);
       return;
     }
 
@@ -86,6 +108,7 @@ export function useAgentEventBridge(eventBus: EventBus, messageStore: MessageSto
       queueState: 'active',
       isPending: true,
     }));
+    addLog(`[AgentBridge] Promoted queued conversation for tab ${tabId} (assistant=${next.assistantMessageId})`);
   }, [messageStore]);
 
   useEffect(() => {
@@ -96,12 +119,15 @@ export function useAgentEventBridge(eventBus: EventBus, messageStore: MessageSto
       const chunk = typeof event.payload === 'string' ? event.payload : '';
       if (!chunk) return;
 
-      messageStore.mutateMessage(event.tabId, entry.assistantMessageId, msg => ({
-        ...msg,
-        content: (msg.content ?? '') + chunk,
-        queueState: 'active',
-        isPending: true,
-      }));
+      // Emit assistant text as finalized message to interleave with tool logs
+      messageStore.appendMessage(event.tabId, {
+        id: messageStore.getNextMessageId(),
+        role: 'assistant',
+        content: chunk,
+        reasoning: '',
+        isPending: false,
+        timestamp: event.timestamp,
+      });
     };
 
     const handleReasoning = (event: AgentEvent) => {
@@ -111,28 +137,55 @@ export function useAgentEventBridge(eventBus: EventBus, messageStore: MessageSto
       const chunk = typeof event.payload === 'string' ? event.payload : '';
       if (!chunk) return;
 
-      messageStore.mutateMessage(event.tabId, entry.assistantMessageId, msg => ({
-        ...msg,
-        reasoning: (msg.reasoning ?? '') + chunk,
-        queueState: 'active',
-        isPending: true,
-      }));
+      // Emit assistant reasoning as finalized message to interleave with tool logs
+      messageStore.appendMessage(event.tabId, {
+        id: messageStore.getNextMessageId(),
+        role: 'assistant',
+        content: '',
+        reasoning: chunk,
+        isPending: false,
+        timestamp: event.timestamp,
+      });
     };
 
     const handleAgentEvent = (event: AgentEvent) => {
+      addLog(`[AgentBridge] handleAgentEvent called for tab ${event.tabId}, event.type=${event.type}, timestamp=${event.timestamp}`);
       ensureActiveEntry(event.tabId);
       const payload = event.payload;
 
       if (payload && typeof payload === 'object' && 'type' in payload && (payload as any).type === 'session') {
         const sessionId = (payload as any).sessionId;
         if (typeof sessionId === 'string') {
-          appendSystemMessage(event.tabId, `[Agent] Using session ${sessionId}`, false);
+          addLog(`[AgentBridge] Session event received for tab ${event.tabId}: ${sessionId}`);
         }
         return;
       }
 
+      addLog(`[AgentBridge] received event for tab ${event.tabId}, with payload: ${JSON.stringify(payload)}`);
+
+      // Filter out SDK internal messages (type=user with message object)
+      // These are tool_result messages sent back to the model, not for UI display
+      if (payload && typeof payload === 'object' && 'type' in payload && (payload as any).type === 'user') {
+        addLog(`[AgentBridge] Ignoring SDK internal user message`);
+        return;
+      }
+
+      if (payload && typeof payload === 'object' && 'result' in payload) {
+        const resultText = typeof (payload as any).result === 'string'
+          ? (payload as any).result
+          : '';
+        addLog(`[AgentBridge] Result event received for tab ${event.tabId} (len=${resultText.length})`);
+        finalizeConversation(event.tabId);
+        return;
+      }
+
       if (payload && typeof payload === 'object' && 'message' in payload) {
-        const message = String((payload as any).message ?? '');
+        const messageField = (payload as any).message;
+        
+        // Debug: Log message field type and content
+        addLog(`[AgentBridge] payload.message type=${typeof messageField}, value=${JSON.stringify(messageField).substring(0, 200)}`);
+        
+        const message = String(messageField ?? '');
         if (!message) return;
 
         const toolUseMatch = message.match(TOOL_USE_REGEX);
@@ -177,19 +230,17 @@ export function useAgentEventBridge(eventBus: EventBus, messageStore: MessageSto
     };
 
     const handleCompleted = (event: AgentEvent) => {
-      const fullText = typeof event.payload === 'string' ? event.payload : '';
-      finalizeConversation(event.tabId, msg => ({
-        ...msg,
-        content: fullText || msg.content,
-        isPending: false,
-        queueState: 'completed',
-      }));
+      addLog(`[AgentBridge] handleCompleted called for tab ${event.tabId}, timestamp=${event.timestamp}`);
+      finalizeConversation(event.tabId);
+      const ts = new Date((event as any).timestamp ?? Date.now()).toISOString();
+      appendSystemMessage(event.tabId, `◼︎ ${ts}`);
     };
 
     const handleFailed = (event: AgentEvent) => {
       const errorMessage = typeof event.payload === 'string' ? event.payload : 'Agent execution failed';
       finalizeConversation(event.tabId, msg => ({
         ...msg,
+        content: '✗ Failed',
         isPending: false,
         queueState: 'completed',
       }));
@@ -231,6 +282,8 @@ export function useAgentEventBridge(eventBus: EventBus, messageStore: MessageSto
       isPending: true,
       queueState: entry.status,
     }));
+
+    addLog(`[AgentBridge] Registered conversation for tab ${tabId} (user=${userMessageId}, assistant=${assistantMessageId}, position=${queue.length - 1})`);
 
     return queue.length - 1; // number of items ahead in queue
   }, [messageStore]);
