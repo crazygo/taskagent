@@ -107,15 +107,11 @@ export class TabExecutor {
 
             // Start agent
             const handle = await agent.start(userInput, context, sinks);
-
-            // Wait for completion (if handle provides a promise)
-            // Note: Some agents may complete synchronously or via events only
-            // This is a simplified version - actual implementation may need
-            // to track completion via events
+            const completed = await handle.completion;
 
             return {
-                success: true,
-                sessionId: context.session?.id,
+                success: completed,
+                sessionId: handle.sessionId ?? context.session?.id,
             };
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
@@ -176,4 +172,3 @@ export class TabExecutor {
         return this.tabExecManager.getStats();
     }
 }
-

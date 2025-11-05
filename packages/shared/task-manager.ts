@@ -45,12 +45,13 @@ export type ForegroundSinks = {
 export interface ForegroundHandle {
   cancel: () => void;
   sessionId: string;
+  completion: Promise<boolean>;
 }
 
 export class TaskManager {
   private tasks: Map<string, TaskExtended> = new Map();
   private eventEmitters: Map<string, EventEmitter> = new Map();
-  private handles: Map<string, { cancel: () => void; sessionId: string }> = new Map();
+  private handles: Map<string, { cancel: () => void; sessionId: string; completion: Promise<boolean> }> = new Map();
   private timeouts: Map<string, NodeJS.Timeout> = new Map();
 
   /**
@@ -119,7 +120,7 @@ export class TaskManager {
     });
 
     // Always use agent.start() in background path
-    const maybeStart = (agent as unknown as { start?: (userInput: string, ctx: any, sinks: any) => { cancel: () => void; sessionId: string } }).start;
+    const maybeStart = (agent as unknown as { start?: (userInput: string, ctx: any, sinks: any) => { cancel: () => void; sessionId: string; completion: Promise<boolean> } }).start;
     if (typeof maybeStart !== 'function') {
       throw new Error('[BG] agent.start() is required for background runs');
     }
@@ -214,7 +215,7 @@ export class TaskManager {
     },
     sinks: ForegroundSinks,
   ): ForegroundHandle {
-    const maybeStart = (agent as unknown as { start?: (userInput: string, ctx: any, sinks: any) => { cancel: () => void; sessionId: string } }).start;
+    const maybeStart = (agent as unknown as { start?: (userInput: string, ctx: any, sinks: any) => { cancel: () => void; sessionId: string; completion: Promise<boolean> } }).start;
     if (typeof maybeStart !== 'function') {
       throw new Error('[FG] agent.start() is required for foreground runs');
     }

@@ -45,7 +45,7 @@ puts "\[E2E] [ts] Automation steps: $automation_steps"
 set env(E2E_SENTINEL) "1"
 set env(E2E_AUTOMATION_STEPS) $automation_steps
 
-spawn yarn start -- --workspace $workspace
+spawn yarn start -- --workspace $workspace --auto-allow
 puts "\[E2E] [ts] Spawned 'yarn start -- --workspace $workspace' with automation"
 
 expect {
@@ -59,4 +59,3 @@ expect {
 }
 
 puts "\[E2E] [ts] Transcript saved to: $log_path"
-

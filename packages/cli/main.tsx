@@ -977,7 +977,7 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
                 if (!agent) {
                     throw new Error(`Failed to create agent: ${targetAgentId}`);
                 }
-                
+
                 // Prepare context and sinks for agent.start()
                 const context: AgentStartContext = {
                     sourceTabId: selectedTab,
@@ -1063,9 +1063,10 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
                     canUseTool: handleAgentPermissionRequest,
                 };
                 
-                await agent.start(rawInput, context, sinks);
+                const executionHandle = await agent.start(rawInput, context, sinks);
                 agentSessionInitializedRef.current = true;
-                return true;
+                const completed = await executionHandle.completion;
+                return completed;
             }
             
             // Fallback to old flow if agent not in registry
@@ -1294,6 +1295,9 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
 
     useEffect(() => { handleSubmitRef.current = handleSubmit; }, [handleSubmit]);
 
+    const waitForStreamsToIdleRef = useRef(waitForStreamsToIdle);
+    useEffect(() => { waitForStreamsToIdleRef.current = waitForStreamsToIdle; }, [waitForStreamsToIdle]);
+
     useEffect(() => {
         if (!nonInteractiveInput || hasProcessedNonInteractiveRef.current || __nonInteractiveSubmittedOnce) return;
         const desiredTab = bootstrapConfig?.driver ? getTabByCliName(bootstrapConfig.driver) : null;
@@ -1317,21 +1321,30 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
         // Use shorter timeout in test environments (7s) vs production (15s)
         const timeoutMs = process.env.E2E_WORKSPACE ? 7000 : 15000;
         let cancelled = false;
+        let finalized = false;
         const safetyTimer = setTimeout(() => {
             addLog(`[NonInteractive] Safety timeout (${timeoutMs}ms) reached, exiting with code 0`);
             try { process.exit(0); } catch {}
         }, timeoutMs);
 
         const finalizeExit = (code: number) => {
-            if (cancelled) return;
+            if (finalized) return;
+            finalized = true;
             clearTimeout(safetyTimer);
             setTimeout(() => process.exit(code), 100);
         };
 
         const runNonInteractive = async () => {
             try {
-                const succeeded = await handleSubmit(nonInteractiveInput);
-                await waitForStreamsToIdle({
+                const submit = handleSubmitRef.current;
+                const waitForStreams = waitForStreamsToIdleRef.current;
+                if (!submit) {
+                    finalizeExit(1);
+                    return;
+                }
+
+                const succeeded = await submit(nonInteractiveInput);
+                await waitForStreams({
                     timeoutMs,
                     isCancelled: () => cancelled,
                     context: 'NonInteractive',
@@ -1346,9 +1359,10 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
 
         return () => {
             cancelled = true;
+            // Safety timer cleared even if we've already finalized
             clearTimeout(safetyTimer);
         };
-    }, [handleSubmit, nonInteractiveInput, selectedTab, bootstrapConfig?.driver, agentSessionId, waitForStreamsToIdle]);
+    }, [nonInteractiveInput, selectedTab, bootstrapConfig?.driver, agentSessionId]);
 
     useEffect(() => {
         if (!e2eSteps || e2eSteps.length === 0 || nonInteractiveInput || automationRanRef.current) return;

@@ -44,6 +44,11 @@ export type AgentStartSinks = {
 export interface ExecutionHandle {
     cancel: () => void;
     sessionId: string;
+    /**
+     * Promise that resolves when the agent finishes streaming.
+     * Resolves to true on successful completion, false when the stream fails or is aborted.
+     */
+    completion: Promise<boolean>;
 }
 
 /**

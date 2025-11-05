@@ -54,7 +54,7 @@ export function buildPromptAgentStart(
     // Accumulator for completion
     let fullText = '';
 
-    void runClaudeStream({
+    const completion = runClaudeStream({
       prompt,
       session,
       queryOptions: options as any,
@@ -100,15 +100,18 @@ export function buildPromptAgentStart(
       log: addLog,
     }).then(() => {
       try { sinks.onCompleted?.(fullText); } catch {}
+      return true;
     }).catch((err) => {
       const message = err instanceof Error ? err.message : String(err);
       addLog(`[RunnableAgent] Stream failed: ${message}`);
       try { sinks.onFailed?.(message); } catch {}
+      return false;
     });
 
     return {
       cancel: () => controller.abort(),
       sessionId: session.id,
+      completion,
     };
   };
 }
