@@ -1,0 +1,13 @@
+feature: "Non-Interactive Mode"
+description: "Describes how the application behaves when launched with arguments from the command line."
+
+scenarios:
+  - scenario: "Application is launched with a prompt to a specific driver"
+    given:
+      - "The application is launched with arguments like '--story -p "A tale of two cities"'."
+    when:
+      - "The application starts."
+    then:
+      - "It automatically switches to the 'Story' tab."
+      - "The prompt 'A tale of two cities' is submitted."
+      - "After the agent finishes, the application automatically exits."
