@@ -42,7 +42,7 @@ const createPlaceholderHandler = (label: string): DriverHandler => {
 
 export function getDriverManifest(): readonly DriverManifestEntry[] {
     // Auto-generate fg/bg slash commands for PromptAgent-based drivers
-    const levelIcons = { info: 'ℹ️', warning: '⚠️', error: '❌' } as const;
+    const levelIcons = { info: '[i]', warning: '[!]', error: '[x]' } as const;
 
     type AgentSlashSpec = {
         driverId: Driver;

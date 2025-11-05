@@ -47,6 +47,35 @@ const MessageComponent: React.FC<MessageProps> = ({ message }) => {
     );
   }
 
+  // Tool use: show tool start with name and description
+  if (message.role === 'tool_use') {
+    const displayName = message.toolName || 'Tool';
+    const description = message.toolDescription || '';
+    const toolIdShort = message.toolId ? ` [${message.toolId.slice(0, 8)}]` : '';
+    
+    return (
+      <Box flexDirection="row">
+        <Text color="cyan">&gt; {displayName}</Text>
+        {description && <Text color="gray"> - {description}</Text>}
+        {message.toolId && <Text color="gray" dimColor>{toolIdShort}</Text>}
+      </Box>
+    );
+  }
+
+  // Tool result: show tool completion with duration
+  if (message.role === 'tool_result') {
+    const displayName = message.toolName || 'Tool';
+    const duration = message.durationMs 
+      ? ` (${(message.durationMs / 1000).toFixed(1)}s)` 
+      : '';
+    
+    return (
+      <Box>
+        <Text color="green">✓ {displayName} completed{duration}</Text>
+      </Box>
+    );
+  }
+
   let prefix = '';
   let textColor: 'white' | 'gray' | 'yellow' | undefined;
   const boxProps: Record<string, unknown> = {};
@@ -55,7 +84,7 @@ const MessageComponent: React.FC<MessageProps> = ({ message }) => {
     prefix = '✦ ';
     textColor = undefined;
   } else if (message.role === 'system') {
-    prefix = 'ℹ️ ';
+    prefix = '[i] ';
     textColor = 'yellow';
     if (message.isBoxed) {
       boxProps.borderStyle = 'round';

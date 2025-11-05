@@ -1,4 +1,4 @@
-export type MessageType = 'user' | 'assistant' | 'system';
+export type MessageType = 'user' | 'assistant' | 'system' | 'tool_use' | 'tool_result';
 
 export interface Message {
     id: number;
@@ -9,6 +9,11 @@ export interface Message {
     reasoning?: string;
     sourceTabId?: string;      // Tab isolation support
     timestamp?: number;         // Event timestamp
+    // Tool call specific fields
+    toolName?: string;          // Tool name (e.g., "Bash", "Read")
+    toolId?: string;            // Tool call ID for tracking
+    toolDescription?: string;   // Human-readable description of the tool action
+    durationMs?: number;        // Execution time (for tool_result)
 }
 
 export type LogMessage = {

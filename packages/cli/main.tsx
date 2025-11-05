@@ -46,6 +46,7 @@ import { uiReviewTabConfig } from '@taskagent/tabs/configs/ui-review';
 import { monitorTabConfig } from '@taskagent/tabs/configs/monitor';
 import { getPresetOrDefault } from '@taskagent/presets';
 import { globalAgentRegistry, registerAllAgents } from '@taskagent/agents/registry';
+import type { AgentStartContext, AgentStartSinks } from '@taskagent/agents/runtime/types.js';
 
 // Guard to prevent double submission in dev double-mount scenarios
 let __nonInteractiveSubmittedOnce = false;
@@ -581,10 +582,10 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
                 let resultContent: string;
                 if (decision.kind === 'allow') {
                     const rememberNote = decision.always && hasSuggestions ? ' (remembered for this session)' : '';
-                    resultContent = `[Agent] Permission #${id} · ${toolName}\n\n${request.summary}\n\n✅ Approved${rememberNote}`;
+                    resultContent = `[Agent] Permission #${id} · ${toolName}\n\n${request.summary}\n\n✓ Approved${rememberNote}`;
                 } else {
                     const reason = decision.reason?.trim().length ? decision.reason.trim() : 'Denied by user';
-                    resultContent = `[Agent] Permission #${id} · ${toolName}\n\n${request.summary}\n\n❌ Denied: ${reason}`;
+                    resultContent = `[Agent] Permission #${id} · ${toolName}\n\n${request.summary}\n\n✗ Denied: ${reason}`;
                 }
                 
                 const { isPending, ...msgWithoutPending } = msg;
@@ -938,17 +939,6 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
                     throw new Error(`Failed to create agent: ${targetAgentId}`);
                 }
                 
-                // Create initial assistant message
-                const assistantMessageId = nextMessageId();
-                const assistantMessage: Types.Message = { 
-                    id: assistantMessageId, 
-                    role: 'assistant', 
-                    content: '',
-                    reasoning: '',
-                    isPending: true 
-                };
-                setActiveMessages(prev => [...prev, assistantMessage]);
-                
                 // Prepare context and sinks for agent.start()
                 const context: AgentStartContext = {
                     sourceTabId: selectedTab,
@@ -959,36 +949,74 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
                 
                 const sinks: AgentStartSinks = {
                     onText: (chunk: string) => {
-                        setActiveMessages(prev => {
-                            return prev.map(msg => 
-                                msg.id === assistantMessageId 
-                                    ? { ...msg, content: msg.content + chunk }
-                                    : msg
-                            );
-                        });
+                        // Each text chunk is a complete sentence - create independent frozen message
+                        if (!chunk.trim()) return;
+                        
+                        const textMessageId = nextMessageId();
+                        const textMessage: Types.Message = {
+                            id: textMessageId,
+                            role: 'assistant',
+                            content: chunk,
+                            timestamp: Date.now(),
+                        };
+                        // Add to frozen immediately to maintain chronological order
+                        setFrozenMessages(prev => [...prev, textMessage]);
                     },
                     onReasoning: (chunk: string) => {
-                        setActiveMessages(prev => {
-                            return prev.map(msg =>
-                                msg.id === assistantMessageId
-                                    ? { ...msg, reasoning: (msg.reasoning ?? '') + chunk }
-                                    : msg
-                            );
-                        });
+                        // Create independent reasoning message
+                        if (!chunk.trim()) return;
+                        
+                        const reasoningMessageId = nextMessageId();
+                        const reasoningMessage: Types.Message = {
+                            id: reasoningMessageId,
+                            role: 'assistant',
+                            content: '',
+                            reasoning: chunk,
+                            timestamp: Date.now(),
+                        };
+                        setFrozenMessages(prev => [...prev, reasoningMessage]);
+                    },
+                    onEvent: (event: Types.TaskEvent) => {
+                        // Parse tool events from runPromptAgentStart
+                        // Format: "Tool: {name} - {description}" or "Tool {name} completed (Xs)"
+                        const toolUseMatch = event.message.match(/^Tool:\s+(\w+)(?:\s+-\s+(.+))?$/);
+                        const toolResultMatch = event.message.match(/^Tool\s+(\w+)\s+completed(?:\s+\(([^)]+)\))?$/);
+                        
+                        if (toolUseMatch) {
+                            const [, toolName, description] = toolUseMatch;
+                            const toolUseMessageId = nextMessageId();
+                            const toolUseMessage: Types.Message = {
+                                id: toolUseMessageId,
+                                role: 'tool_use',
+                                content: '',
+                                toolName: toolName || 'Unknown',
+                                toolDescription: description,
+                                timestamp: event.ts,
+                            };
+                            setFrozenMessages(prev => [...prev, toolUseMessage]);
+                            addLog(`[ToolUI] Tool use: ${toolName}${description ? ` - ${description}` : ''}`);
+                        } else if (toolResultMatch) {
+                            const [, toolName, durationStr] = toolResultMatch;
+                            const durationMs = durationStr ? parseFloat(durationStr.replace('s', '')) * 1000 : undefined;
+                            const toolResultMessageId = nextMessageId();
+                            const toolResultMessage: Types.Message = {
+                                id: toolResultMessageId,
+                                role: 'tool_result',
+                                content: '',
+                                toolName: toolName || 'Unknown',
+                                durationMs,
+                                timestamp: event.ts,
+                            };
+                            setFrozenMessages(prev => [...prev, toolResultMessage]);
+                            addLog(`[ToolUI] Tool result: ${toolName}${durationMs ? ` (${durationMs}ms)` : ''}`);
+                        }
                     },
                     onSessionId: (sid: string) => {
                         addLog(`[Agent] Resolved session ID: ${sid}`);
                     },
                     onCompleted: (fullText: string) => {
-                        // Mark message as no longer pending
-                        setActiveMessages(prev => {
-                            return prev.map(msg =>
-                                msg.id === assistantMessageId
-                                    ? { ...msg, isPending: false }
-                                    : msg
-                            );
-                        });
-                        finalizeMessageById(assistantMessageId);
+                        // No-op: messages are already frozen incrementally
+                        addLog('[Agent] Stream completed.');
                     },
                     onFailed: (error: string) => {
                         appendSystemMessage(`[Agent] Failed: ${error}`, true);
