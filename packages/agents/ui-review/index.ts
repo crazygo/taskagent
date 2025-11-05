@@ -2,7 +2,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { loadAgentPipelineConfig } from '../runtime/agentLoader.js';
 import { buildUiReviewSystemPrompt } from './prompt.js';
-import type { AgentStartContext, AgentStartSinks } from '../runtime/types.js';
+import { buildPromptAgentStart } from '../runtime/runPromptAgentStart.js';
+import type { AgentContext, AgentStartContext, AgentStartSinks, ExecutionHandle, RunnableAgent } from '../runtime/types.js';
 
 /**
  * createUiReviewAgent
@@ -10,46 +11,34 @@ import type { AgentStartContext, AgentStartSinks } from '../runtime/types.js';
  * Returns a simplified agent for UI Review with custom system prompt.
  * Uses loadAgentPipelineConfig for tool configurations.
  */
-export async function createAgent() {
+export async function createAgent(): Promise<RunnableAgent> {
   const agentDir = path.dirname(fileURLToPath(import.meta.url));
   
-  const { systemPrompt: _, allowedTools, disallowedTools } = await loadAgentPipelineConfig(agentDir, {
+  const { systemPrompt: _, allowedTools } = await loadAgentPipelineConfig(agentDir, {
     systemPromptFactory: buildUiReviewSystemPrompt,
   });
   
-  const systemPrompt = buildUiReviewSystemPrompt();
   const agentId = 'ui-review';
   const agentDescription = 'UI Review Agent (ASCII wireframes + annotations)';
+
+  const getPrompt = (userInput: string, _ctx: AgentContext | AgentStartContext) => userInput.trim();
+  const getSystemPrompt = () => ({ type: 'preset', preset: 'claude_code', append: buildUiReviewSystemPrompt() } as const);
+  const getAgentDefinitions = () => undefined; // No sub-agents
+  const getTools = () => allowedTools ?? [];
+
+  const start = buildPromptAgentStart({
+    getPrompt: (userInput: string, ctx: { sourceTabId: string; workspacePath?: string }) => getPrompt(userInput, ctx),
+    getSystemPrompt,
+    getAgentDefinitions,
+  });
 
   return {
     id: agentId,
     description: agentDescription,
-
-    // Agent contract
-    getPrompt(userInput: string) {
-      return userInput.trim();
-    },
-
-    getSystemPrompt() {
-      return { type: 'preset', preset: 'claude_code', append: systemPrompt } as const;
-    },
-
-    getAgentDefinitions() {
-      return undefined; // No sub-agents
-    },
-
-    getTools(): string[] {
-      return allowedTools || [];
-    },
-    
-    getModel(): string | undefined {
-      return undefined;
-    },
-
-    // Minimal start implementation (not used in current pipeline flow)
-    start(userInput: string, ctx: AgentStartContext, sinks: AgentStartSinks) {
-      throw new Error('UI Review Agent uses pipeline flow, not direct start()');
-    },
+    getPrompt,
+    getAgentDefinitions,
+    getTools,
+    start: (userInput: string, context: AgentStartContext, sinks: AgentStartSinks): ExecutionHandle => start(userInput, context, sinks),
   };
 }
 
