@@ -1231,6 +1231,17 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
         if (!nonInteractiveInput || hasProcessedNonInteractiveRef.current || __nonInteractiveSubmittedOnce) return;
         const desiredTab = bootstrapConfig?.driver ? getTabByCliName(bootstrapConfig.driver) : null;
         if (desiredTab && selectedTab !== desiredTab.label) return;
+        
+        // Check if this tab requires a session
+        const tabInfo = getTabInfoByLabel(selectedTab);
+        const needsSession = selectedTab === Driver.AGENT || (tabInfo?.requiresSession ?? false);
+        
+        // Wait for session to be ready if needed
+        if (needsSession && !agentSessionId) {
+            addLog(`[NonInteractive] Waiting for session to initialize for tab: ${selectedTab}`);
+            return; // Will retry when agentSessionId changes
+        }
+        
         hasProcessedNonInteractiveRef.current = true;
         __nonInteractiveSubmittedOnce = true;
         addLog(`Non-interactive mode: Processing input "${nonInteractiveInput}"`);
@@ -1252,7 +1263,7 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
                 clearTimeout(safetyTimer);
                 setTimeout(() => process.exit(1), 100);
             });
-    }, [handleSubmit, nonInteractiveInput, selectedTab, bootstrapConfig?.driver]);
+    }, [handleSubmit, nonInteractiveInput, selectedTab, bootstrapConfig?.driver, agentSessionId]);
 
     useEffect(() => {
         if (!e2eSteps || e2eSteps.length === 0 || nonInteractiveInput || automationRanRef.current) return;
