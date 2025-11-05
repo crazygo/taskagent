@@ -118,9 +118,9 @@ export class DefaultAtomicAgent implements RunnableAgent {
         return undefined;
     }
 
-    start(userInput: string, context: AgentStartContext, sinks: AgentStartSinks): ExecutionHandle {
+    async start(userInput: string, context: AgentStartContext, sinks: AgentStartSinks): Promise<ExecutionHandle> {
         // Use the shared builder for standard prompt agent behavior
-        const { buildPromptAgentStart } = require('./runPromptAgentStart.js');
+        const { buildPromptAgentStart } = await import('./runPromptAgentStart.js');
         const starter = buildPromptAgentStart({
             getPrompt: (input: string) => input,
             getSystemPrompt: () => ({ type: 'preset', preset: 'claude_code' } as const),
