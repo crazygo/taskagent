@@ -10,6 +10,7 @@ export interface CliConfig {
   driver?: DriverName;
   workspacePath: string;
   newSession: boolean;
+  autoAllowPermissions: boolean;
   ignoredPositionalPrompt?: string;
   preset?: string; // Preset name: 'default', 'monitor', etc.
 }
@@ -38,19 +39,21 @@ export const loadCliConfig = (): CliConfig => {
   loadEnv(workspacePath); // Load environment variables using resolved workspace path
 
   const newSession = cliArgs.newSession === true;
+  const autoAllowPermissions = cliArgs.autoAllow === true;
 
   const cfg: CliConfig = {
     prompt: cliArgs.prompt,
     driver: cliArgs.driver,
     workspacePath,
     newSession,
+    autoAllowPermissions,
     ignoredPositionalPrompt: cliArgs.ignoredPositionalPrompt,
     preset: cliArgs.preset,
   };
 
   try {
     addLog(
-      `[CLI] Config -> driver: ${cfg.driver ?? 'undefined'}, prompt: ${cfg.prompt ?? 'undefined'}, ignoredPositionalPrompt: ${cfg.ignoredPositionalPrompt ?? 'undefined'}, workspace: ${cfg.workspacePath ?? 'undefined'}, newSession: ${cfg.newSession}, preset: ${cfg.preset ?? 'undefined'}`
+      `[CLI] Config -> driver: ${cfg.driver ?? 'undefined'}, prompt: ${cfg.prompt ?? 'undefined'}, ignoredPositionalPrompt: ${cfg.ignoredPositionalPrompt ?? 'undefined'}, workspace: ${cfg.workspacePath ?? 'undefined'}, newSession: ${cfg.newSession}, autoAllow: ${cfg.autoAllowPermissions}, preset: ${cfg.preset ?? 'undefined'}`
     );
   } catch {}
 

@@ -367,6 +367,7 @@ const App = () => {
     }, [bootstrapConfig.preset, tabsInitialized]);
 
     const nonInteractiveInput = bootstrapConfig.prompt;
+    const autoAllowPermissions = bootstrapConfig.autoAllowPermissions;
     const e2eSteps = useMemo<E2EAutomationStep[] | null>(() => {
         const raw = process.env.E2E_AUTOMATION_STEPS;
         if (!raw) {
@@ -745,6 +746,12 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
                     cancel: () => finalize({ behavior: 'deny', message: 'Permission request cancelled.', interrupt: false }),
                 });
 
+                if (autoAllowPermissions) {
+                    addLog(`[Agent] Auto-approving permission #${requestId} for "${toolName}" (--auto-allow).`);
+                    resolveAgentPermission(requestId, { kind: 'allow', always: true });
+                    return;
+                }
+
                 agentPermissionQueueRef.current.push(requestId);
                 if (!agentPermissionPrompt) {
                     activateNextAgentPermissionPrompt();
@@ -757,7 +764,7 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
                 }
             });
         },
-        [activateNextAgentPermissionPrompt, agentPermissionPrompt, nextMessageId, appendSystemMessage, setActiveMessages]
+        [activateNextAgentPermissionPrompt, agentPermissionPrompt, nextMessageId, appendSystemMessage, setActiveMessages, autoAllowPermissions, resolveAgentPermission]
     );
 
     const handlePermissionPromptSubmit = useCallback(
