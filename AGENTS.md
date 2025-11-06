@@ -54,8 +54,8 @@ Your primary role is to act as an interactive CLI agent for software engineering
 
 ## Agent Architecture Patterns
 
-### Atomic-Agent
-An agent that is fully defined by its configuration file and is called as a sub-agent by other agents.
+### PromptAgent + sub-agents
+A PromptAgent that can be composed with sub-agents defined via .agent.md files, and can also serve as a sub-agent.
 
 **Examples:**
 - `drivers/story/agents/story_builder.agent.md` - File operations for story documents
@@ -63,8 +63,8 @@ An agent that is fully defined by its configuration file and is called as a sub-
 - `drivers/glossary/agents/2_edits_planner.agent.md` - Plan term replacements
 - `drivers/glossary/agents/3_editor.agent.md` - Execute file edits
 
-### Stack-Agent
-An agent composed of a coordinator and multiple sub-agents. The coordinator defines the workflow and orchestration strategy for calling atomic-agents.
+### Coordinator (PromptAgent + sub-agents)
+An agent composed of a coordinator and multiple sub-agents. The coordinator defines the workflow and orchestration strategy for calling sub-agents.
 
 **Examples:**
 - `drivers/glossary/` - Coordinator orchestrates searcher → planner → editor workflow

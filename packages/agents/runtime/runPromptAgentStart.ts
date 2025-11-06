@@ -77,11 +77,7 @@ export function buildPromptAgentStart(
           // Forward tool use events to UI as info events
           if (sinks.onEvent) {
             try {
-              sinks.onEvent({
-                level: 'info',
-                message: `Tool: ${event.name}${event.description ? ` - ${event.description}` : ''}`,
-                ts: Date.now(),
-              });
+              sinks.onEvent(event);
             } catch {}
           }
         },
@@ -89,17 +85,12 @@ export function buildPromptAgentStart(
           // Forward tool result events to UI as info events
           if (sinks.onEvent) {
             try {
-              const duration = event.durationMs ? ` (${(event.durationMs / 1000).toFixed(1)}s)` : '';
-              sinks.onEvent({
-                level: 'info',
-                message: `Tool ${event.name} completed${duration}`,
-                ts: Date.now(),
-              });
+              sinks.onEvent(event);
             } catch {}
           }
         },
         onNonAssistantEvent: (evt: unknown) => {
-          addLog(`[RunPromptAgentStart] onNonAssistantEvent called: ${JSON.stringify(evt).substring(0, 500)}`);
+          addLog(`[RunPromptAgentStart] onNonAssistantEvent called, uuid=${(evt as any)?.uuid ? (evt as any).uuid : 'n/a'}`);
           try {
             const evtObj = evt as any;
             if (evtObj && typeof evtObj === 'object' && evtObj.type === 'result') {

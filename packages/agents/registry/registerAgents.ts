@@ -10,7 +10,7 @@ import { createAgent as createStoryAgent } from '../story/index.js';
 import { createAgent as createGlossaryAgent } from '../glossary/index.js';
 import { createAgent as createUiReviewAgent } from '../ui-review/index.js';
 import { createAgent as createMonitorAgent } from '../monitor/index.js';
-import { DefaultAtomicAgent } from '../runtime/types.js';
+import { DefaultPromptAgent } from '../runtime/types.js';
 
 /**
  * Register all built-in agents
@@ -19,7 +19,7 @@ export function registerAllAgents(): void {
     // Default Agent (passthrough for Agent tab)
     globalAgentRegistry.register({
         id: 'default',
-        factory: async () => new DefaultAtomicAgent(),
+        factory: async () => new DefaultPromptAgent(),
         description: 'Default Agent - Direct Claude Code access',
         tags: ['default', 'passthrough'],
     });

@@ -291,17 +291,17 @@ User ◄─────────────────┘
 
 ## Agent Types & Patterns
 
-### Atomic-Agent
+### PromptAgent + sub-agents
 - **specs_breakdown**
 - **task_log**
 - **git_diff**
 
 **特性**: 完全由配置文件定义，作为子代理被调用。
 
-### Stack-Agent (Composed)
+### Coordinator (PromptAgent + sub-agents)
 - **ReviewAgent**
 
-**特性**: 组合型代理，初始化时装配多个 Atomic-Agent 并合并配置，执行单次审查。
+**特性**: 组合型代理，初始化时装配多个 PromptAgent 子代理并合并配置，执行单次审查。
 
 ### Mediator-Agent (Dialog Interface)
 - **Mediator Agent**
@@ -417,7 +417,7 @@ packages/agents/monitor/
 ```
 
 ### Integration with Existing System
-- 参考 `drivers/glossary/` 的 Stack-Agent 模式（ReviewAgent 装配）
+- 参考 `drivers/glossary/` 的 PromptAgent + sub-agents 装配模式（ReviewAgent 装配）
 - 复用 `drivers/story/` 的用户对话模式（Mediator 对话通道）
 - 集成 MCP 工具（memory read/write、git 操作）
 - 参考 Ink UI 的消息流机制实现双通道推送
@@ -515,7 +515,7 @@ class MediatorChannels {
 
 ## References
 
-- **Glossary Driver**: Stack-Agent 装配模式
+- **Glossary Driver**: PromptAgent + sub-agents 装配模式
 - **Story Driver**: 用户对话流程
 - **MCP Tools**: Memory & Git 集成
 - **Ink UI**: 终端界面交互模式与消息流

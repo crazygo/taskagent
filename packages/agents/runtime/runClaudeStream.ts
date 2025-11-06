@@ -6,6 +6,7 @@ import { addLog } from '@taskagent/shared/logger';
 const truncate = (s: string, n = 200) => (s.length <= n ? s : `${s.slice(0, n)}…`);
 
 export type ToolUseEvent = {
+    type: 'tool_use';
     id: string;
     name: string;
     input?: unknown;
@@ -13,8 +14,11 @@ export type ToolUseEvent = {
 };
 
 export type ToolResultEvent = {
+    type: 'tool_result';
     id: string;
     name: string;
+    isError?: boolean;
+    content?: string;
     durationMs?: number;
     payload: unknown;
 };
@@ -142,7 +146,7 @@ export const runClaudeStream = async ({
             }
             const sinceStartMs = Date.now() - streamStartAt;
             const sinceStartSeconds = (sinceStartMs / 1000).toFixed(3);
-            log(`[Agent] Event #${eventCount} type=${type} (+${sinceStartSeconds}s)`);
+            log(`[Agent] Event #${eventCount} type=${type} (+${sinceStartSeconds}s), raw=${JSON.stringify(message, null, 2)}`);
         } catch (error) {
             log(`[Agent] Failed to log event metadata: ${String(error)}`);
         }
@@ -179,23 +183,43 @@ export const runClaudeStream = async ({
                     const raw = block as any;
                     const id = String(raw?.id ?? raw?.tool_use_id ?? 'unknown');
                     const name = String(raw?.name ?? raw?.tool?.name ?? 'unknown');
-                    const input = raw?.input ?? raw?.arguments ?? raw?.params;
+                    const input = raw?.input?.command ?? raw?.input?.file_path ?? raw?.input?.arguments ?? raw?.input?.params;
                     toolUseStartAt.set(id, Date.now());
                     toolUseName.set(id, name);
                     log(`[ToolUse] start id=${id} name=${name}`);
-                    try {
-                        log(`[ToolUse] input full id=${id}: ${JSON.stringify(input)}`);
-                    } catch {
-                        log(`[ToolUse] input inspect id=${id}: ${inspect(input, { depth: 6 })}`);
-                    }
                     const description = (input && typeof (input as { description?: unknown }).description === 'string')
                         ? String((input as { description?: string }).description)
                         : undefined;
-                    cb.onToolUse?.({ id, name, input, description });
+                    cb.onToolUse?.({ type: 'tool_use', id, name, input, description });
                 }
+                // tool result will be a 'user' message
             }
+        } else if ((message as { type?: string }).type === 'user') {
+            try {
+                const userMessage: any = message;
+                if (userMessage?.type === 'user' && Array.isArray(userMessage?.message?.content)) {
+                    for (const block of userMessage.message.content) {
+                        if (block?.type === 'tool_result') {
+                            const rid = String(block?.tool_use_id ?? 'unknown');
+                            const name = toolUseName.get(rid) ?? 'unknown';
+                            const started = toolUseStartAt.get(rid);
+                            const isError = block?.is_error ?? false;
+                            const duration = started ? (Date.now() - started) : undefined;
+                            log(`[ToolResult] id=${rid} name=${name} duration_ms=${duration ?? 'n/a'}`);
+                            cb.onToolResult?.({ type: 'tool_result', id: rid, isError, name, content: block?.content ?? '', durationMs: duration, payload: block });
+                            toolUseStartAt.delete(rid);
+                            toolUseName.delete(rid);
+                        }
+                    }
+                }
+            } catch (error) {
+                log(`[Agent] Failed to process tool_result blocks: ${String(error)}`);
+            }
+            
         } else {
+            log(`[Agent] Non-assistant / Non-user event (type=${(message as { type?: string }).type}): ${JSON.stringify(message)}`);
             cb.onNonAssistantEvent?.(message);
+
             try {
                 const m: any = message;
                 const kind = m?.type ?? 'unknown';
@@ -232,34 +256,6 @@ export const runClaudeStream = async ({
                 log(`[Agent] Non-assistant event (logging failed): ${String(error)}`);
             }
 
-            try {
-                const userMessage: any = message;
-                if (userMessage?.type === 'user' && Array.isArray(userMessage?.message?.content)) {
-                    for (const block of userMessage.message.content) {
-                        if (block?.type === 'tool_result') {
-                            const rid = String(block?.tool_use_id ?? 'unknown');
-                            const name = toolUseName.get(rid) ?? 'unknown';
-                            const started = toolUseStartAt.get(rid);
-                            const duration = started ? (Date.now() - started) : undefined;
-                            log(`[ToolResult] id=${rid} name=${name} duration_ms=${duration ?? 'n/a'}`);
-                            try {
-                                log(`[ToolResult] full id=${rid}: ${JSON.stringify(block)}`);
-                            } catch {
-                                log(`[ToolResult] inspect id=${rid}: ${inspect(block, { depth: 6 })}`);
-                            }
-                            const out = block?.content ?? block?.result ?? block?.stdout ?? block?.stderr ?? '';
-                            if (typeof out === 'string') {
-                                log(`[ToolResult] out_len id=${rid} = ${out.length}`);
-                            }
-                            cb.onToolResult?.({ id: rid, name, durationMs: duration, payload: block });
-                            toolUseStartAt.delete(rid);
-                            toolUseName.delete(rid);
-                        }
-                    }
-                }
-            } catch (error) {
-                log(`[Agent] Failed to process tool_result blocks: ${String(error)}`);
-            }
         }
     }
 
