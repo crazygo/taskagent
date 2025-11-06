@@ -1,0 +1,22 @@
+feature: "Agent Concurrency and Queuing"
+description: "Describes how the system handles concurrent agent execution across tabs and queuing within a single tab."
+
+scenarios:
+  - scenario: "Agents on different tabs execute in parallel"
+    given:
+      - "The user is on the 'Story' tab and has submitted a long-running prompt."
+      - "The 'Story' agent is currently processing."
+    when:
+      - "The user switches to the 'Glossary' tab and submits a new prompt."
+    then:
+      - "The 'Glossary' agent starts processing the new prompt immediately."
+      - "The 'Story' agent and 'Glossary' agent run concurrently."
+
+  - scenario: "Prompts for the same tab are queued"
+    given:
+      - "The 'Story' agent is currently processing a prompt on the 'Story' tab."
+    when:
+      - "The user submits another prompt to the 'Story' tab."
+    then:
+      - "The new prompt is added to the 'Story' tab's independent queue."
+      - "The new prompt starts only after the first 'Story' prompt is complete."

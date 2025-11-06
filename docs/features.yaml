@@ -1,0 +1,126 @@
+# TaskAgent 核心业务逻辑与功能规格
+
+# 会话分支管理
+session_forking:
+  description: "通过斜杠命令创建会话分支，实现并行执行"
+  type: "会话管理"
+
+  features:
+    - feature: 前台临时切换命令
+      description: "通过 /fg:agent 命令临时使用其他 Agent"
+      given: "用户想要在当前 Tab 临时使用其他 Agent"
+      when: "用户输入 /fg:agentId prompt 命令"
+      then: "系统使用指定 Agent 执行单次任务，不改变默认绑定"
+
+      acceptance_criteria:
+        - "指定 Agent 执行单次任务"
+        - "完成后恢复 Tab 的默认 Agent 绑定"
+        - "不影响 Tab 的会话状态"
+        - "可以用于快速调用其他 Agent 的功能"
+
+      test_scenarios:
+        - scenario: "前台临时切换测试"
+          steps:
+            - "当前在 Story Tab，默认绑定 Story Agent"
+            - "执行命令：/fg:glossary 查找术语 BDD"
+            - "预期：使用 Glossary Agent 执行查询"
+            - "等待任务完成"
+            - "预期：完成后恢复 Story Agent 绑定"
+            - "继续正常使用 Story Tab 功能"
+
+# 全局命令系统
+global_commands:
+  description: "全局可用的命令系统，在任何 Tab 都可以使用"
+  type: "命令系统"
+
+  features:
+    - feature: Tab 切换命令
+      description: "支持 Tab 键、Shift+Tab、数字键快速切换 Tab"
+      given: "用户有多个 Tab 可用"
+      when: "用户使用键盘快捷键"
+      then: "快速切换到指定 Tab"
+
+      test_scenarios:
+        - scenario: "键盘快捷键切换测试"
+          steps:
+            - "应用启动，默认在 Chat Tab"
+            - "按 Tab 键"
+            - "预期：切换到下一个 Tab"
+            - "按 Shift+Tab"
+            - "预期：切换到上一个 Tab"
+            - "按数字键 2"
+            - "预期：切换到第二个 Tab"
+
+    - feature: 帮助命令
+      description: "输入 /help 显示可用命令列表"
+      given: "用户需要查看帮助信息"
+      when: "用户输入 /help"
+      then: "显示当前可用的所有命令和说明"
+
+    - feature: 版本命令
+      description: "输入 /version 显示当前版本信息"
+      given: "用户需要查看版本信息"
+      when: "用户输入 /version"
+      then: "显示应用版本和构建信息"
+
+    - feature: 退出命令
+      description: "输入 /quit 退出应用"
+      given: "用户想要退出应用"
+      when: "用户输入 /quit"
+      then: "应用正常退出"
+
+# 错误处理与状态管理
+error_handling:
+  description: "执行过程中的错误处理和状态管理"
+  type: "错误处理"
+
+  features:
+    - feature: 任务失败处理
+      description: "Agent 执行失败时的处理机制"
+      given: "Agent 任务执行过程中发生错误"
+      when: "错误发生时"
+      then: "显示错误信息，保持系统稳定"
+
+      acceptance_criteria:
+        - "错误信息清晰显示给用户"
+        - "不影响其他 Tab 的正常运行"
+        - "队列中的后续任务继续执行"
+        - "提供错误恢复建议"
+
+    - feature: 状态持久化
+      description: "关键状态的持久化和恢复"
+      given: "应用异常退出或重启"
+      when: "应用重新启动"
+      then: "恢复到合理的状态"
+
+      acceptance_criteria:
+        - "Tab 配置正确恢复"
+        - "Agent 注册状态正确"
+        - "会话状态重置为初始状态"
+        - "用户配置和偏好设置保持"
+
+# 技术实现要点
+technical_implementation:
+  concurrency_model:
+    - "每个 Tab 维护独立的执行状态（idle/busy）"
+    - "TabExecutionManager 管理队列和执行顺序"
+    - "MessageAdapter 处理事件分发"
+    - "Event Bus 实现组件间解耦通信"
+
+  session_strategy:
+    - "前台 Session：全局共享，内存存储"
+    - "后台 Session：fork 机制，独立 ID"
+    - "Session 状态：{ id: string, initialized: boolean }"
+    - "Agent 启动时传入 Session 上下文"
+
+  command_parsing:
+    - "命令解析器识别 /bg: 和 /fg: 前缀"
+    - "参数提取：agentId 和 prompt"
+    - "命令路由到对应的执行器"
+    - "支持命令别名和简化写法"
+
+  queue_management:
+    - "每个 Tab 独立的任务队列"
+    - "FIFO（先进先出）队列策略"
+    - "队列状态实时显示"
+    - "支持队列取消和清空"

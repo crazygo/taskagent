@@ -22,9 +22,7 @@
     }
   },
   "include": [
-    "ui.tsx",
-    "task-manager.ts",
-    "src/**/*.ts",
-    "src/**/*.tsx"
+    "packages/**/*.ts",
+    "packages/**/*.tsx"
   ]
 }

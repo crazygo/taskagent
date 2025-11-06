@@ -1,4 +1,10 @@
 {
+  "name": "@askman-dev/task",
+  "version": "1.0.9",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
   "author": "",
   "dependencies": {
     "@ai-sdk/openai": "^2.0.48",
@@ -33,17 +39,16 @@
   },
   "keywords": [],
   "license": "ISC",
-  "name": "@askman-dev/task",
   "packageManager": "yarn@4.9.1",
-  "version": "1.0.9",
   "type": "module",
   "scripts": {
-    "start": "tsx ui.tsx --",
+    "start": "tsx packages/cli/main.tsx --",
     "build": "tsc",
+    "postbuild": "node scripts/create-aliases.js",
     "prepublishOnly": "yarn build",
     "start:test": "concurrently --raw --kill-others --success first \"yarn start\" \"sleep 10\"",
-    "test:story": "concurrently --raw --kill-others --success first \"yarn start -- --story -p \\\"Hi\\\"\" \"sleep 10\"",
-    "test:glossary": "concurrently --raw --kill-others --success first \"yarn start -- --glossary -p \\\"Hi\\\"\" \"sleep 10\"",
+    "test:story": "yarn start -- --story -p \"Hi\" --auto-allow",
+    "test:glossary": "yarn start -- --glossary -p \"Hi\" --auto-allow",
     "e2e:experiment": "expect scripts/e2e-experiment.expect --",
     "test": "vitest",
     "test:ci": "vitest run",
@@ -55,7 +60,10 @@
     "package.json",
     "README.md"
   ],
-  "bin": "dist/ui.js",
-  "main": "dist/ui.js",
-  "types": "dist/ui.d.ts"
+  "bin": {
+    "taskagent": "dist/packages/cli/main.js",
+    "taskagent-monitor": "dist/main-monitor.js"
+  },
+  "main": "dist/packages/cli/main.js",
+  "types": "dist/packages/cli/main.d.ts"
 }

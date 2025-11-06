@@ -1,0 +1,13 @@
+{
+  "name": "@taskagent/presets",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./default": "./default.ts",
+    "./monitor": "./monitor.ts",
+    "./types": "./types.ts"
+  }
+}

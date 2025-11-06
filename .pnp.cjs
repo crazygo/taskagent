@@ -13,13 +13,48 @@ const RAW_RUNTIME_STATE =
     {\
       "name": "@askman-dev/task",\
       "reference": "workspace:."\
+    },\
+    {\
+      "name": "@taskagent/agents",\
+      "reference": "workspace:packages/agents"\
+    },\
+    {\
+      "name": "@taskagent/cli",\
+      "reference": "workspace:packages/cli"\
+    },\
+    {\
+      "name": "@taskagent/core",\
+      "reference": "workspace:packages/core"\
+    },\
+    {\
+      "name": "@taskagent/execution",\
+      "reference": "workspace:packages/execution"\
+    },\
+    {\
+      "name": "@taskagent/presets",\
+      "reference": "workspace:packages/presets"\
+    },\
+    {\
+      "name": "@taskagent/shared",\
+      "reference": "workspace:packages/shared"\
+    },\
+    {\
+      "name": "@taskagent/tabs",\
+      "reference": "workspace:packages/tabs"\
     }\
   ],\
   "enableTopLevelFallback": true,\
   "ignorePatternData": "(^(?:\\\\.yarn\\\\/sdks(?:\\\\/(?!\\\\.{1,2}(?:\\\\/|$))(?:(?:(?!(?:^|\\\\/)\\\\.{1,2}(?:\\\\/|$)).)*?)|$))$)",\
   "pnpZipBackend": "libzip",\
   "fallbackExclusionList": [\
-    ["@askman-dev/task", ["workspace:."]]\
+    ["@askman-dev/task", ["workspace:."]],\
+    ["@taskagent/agents", ["workspace:packages/agents"]],\
+    ["@taskagent/cli", ["workspace:packages/cli"]],\
+    ["@taskagent/core", ["workspace:packages/core"]],\
+    ["@taskagent/execution", ["workspace:packages/execution"]],\
+    ["@taskagent/presets", ["workspace:packages/presets"]],\
+    ["@taskagent/shared", ["workspace:packages/shared"]],\
+    ["@taskagent/tabs", ["workspace:packages/tabs"]]\
   ],\
   "fallbackPool": [\
   ],\
@@ -1094,6 +1129,118 @@ const RAW_RUNTIME_STATE =
           ["@standard-schema/spec", "npm:1.0.0"]\
         ],\
         "linkType": "HARD"\
+      }]\
+    ]],\
+    ["@taskagent/agents", [\
+      ["workspace:packages/agents", {\
+        "packageLocation": "./packages/agents/",\
+        "packageDependencies": [\
+          ["@ai-sdk/openai", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:2.0.60"],\
+          ["@anthropic-ai/claude-agent-sdk", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:0.1.30"],\
+          ["@openrouter/ai-sdk-provider", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#https://github.com/crazygo/ai-sdk-provider/releases/download/1.2.1/openrouter-ai-sdk-provider-1.2.1.tgz"],\
+          ["@taskagent/agents", "workspace:packages/agents"],\
+          ["@taskagent/core", "workspace:packages/core"],\
+          ["@taskagent/execution", "workspace:packages/execution"],\
+          ["@taskagent/shared", "workspace:packages/shared"],\
+          ["@types/js-yaml", "npm:4.0.9"],\
+          ["@types/node", "npm:24.10.0"],\
+          ["ai", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:5.0.86"],\
+          ["dotenv", "npm:17.2.3"],\
+          ["glob", "npm:11.0.3"],\
+          ["js-yaml", "npm:4.1.0"],\
+          ["typescript", "patch:typescript@npm%3A5.9.3#optional!builtin<compat/typescript>::version=5.9.3&hash=5786d5"],\
+          ["zod", "npm:4.1.12"]\
+        ],\
+        "linkType": "SOFT"\
+      }]\
+    ]],\
+    ["@taskagent/cli", [\
+      ["workspace:packages/cli", {\
+        "packageLocation": "./packages/cli/",\
+        "packageDependencies": [\
+          ["@ai-sdk/openai", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:2.0.60"],\
+          ["@anthropic-ai/claude-agent-sdk", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:0.1.30"],\
+          ["@openrouter/ai-sdk-provider", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#https://github.com/crazygo/ai-sdk-provider/releases/download/1.2.1/openrouter-ai-sdk-provider-1.2.1.tgz"],\
+          ["@taskagent/agents", "workspace:packages/agents"],\
+          ["@taskagent/cli", "workspace:packages/cli"],\
+          ["@taskagent/core", "workspace:packages/core"],\
+          ["@taskagent/execution", "workspace:packages/execution"],\
+          ["@taskagent/presets", "workspace:packages/presets"],\
+          ["@taskagent/shared", "workspace:packages/shared"],\
+          ["@taskagent/tabs", "workspace:packages/tabs"],\
+          ["@types/ink", "npm:2.0.3"],\
+          ["@types/ink-text-input", "npm:2.0.5"],\
+          ["@types/minimist", "npm:1.2.5"],\
+          ["@types/node", "npm:24.10.0"],\
+          ["@types/react", "npm:19.2.2"],\
+          ["ai", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:5.0.86"],\
+          ["dotenv", "npm:17.2.3"],\
+          ["glob", "npm:11.0.3"],\
+          ["ink", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:6.4.0"],\
+          ["ink-text-input", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:6.0.0"],\
+          ["js-yaml", "npm:4.1.0"],\
+          ["minimist", "npm:1.2.8"],\
+          ["react", "npm:19.2.0"],\
+          ["tsx", "npm:4.20.6"],\
+          ["typescript", "patch:typescript@npm%3A5.9.3#optional!builtin<compat/typescript>::version=5.9.3&hash=5786d5"],\
+          ["zod", "npm:4.1.12"]\
+        ],\
+        "linkType": "SOFT"\
+      }]\
+    ]],\
+    ["@taskagent/core", [\
+      ["workspace:packages/core", {\
+        "packageLocation": "./packages/core/",\
+        "packageDependencies": [\
+          ["@taskagent/core", "workspace:packages/core"],\
+          ["@types/node", "npm:24.10.0"],\
+          ["typescript", "patch:typescript@npm%3A5.9.3#optional!builtin<compat/typescript>::version=5.9.3&hash=5786d5"],\
+          ["zod", "npm:4.1.12"]\
+        ],\
+        "linkType": "SOFT"\
+      }]\
+    ]],\
+    ["@taskagent/execution", [\
+      ["workspace:packages/execution", {\
+        "packageLocation": "./packages/execution/",\
+        "packageDependencies": [\
+          ["@taskagent/agents", "workspace:packages/agents"],\
+          ["@taskagent/core", "workspace:packages/core"],\
+          ["@taskagent/execution", "workspace:packages/execution"]\
+        ],\
+        "linkType": "SOFT"\
+      }]\
+    ]],\
+    ["@taskagent/presets", [\
+      ["workspace:packages/presets", {\
+        "packageLocation": "./packages/presets/",\
+        "packageDependencies": [\
+          ["@taskagent/presets", "workspace:packages/presets"]\
+        ],\
+        "linkType": "SOFT"\
+      }]\
+    ]],\
+    ["@taskagent/shared", [\
+      ["workspace:packages/shared", {\
+        "packageLocation": "./packages/shared/",\
+        "packageDependencies": [\
+          ["@taskagent/shared", "workspace:packages/shared"],\
+          ["@types/node", "npm:24.10.0"],\
+          ["dotenv", "npm:17.2.3"],\
+          ["typescript", "patch:typescript@npm%3A5.9.3#optional!builtin<compat/typescript>::version=5.9.3&hash=5786d5"]\
+        ],\
+        "linkType": "SOFT"\
+      }]\
+    ]],\
+    ["@taskagent/tabs", [\
+      ["workspace:packages/tabs", {\
+        "packageLocation": "./packages/tabs/",\
+        "packageDependencies": [\
+          ["@taskagent/tabs", "workspace:packages/tabs"],\
+          ["@types/node", "npm:24.10.0"],\
+          ["typescript", "patch:typescript@npm%3A5.9.3#optional!builtin<compat/typescript>::version=5.9.3&hash=5786d5"]\
+        ],\
+        "linkType": "SOFT"\
       }]\
     ]],\
     ["@types/chai", [\
