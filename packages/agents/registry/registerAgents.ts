@@ -10,6 +10,8 @@ import { createAgent as createStoryAgent } from '../story/index.js';
 import { createAgent as createGlossaryAgent } from '../glossary/index.js';
 import { createAgent as createUiReviewAgent } from '../ui-review/index.js';
 import { createAgent as createMonitorAgent } from '../monitor/index.js';
+import { createAgent as createCoderAgent } from '../monitor/coder/index.js';
+import { createAgent as createReviewAgent } from '../monitor/review/index.js';
 import { DefaultPromptAgent } from '../runtime/types.js';
 
 /**
@@ -56,5 +58,21 @@ export function registerAllAgents(): void {
         tags: ['monitoring', 'logs'],
     });
 
-    console.log('[AgentRegistry] Registered 5 agents: default, story, glossary, ui-review, log-monitor');
+    // Coder Agent
+    globalAgentRegistry.register({
+        id: 'coder',
+        factory: createCoderAgent,
+        description: 'Coder Agent - Backend development executor with self-testing',
+        tags: ['development', 'coding', 'monitor'],
+    });
+
+    // Review Agent
+    globalAgentRegistry.register({
+        id: 'review',
+        factory: createReviewAgent,
+        description: 'Review Agent - Unified code review, progress summary, and quality monitoring',
+        tags: ['review', 'quality', 'monitor'],
+    });
+
+    console.log('[AgentRegistry] Registered 7 agents: default, story, glossary, ui-review, log-monitor, coder, review');
 }

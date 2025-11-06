@@ -59,6 +59,16 @@ export function getDriverManifest(): readonly DriverManifestEntry[] {
             name: 'log-monitor',
             requiresSession: true,
         },
+        {
+            driverId: Driver.MONITOR,
+            name: 'coder',
+            requiresSession: true,
+        },
+        {
+            driverId: Driver.MONITOR,
+            name: 'review',
+            requiresSession: true,
+        },
     ];
 
     const fgEntries: BackgroundTaskDriverEntry[] = agentSlashSpecs.map((spec) => ({
