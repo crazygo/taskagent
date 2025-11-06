@@ -61,9 +61,9 @@
     "README.md"
   ],
   "bin": {
-    "taskagent": "dist/packages/cli/main.js",
+    "taskagent": "dist/cli/main.js",
     "taskagent-monitor": "dist/main-monitor.js"
   },
-  "main": "dist/packages/cli/main.js",
-  "types": "dist/packages/cli/main.d.ts"
+  "main": "dist/cli/main.js",
+  "types": "dist/cli/main.d.ts"
 }
