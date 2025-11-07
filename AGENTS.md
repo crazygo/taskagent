@@ -45,6 +45,17 @@ Request Level 3 (Architecture) or Level 4 (Implementation) explicitly when detai
 - **[Memory Systems Analyst](memory/AGENTS.md)**: Use for tasks involving the analysis of conversations or documents to extract and store structured memories (events, facts, skills).
 - **[Source Code Conventions](src/AGENTS.md)**: Implementation-level guidance for TUI streaming, message/state management, error boundaries, performance, and Ink UI.
 
+## Document & Memory Placement
+
+- **Chat Memory Store (`memory/chat/`)**: See [memory/chat/AGENTS.md](memory/chat/AGENTS.md) for details.
+- **Docs Memory Store (`memory/docs/`)**: See [memory/docs/AGENTS.md](memory/docs/AGENTS.md) for details.
+- **Serena MCP Named Memories**: Managed via MCP tools (`write_memory`, `read_memory`, `list_memories`, `delete_memory`). Follow each tool's definition for proper usage.
+- **Feature Specifications (`docs/features/`)**: ⚠️ **READ-ONLY** - Core business logic and feature specifications. AI agents **MUST NOT** modify these files proactively. Changes require:
+  - Explicit human request
+  - Rigorous review process
+  - Comprehensive testing verification
+  - These files define system behavior contracts and acceptance criteria
+
 ## Agent Architecture Patterns
 
 ### PromptAgent + sub-agents
