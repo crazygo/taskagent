@@ -27,9 +27,7 @@ export function createMediatorMcpServer(
     'send_to_looper',
     '向 Looper 循环引擎发送命令或任务',
     {
-      type: commandSchema.optional(),
-      command: commandSchema.optional(),
-      task: z.string().trim().min(1).optional(),
+      command: z.string(),
     },
     async (args) => {
       if (!options.tabExecutor) {
@@ -41,29 +39,7 @@ export function createMediatorMcpServer(
         };
       }
 
-      const resolvedCommand = args.type ?? args.command;
-      if (!resolvedCommand) {
-        const message = 'send_to_looper 需要提供 `type` 或 `command` 参数。';
-        addLog(`[Mediator Tool] ${message}`);
-        return {
-          content: [{ type: 'text', text: message }],
-          isError: true,
-        };
-      }
-
-      if ((resolvedCommand === 'start' || resolvedCommand === 'add_pending') && !args.task) {
-        const message = '命令 start/add_pending 需要提供 task 描述。';
-        addLog(`[Mediator Tool] ${message}`);
-        return {
-          content: [{ type: 'text', text: message }],
-          isError: true,
-        };
-      }
-
-      const payload: Record<string, string> = { type: resolvedCommand };
-      if (args.task) {
-        payload.task = args.task;
-      }
+      const payload: Record<string, string> = { type: args.command };
 
       try {
         addLog(
@@ -82,9 +58,7 @@ export function createMediatorMcpServer(
           }
         );
 
-        const confirmation = `命令已发送给 Looper: ${resolvedCommand}${
-          args.task ? `（${args.task}）` : ''
-        }`;
+        const confirmation = `命令已发送给 Looper: ${args.command}`;
         return {
           content: [{ type: 'text', text: confirmation }],
         };
