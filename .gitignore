@@ -50,6 +50,7 @@ storybook-static/
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+!.yarn/constraints.pro
 # If not using Zero-Installs, ensure cache stays untracked
 .yarn/cache/
 
