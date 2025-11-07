@@ -194,7 +194,13 @@ export class TaskManager {
     const handle = maybeStart.call(
       agent,
       userPrompt,
-      { sourceTabId: context.sourceTabId, workspacePath: context.workspacePath, session: context.session, forkSession: context.forkSession },
+      { 
+        sourceTabId: context.sourceTabId, 
+        workspacePath: context.workspacePath, 
+        session: context.session, 
+        forkSession: context.forkSession,
+        parentAgentId: context.parentAgentId
+      },
       {
         ...sinks,
         onSessionId: (sid: string) => {
@@ -226,6 +232,7 @@ export class TaskManager {
       workspacePath?: string;
       session?: { id: string; initialized: boolean };
       forkSession?: boolean;
+      parentAgentId?: string;
     },
     sinks: ForegroundSinks,
   ): ForegroundHandle {
@@ -238,7 +245,13 @@ export class TaskManager {
     return maybeStart.call(
       agent,
       userPrompt,
-      { sourceTabId: context.sourceTabId, workspacePath: context.workspacePath, session: context.session, forkSession: context.forkSession },
+      { 
+        sourceTabId: context.sourceTabId, 
+        workspacePath: context.workspacePath, 
+        session: context.session, 
+        forkSession: context.forkSession,
+        parentAgentId: context.parentAgentId
+      },
       sinks,
     );
   }
