@@ -27,6 +27,10 @@ export type AgentStartContext = {
      * Default: false. Set to true for background (/bg) runs.
      */
     forkSession?: boolean;
+    /**
+     * Parent agent in call chain (for agent hierarchy tracking)
+     */
+    parentAgentId?: string;
 };
 
 export type AgentStartSinks = {

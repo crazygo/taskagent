@@ -26,7 +26,7 @@ import type { AgentRegistry } from '@taskagent/agents/registry/AgentRegistry.js'
 import { TabExecutionManager } from './TabExecutionManager.js';
 import { MessageAdapter } from './MessageAdapter.js';
 import type { ExecutionContext, ExecutionResult } from './types.js';
-import type { PermissionResult } from '@anthropic-ai/claude-agent-sdk';
+import type { AgentStartSinks } from '@taskagent/agents/runtime/types.js';
 
 export class TabExecutor {
     constructor(
@@ -143,11 +143,11 @@ export class TabExecutor {
      * Default tool permission handler
      * Always allows tools (can be overridden by context)
      */
-    private defaultCanUseTool = async (
+    private defaultCanUseTool: AgentStartSinks['canUseTool'] = async (
         _toolName: string,
         input: Record<string, unknown>,
         _options: { signal: AbortSignal; suggestions?: any[] }
-    ): Promise<PermissionResult> => {
+    ) => {
         // Auto-approve with a full PermissionResult object; booleans are invalid per https://docs.claude.com/en/api/agent-sdk/typescript.md.
         return {
             behavior: 'allow',

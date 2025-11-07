@@ -109,7 +109,7 @@ const MessageComponent: React.FC<MessageProps> = ({ message }) => {
   }
 
   let prefix = '';
-  let textColor: 'white' | 'gray' | 'yellow' | undefined;
+  let textColor: 'white' | 'gray' | 'yellow' | 'cyan' | undefined;
   const boxProps: Record<string, unknown> = {};
 
   if (message.role === 'assistant') {
