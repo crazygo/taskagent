@@ -465,7 +465,6 @@ const App = () => {
         isStreamingRef.current = isStreaming;
     }, [isStreaming]);
 
-    const prevTasksLengthRef = useRef(tasks.length);
     const agentWorkspaceStatusRef = useRef<{ missingNotified: boolean; errorNotified: boolean }>({
         missingNotified: false,
         errorNotified: false,
@@ -760,14 +759,6 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
             setFocusedControl('input');
         }
     }, [agentPermissionPrompt, focusedControl]);
-
-    useEffect(() => {
-        if (tasks.length > prevTasksLengthRef.current) {
-            const newTaskIndex = tasks.length - 1;
-            setSelectedTab(`Task ${newTaskIndex + 1}`);
-        }
-        prevTasksLengthRef.current = tasks.length;
-    }, [tasks]);
 
     useEffect(() => {
         const tabInfo = getTabInfoByLabel(selectedTab);
