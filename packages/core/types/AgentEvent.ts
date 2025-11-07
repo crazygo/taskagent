@@ -10,7 +10,8 @@ export type AgentEventType =
     | 'agent:reasoning'     // Reasoning/thinking text
     | 'agent:event'         // Task event (info/warning/error)
     | 'agent:completed'     // Agent execution completed
-    | 'agent:failed';       // Agent execution failed
+    | 'agent:failed'        // Agent execution failed
+    | 'message:added';      // Message added to MessageStore (cross-tab communication)
 
 export interface AgentEvent {
     type: AgentEventType;
@@ -43,5 +44,17 @@ export interface AgentCompletedPayload {
 export interface AgentFailedPayload {
     error: string;
     code?: string;
+}
+
+export interface MessageAddedPayload {
+    tabId: string;
+    message: {
+        id: number;
+        role: string;
+        content: string;
+        isPending?: boolean;
+        queueState?: string;
+        isBoxed?: boolean;
+    };
 }
 

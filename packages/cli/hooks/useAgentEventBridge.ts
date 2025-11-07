@@ -240,6 +240,8 @@ export function useAgentEventBridge(eventBus: EventBus, messageStore: MessageSto
     const handleCompleted = (event: AgentEvent) => {
       addLog(`[AgentBridge] handleCompleted called for tab ${event.tabId}, timestamp=${event.timestamp}`);
       finalizeConversation(event.tabId);
+      // Safety: ensure no leftover pending placeholders remain active
+      messageStore.updateActiveMessages(event.tabId, prev => prev.map(msg => ({ ...msg, isPending: false, queueState: 'completed' })));
       const ts = new Date((event as any).timestamp ?? Date.now()).toISOString();
       appendSystemMessage(event.tabId, `◼︎ ${ts}`);
     };

@@ -157,7 +157,6 @@ tsx ui.tsx
 - **Package Manager**: Yarn Berry v4.9.1 with Plug'n'Play (no node_modules)
 - **Runtime**: Node.js with ES Modules
 - **Execution**: Direct TypeScript execution via tsx (no build step)
-- **Logging**: Real-time logging to `debug.log`
 
 ## Architecture Overview
 
@@ -212,7 +211,7 @@ OPENROUTER_BASE_URL='https://openrouter.ai/api/v1'
 - **Performance**: Memoization and throttled rendering for smooth terminal UI
 
 ### Logging and Debugging
-- Comprehensive logging to `debug.log` with timestamps
+- Real-time debug output streams to `logs/debug.log`, and older sessions remain alongside it under the `logs/` directory for easy discovery.
 - Application lifecycle tracking (start, submissions, API calls, errors)
 - Stream progress monitoring for AI responses
 - Error details captured and displayed in system messages

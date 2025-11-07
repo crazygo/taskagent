@@ -1,14 +1,15 @@
 import type { TabConfig } from '../types.js';
 
 export const monitorTabConfig: TabConfig = {
-  id: 'Monitor',
-  label: 'Monitor',
+  id: 'Mediator',
+  label: 'Mediator',
   type: 'agent',
-  agentId: 'log-monitor',
-  description: 'Log monitor · Track debug logs, task logs, and git changes',
+  agentId: 'mediator',
+  description: 'Mediator · 对话路由器，协调任务执行',
   requiresSession: true,
   executionMode: 'foreground',
-  maxFrozenMessages: 50, // Higher limit for monitoring logs
+  maxFrozenMessages: 50,
   isPlaceholder: false,
+  cliFlag: '--mediator',
 };
 

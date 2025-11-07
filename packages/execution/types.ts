@@ -5,7 +5,7 @@
  * Agent execution from UI rendering.
  */
 
-import type { ExecutionHandle } from '@taskagent/agents/runtime/types.js';
+import type { ExecutionHandle, AgentStartSinks } from '@taskagent/agents/runtime/types.js';
 
 /**
  * Execution context passed to agents
@@ -14,7 +14,8 @@ export interface ExecutionContext {
     sourceTabId: string;
     workspacePath?: string;
     session?: SessionContext;
-    canUseTool?: (toolName: string, input: Record<string, unknown>) => Promise<boolean>;
+    // Claude Agent SDK expects the full PermissionResult signature (see docs https://docs.claude.com/en/api/agent-sdk/typescript.md), so we pass the sinks-level handler verbatim.
+    canUseTool?: AgentStartSinks['canUseTool'];
 }
 
 /**
@@ -66,4 +67,3 @@ export type ExecutorFn = (
     userInput: string,
     context: ExecutionContext
 ) => Promise<ExecutionResult>;
-

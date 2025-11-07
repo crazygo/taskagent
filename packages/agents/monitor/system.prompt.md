@@ -9,7 +9,7 @@ First, you must gather information using the following sources and sub-agents.
 
 **Sources:**
 - **Task Specification Document**: You must first find the project's main task or plan document. Search for markdown files (`.md`) with names like `task.md`, `plan.md`, `roadmap.md`, or similar, in the root directory or a `docs/` directory. This document contains the list of phases for the project.
-- **`tail_debug`**: Tail the last 100 lines of `debug.log` to find errors, warnings, or notable events.
+- **`tail_debug`**: Tail the last 100 lines of `logs/debug.log` to find errors, warnings, or notable events.
 - **`task_log`**: Scan the most recent `logs/*.log` file for failures or anomalies.
 - **`git_diff`**: Get a summary of recent code changes to identify risk.
 

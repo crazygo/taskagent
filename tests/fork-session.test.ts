@@ -25,7 +25,10 @@ describe('forkSession propagation', () => {
       queryOptions: {
         model: 'fake-model',
         cwd: process.cwd(),
-        canUseTool: async () => undefined,
+        canUseTool: async (_toolName, input, _options) => ({
+          behavior: 'allow',
+          updatedInput: input,
+        }),
         forkSession: true,
       },
     });

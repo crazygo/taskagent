@@ -1,6 +1,16 @@
 import fs from 'fs';
+import path from 'path';
 
-const LOG_FILE = 'debug.log';
+const LOG_DIR = 'logs';
+const LOG_FILE = path.join(LOG_DIR, 'debug.log');
+
+const ensureLogDir = () => {
+    try {
+        fs.mkdirSync(LOG_DIR, { recursive: true });
+    } catch {}
+};
+
+ensureLogDir();
 
 export const addLog = (message: string) => {
     const now = new Date();
@@ -20,7 +30,7 @@ try {
         const hh = String(d.getHours()).padStart(2, '0');
         const mi = String(d.getMinutes()).padStart(2, '0');
         const ss = String(d.getSeconds()).padStart(2, '0');
-        const backup = `debug.${y}${mm}${dd}-${hh}${mi}${ss}.log`;
+        const backup = path.join(LOG_DIR, `debug.${y}${mm}${dd}_${hh}${mi}${ss}.log`);
         try { fs.copyFileSync(LOG_FILE, backup); } catch {}
     }
 } catch {}

@@ -6,17 +6,19 @@ import type { TaskEvent } from '@taskagent/core/types/TaskEvent.js';
 import fs from 'fs';
 import path from 'path';
 
+const DEFAULT_LOG_PATH = path.join('logs', 'debug.log');
+
 /**
  * LogMonitor - Prompt-driven agent that monitors project signals for changes
- * Primary source: debug.log tail. Also scans latest task log and (if available) recent git diff.
+ * Primary source: logs/debug.log tail. Also scans latest task log and (if available) recent git diff.
  * Self-manages loop via prompt instructions.
  */
 class LogMonitor extends PromptAgent {
     readonly id = 'log-monitor';
-    readonly description = 'Multi-module monitor (debug.log, task logs, git diff) with mutual cross-checking and consensus before emitting events';
+    readonly description = 'Multi-module monitor (logs/debug.log, task logs, git diff) with mutual cross-checking and consensus before emitting events';
 
     constructor(
-        private readonly logFilePath: string = 'debug.log',
+        private readonly logFilePath: string = DEFAULT_LOG_PATH,
         private readonly tailLines: number = 100,
         private readonly intervalSec: number = 30
     ) {
@@ -246,5 +248,5 @@ class LogMonitor extends PromptAgent {
 }
 
 export async function createAgent() {
-    return new LogMonitor('debug.log', 100, 30);
+    return new LogMonitor(DEFAULT_LOG_PATH, 100, 30);
 }

@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import { inspect } from 'util';
 import { addLog } from '@taskagent/shared/logger';
 import { runClaudeStream } from './runClaudeStream.js';
-import type { AgentDefinition } from '@anthropic-ai/claude-agent-sdk';
+import type { AgentDefinition, McpServerConfig } from '@anthropic-ai/claude-agent-sdk';
 import type { AgentStartContext, AgentStartSinks, ExecutionHandle } from '../types.js';
 
 /**
@@ -17,6 +17,7 @@ export function buildPromptAgentStart(
     getAgentDefinitions?: () => Record<string, AgentDefinition> | undefined;
     getModel?: () => string | undefined;
     parseOutput?: (rawChunk: string) => { level: 'info'|'warning'|'error'; message: string; ts: number }[];
+    getMcpServers?: (ctx: { sourceTabId: string; workspacePath?: string; session: { id: string; initialized: boolean }; rawContext: AgentStartContext }) => Record<string, McpServerConfig> | undefined;
   }
 ): (userInput: string, context: AgentStartContext, sinks: AgentStartSinks) => ExecutionHandle {
   return (userInput: string, context: AgentStartContext, sinks: AgentStartSinks): ExecutionHandle => {
@@ -39,6 +40,16 @@ export function buildPromptAgentStart(
     // Request forking when resuming if asked by the caller (background runs)
     if (context.forkSession) {
       (options as any).forkSession = true;
+    }
+
+    const mcpServers = adapter.getMcpServers?.({
+      sourceTabId: context.sourceTabId,
+      workspacePath: context.workspacePath,
+      session,
+      rawContext: context,
+    });
+    if (mcpServers && Object.keys(mcpServers).length > 0) {
+      (options as any).mcpServers = mcpServers;
     }
 
     // Inject sub-agents if present

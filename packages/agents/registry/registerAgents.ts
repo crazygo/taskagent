@@ -12,12 +12,14 @@ import { createAgent as createUiReviewAgent } from '../ui-review/index.js';
 import { createAgent as createMonitorAgent } from '../monitor/index.js';
 import { createAgent as createCoderAgent } from '../monitor/coder/index.js';
 import { createAgent as createReviewAgent } from '../monitor/review/index.js';
+import { createAgent as createLooperAgent } from '../looper/index.js';
+import { createAgent as createMediatorAgent } from '../mediator/index.js';
 import { DefaultPromptAgent } from '../runtime/types.js';
 
 /**
  * Register all built-in agents
  */
-export function registerAllAgents(): void {
+export function registerAllAgents(options?: { eventBus?: any; tabExecutor?: any; taskManager?: any }): void {
     // Default Agent (passthrough for Agent tab)
     globalAgentRegistry.register({
         id: 'default',
@@ -74,5 +76,24 @@ export function registerAllAgents(): void {
         tags: ['review', 'quality', 'monitor'],
     });
 
-    console.log('[AgentRegistry] Registered 7 agents: default, story, glossary, ui-review, log-monitor, coder, review');
+    // Looper Agent
+    globalAgentRegistry.register({
+        id: 'looper',
+        factory: () => createLooperAgent({ taskManager: options?.taskManager }),
+        description: 'Looper Agent - Coder-Review循环执行引擎',
+        tags: ['automation', 'loop', 'monitor'],
+    });
+
+    // Mediator Agent
+    globalAgentRegistry.register({
+        id: 'mediator',
+        factory: () => createMediatorAgent({ 
+            eventBus: options?.eventBus, 
+            tabExecutor: options?.tabExecutor 
+        }),
+        description: 'Mediator Agent - 对话路由器，协调任务执行',
+        tags: ['coordination', 'routing', 'monitor'],
+    });
+
+    console.log('[AgentRegistry] Registered 9 agents: default, story, glossary, ui-review, log-monitor, coder, review, looper, mediator');
 }

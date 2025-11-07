@@ -10,7 +10,8 @@ export const AgentEventSchema = z.object({
         'agent:reasoning',
         'agent:event',
         'agent:completed',
-        'agent:failed'
+        'agent:failed',
+        'message:added'
     ]),
     agentId: z.string().min(1),
     tabId: z.string().min(1),

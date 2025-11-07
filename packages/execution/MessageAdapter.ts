@@ -15,6 +15,7 @@
 
 import type { EventBus } from '@taskagent/core/event-bus';
 import type { AgentStartSinks } from '@taskagent/agents/runtime/types.js';
+import { addLog } from '../shared/logger.js';
 
 export interface MessageAdapterOptions {
     eventBus: EventBus;
@@ -44,6 +45,7 @@ export class MessageAdapter {
         return {
             // Text output from agent
             onText: (chunk: string) => {
+                addLog(`[MessageAdapter] onText called for agent=${agentId} tab=${tabId} chunk.length=${chunk.length}`);
                 eventBus.emit({
                     type: 'agent:text',
                     agentId,

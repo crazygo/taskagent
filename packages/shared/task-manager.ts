@@ -175,9 +175,17 @@ export class TaskManager {
         this.handles.delete(id);
       },
       onReasoning: undefined,
-      canUseTool: async (toolName: string) => {
+      canUseTool: async (
+        toolName: string,
+        input: Record<string, unknown>,
+        _options: { signal: AbortSignal; suggestions?: any[] }
+      ) => {
         addLog(`[BG] Auto-approve tool: ${toolName}`);
-        return undefined;
+        // Return full PermissionResult so background runs satisfy the SDK contract (https://docs.claude.com/en/api/agent-sdk/typescript.md).
+        return {
+          behavior: 'allow',
+          updatedInput: input,
+        };
       },
     };
 

@@ -26,7 +26,8 @@ export const defaultPreset: PresetConfig = {
         'Story',
         'Glossary',
         'UI-Review',
-        'Monitor'
+        'Mediator',
+        'Looper'
     ],
     
     // All agents registered
@@ -35,7 +36,9 @@ export const defaultPreset: PresetConfig = {
         'glossary',
         'ui-review',
         'monitor',
-        'log-monitor'
+        'log-monitor',
+        'looper',
+        'mediator'
     ],
     
     // Default to Chat tab

@@ -1,5 +1,5 @@
 import { inspect } from 'util';
-import { query, type SDKAssistantMessage, type PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
+import { query, type SDKAssistantMessage, type PermissionUpdate, type McpServerConfig } from '@anthropic-ai/claude-agent-sdk';
 
 import { addLog } from '@taskagent/shared/logger';
 
@@ -48,6 +48,7 @@ export type RunClaudeStreamParams = {
         disallowedTools?: string[];
         permissionMode?: string;
         forkSession?: boolean;
+        mcpServers?: Record<string, McpServerConfig>;
     };
     log?: (message: string) => void;
     callbacks?: RunClaudeStreamCallbacks;
@@ -102,6 +103,9 @@ export const runClaudeStream = async ({
     if (queryOptions.permissionMode) {
         (options as Record<string, unknown>).permissionMode = queryOptions.permissionMode;
     }
+    if (queryOptions.mcpServers) {
+        (options as Record<string, unknown>).mcpServers = queryOptions.mcpServers;
+    }
 
     // If caller requested forking on resume, propagate flag to SDK options
     if (queryOptions.forkSession) {
@@ -111,10 +115,10 @@ export const runClaudeStream = async ({
 
     // A.) Log full options and prompt similarly to TaskManager for Story/Agent runs
     // B.) Add additional logging for query parameters as requested by the user.
-    try {
-        log(`[Agent-PreQuery] Full Options for query: ${inspect(options, { depth: 5 })}`); // Increased depth for more detail
-        log(`[Agent-PreQuery] Prompt (len=${prompt.length}):\n${truncate(prompt, 5000)}`);
-    } catch {}
+    // try {
+        // log(`[Agent-PreQuery] Full Options for query: ${inspect(options, { depth: 5 })}`); // Increased depth for more detail
+        // log(`[Agent-PreQuery] Prompt (len=${prompt.length}):\n${truncate(prompt, 5000)}`);
+    // } catch {}
 
     try {
         log(`[Agent-FinalQueryOptions] Final options passed to SDK: ${inspect(options, { depth: 5 })}`);

@@ -44,6 +44,7 @@ import { storyTabConfig } from '@taskagent/tabs/configs/story';
 import { glossaryTabConfig } from '@taskagent/tabs/configs/glossary';
 import { uiReviewTabConfig } from '@taskagent/tabs/configs/ui-review';
 import { monitorTabConfig } from '@taskagent/tabs/configs/monitor';
+import { looperTabConfig } from '@taskagent/tabs/configs/looper';
 import { getPresetOrDefault } from '@taskagent/presets';
 import { globalAgentRegistry, registerAllAgents } from '@taskagent/agents/registry';
 import type { AgentStartContext, AgentStartSinks } from '@taskagent/agents/runtime/types.js';
@@ -318,7 +319,8 @@ const App = () => {
                 'Story': storyTabConfig,
                 'Glossary': glossaryTabConfig,
                 'UI-Review': uiReviewTabConfig,
-                'Monitor': monitorTabConfig,
+                'Mediator': monitorTabConfig,
+                'Looper': looperTabConfig,
             };
 
             // Register tabs based on preset
@@ -335,7 +337,8 @@ const App = () => {
                     storyTabConfig,
                     glossaryTabConfig,
                     uiReviewTabConfig,
-                    monitorTabConfig
+                    monitorTabConfig,
+                    looperTabConfig
                 ]);
             } else {
                 tabRegistry.registerMany(tabsToRegister);
@@ -381,7 +384,7 @@ const App = () => {
 
     // --- STATE ---
     const eventBus = useMemo(() => new EventBus(), []);
-    const messageStore = useMemo(() => new MessageStore(), []);
+    const messageStore = useMemo(() => new MessageStore({ eventBus }), [eventBus]);
     const tabExecManager = useMemo(() => new TabExecutionManager(), []);
     const tabExecutor = useMemo(() => new TabExecutor(tabExecManager, globalAgentRegistry, eventBus), [tabExecManager, eventBus]);
     const { registerConversation, getQueueLength } = useAgentEventBridge(eventBus, messageStore);
@@ -394,6 +397,28 @@ const App = () => {
     const [agentSessionId, setAgentSessionId] = useState<string | null>(null);
     const [, setWorkspaceSettings] = useState<WorkspaceSettings | null>(null);
     const { tasks, startBackground, waitTask, cancelTask } = useTaskStore();
+    
+    // Re-register agents with runtime dependencies (after hooks are initialized)
+    // Use a ref to track if already registered to prevent infinite loop
+    const agentsRegisteredRef = useRef(false);
+    useEffect(() => {
+        if (agentsRegisteredRef.current) {
+            return; // Already registered, skip
+        }
+        
+        const taskManager = { 
+            startBackground, 
+            waitTask,
+            cancelTask 
+        };
+        registerAllAgents({ 
+            eventBus, 
+            tabExecutor, 
+            taskManager 
+        });
+        addLog('[AgentRegistry] Re-registered agents with runtime dependencies');
+        agentsRegisteredRef.current = true;
+    }, [eventBus, tabExecutor]); // Remove startBackground, waitTask, cancelTask from dependencies
     const [positionalPromptWarning, setPositionalPromptWarning] = useState<string | null>(null);
 
     const automationRanRef = useRef(false);
@@ -954,14 +979,8 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
                     sourceTabId: tabId,
                     workspacePath: bootstrapConfig?.workspacePath,
                     session: sessionForRun,
-                    canUseTool: async (toolName, input) => {
-                        try {
-                            await handleAgentPermissionRequest(toolName, input, { signal: new AbortSignal() as any });
-                            return true;
-                        } catch {
-                            return false;
-                        }
-                    },
+                    // Forward the SDK-compatible handler so tool requests receive proper PermissionResult payloads (per https://docs.claude.com/en/api/agent-sdk/typescript.md).
+                    canUseTool: handleAgentPermissionRequest,
                 };
 
                 return await tabExecutor.execute(tabId, targetAgentId, prompt, context);

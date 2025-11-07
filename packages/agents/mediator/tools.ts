@@ -1,0 +1,108 @@
+/**
+ * Mediator Tools - MCP server + tool definitions
+ *
+ * Exposes the `send_to_looper` capability to Claude via the Agent SDK.
+ */
+
+import { tool, createSdkMcpServer } from '@anthropic-ai/claude-agent-sdk';
+import { z } from 'zod';
+import { addLog } from '../../shared/logger.js';
+import type { TabExecutor } from '../../execution/TabExecutor.js';
+import type { McpSdkServerConfigWithInstance } from '@anthropic-ai/claude-agent-sdk';
+
+interface CreateMediatorMcpServerOptions {
+  tabExecutor?: TabExecutor;
+  workspacePath?: string;
+}
+
+/**
+ * Build an in-process MCP server exposing mediator-specific tools.
+ */
+export function createMediatorMcpServer(
+  options: CreateMediatorMcpServerOptions
+): McpSdkServerConfigWithInstance {
+  const commandSchema = z.enum(['start', 'stop', 'status', 'add_pending']);
+
+  const sendToLooper = tool(
+    'send_to_looper',
+    '向 Looper 循环引擎发送命令或任务',
+    {
+      type: commandSchema.optional(),
+      command: commandSchema.optional(),
+      task: z.string().trim().min(1).optional(),
+    },
+    async (args) => {
+      if (!options.tabExecutor) {
+        const message = 'TabExecutor 未初始化，无法发送命令。';
+        addLog(`[Mediator Tool] ${message}`);
+        return {
+          content: [{ type: 'text', text: message }],
+          isError: true,
+        };
+      }
+
+      const resolvedCommand = args.type ?? args.command;
+      if (!resolvedCommand) {
+        const message = 'send_to_looper 需要提供 `type` 或 `command` 参数。';
+        addLog(`[Mediator Tool] ${message}`);
+        return {
+          content: [{ type: 'text', text: message }],
+          isError: true,
+        };
+      }
+
+      if ((resolvedCommand === 'start' || resolvedCommand === 'add_pending') && !args.task) {
+        const message = '命令 start/add_pending 需要提供 task 描述。';
+        addLog(`[Mediator Tool] ${message}`);
+        return {
+          content: [{ type: 'text', text: message }],
+          isError: true,
+        };
+      }
+
+      const payload: Record<string, string> = { type: resolvedCommand };
+      if (args.task) {
+        payload.task = args.task;
+      }
+
+      try {
+        addLog(
+          `[Mediator Tool] Executing Looper command via TabExecutor: ${JSON.stringify(
+            payload
+          )}`
+        );
+
+        await options.tabExecutor.execute(
+          'Looper',
+          'looper',
+          JSON.stringify(payload),
+          {
+            sourceTabId: 'Mediator',
+            workspacePath: options.workspacePath,
+          }
+        );
+
+        const confirmation = `命令已发送给 Looper: ${resolvedCommand}${
+          args.task ? `（${args.task}）` : ''
+        }`;
+        return {
+          content: [{ type: 'text', text: confirmation }],
+        };
+      } catch (error) {
+        const message = `发送命令失败: ${
+          error instanceof Error ? error.message : String(error)
+        }`;
+        addLog(`[Mediator Tool] ${message}`);
+        return {
+          content: [{ type: 'text', text: message }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  return createSdkMcpServer({
+    name: 'mediator-tools',
+    tools: [sendToLooper],
+  });
+}
