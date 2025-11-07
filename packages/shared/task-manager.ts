@@ -70,6 +70,7 @@ export class TaskManager {
       timeoutSec?: number;
       session?: { id: string; initialized: boolean };
       forkSession?: boolean;
+      parentAgentId?: string;
     }
   ): { task: TaskExtended; emitter: EventEmitter } {
     const id = crypto.randomUUID();
@@ -83,6 +84,7 @@ export class TaskManager {
     const agentContext = {
       sourceTabId: context.sourceTabId || 'unknown',
       workspacePath: context.workspacePath,
+      parentAgentId: context.parentAgentId,
     };
 
     const generatedPrompt = agent.getPrompt(userPrompt, agentContext);

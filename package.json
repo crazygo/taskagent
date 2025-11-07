@@ -52,7 +52,10 @@
     "e2e:experiment": "expect scripts/e2e-experiment.expect --",
     "test": "vitest",
     "test:ci": "vitest run",
-    "test:mediator:status": "concurrently --raw --kill-others --success first \"yarn start -- --workspace $(mktemp -d)/taskagent-tmp --newsession --mediator --auto-allow -p 'Hello, please use send_to_looper tool to send status command'\" \"sleep 15\"",
+    "test:mediator:status": "concurrently --raw --kill-others --success first \"yarn start -- --workspace $(mktemp -d)/taskagent-tmp --newsession --mediator --auto-allow -p 'Hello, please use send_to_looper tool with command status'\" \"sleep 20\"",
+    "test:mediator:start": "concurrently --raw --kill-others --success first \"yarn start -- --workspace $(mktemp -d)/taskagent-tmp --newsession --mediator --auto-allow -p 'Hello, please use send_to_looper tool with command start and task Optimize code structure'\" \"sleep 20\"",
+    "test:mediator:add_pending": "concurrently --raw --kill-others --success first \"yarn start -- --workspace $(mktemp -d)/taskagent-tmp --newsession --mediator --auto-allow -p 'Hello, please use send_to_looper tool with command add_pending and task Refactor logging system'\" \"sleep 20\"",
+    "test:mediator:stop": "concurrently --raw --kill-others --success first \"yarn start -- --workspace $(mktemp -d)/taskagent-tmp --newsession --mediator --auto-allow -p 'Hello, please use send_to_looper tool with command stop'\" \"sleep 20\"",
     "test:watch": "vitest watch",
     "publish": "echo \"Use yarn npm publish --access public\""
   },

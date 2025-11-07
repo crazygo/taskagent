@@ -16,6 +16,7 @@ export interface ExecutionContext {
     session?: SessionContext;
     // Claude Agent SDK expects the full PermissionResult signature (see docs https://docs.claude.com/en/api/agent-sdk/typescript.md), so we pass the sinks-level handler verbatim.
     canUseTool?: AgentStartSinks['canUseTool'];
+    parentAgentId?: string;  // Parent agent in call chain (for agent hierarchy tracking)
 }
 
 /**

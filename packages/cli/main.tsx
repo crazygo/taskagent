@@ -414,7 +414,8 @@ const App = () => {
         registerAllAgents({ 
             eventBus, 
             tabExecutor, 
-            taskManager 
+            taskManager,
+            messageStore
         });
         addLog('[AgentRegistry] Re-registered agents with runtime dependencies');
         agentsRegisteredRef.current = true;

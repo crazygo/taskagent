@@ -6,7 +6,7 @@
 
 import { tool, createSdkMcpServer } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod';
-import { addLog } from '../../shared/logger.js';
+import { addLog } from '@taskagent/shared/logger';
 import type { TabExecutor } from '../../execution/TabExecutor.js';
 import type { McpSdkServerConfigWithInstance } from '@anthropic-ai/claude-agent-sdk';
 
@@ -27,7 +27,8 @@ export function createMediatorMcpServer(
     'send_to_looper',
     '向 Looper 循环引擎发送命令或任务',
     {
-      command: z.string(),
+      command: commandSchema,
+      task: z.string().optional(),
     },
     async (args) => {
       if (!options.tabExecutor) {
@@ -39,7 +40,7 @@ export function createMediatorMcpServer(
         };
       }
 
-      const payload: Record<string, string> = { type: args.command };
+      const payload: Record<string, string> = args.task ? { type: args.command, task: args.task } : { type: args.command };
 
       try {
         addLog(
@@ -55,6 +56,7 @@ export function createMediatorMcpServer(
           {
             sourceTabId: 'Mediator',
             workspacePath: options.workspacePath,
+            parentAgentId: 'mediator',
           }
         );
 

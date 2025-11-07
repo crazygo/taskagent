@@ -141,7 +141,7 @@ export class LooperGraphAgent implements RunnableAgent {
 
         while (this.state.iteration < this.state.maxIterations && !this.state.shouldStop) {
             this.state.iteration++;
-            this.pushMessage(`\n[AUTO] === Iteration ${this.state.iteration} ===`);
+            this.pushMessage(`[AUTO] === Iteration ${this.state.iteration} ===`);
             this.pushMessage(`[AUTO] 当前任务: ${this.state.currentTask}`);
 
             // Step 1: Run Coder
@@ -230,6 +230,7 @@ export class LooperGraphAgent implements RunnableAgent {
                     timeoutSec: 300, // 5 minutes timeout
                     session: this.currentContext?.session,
                     forkSession: true,
+                    parentAgentId: 'looper',
                 }
             );
 

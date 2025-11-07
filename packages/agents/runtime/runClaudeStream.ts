@@ -121,7 +121,11 @@ export const runClaudeStream = async ({
     // } catch {}
 
     try {
-        log(`[Agent-FinalQueryOptions] Final options passed to SDK: ${inspect(options, { depth: 5 })}`);
+        const inspectedOptions = inspect(options, { depth: 5 });
+        const inspectedLines = inspectedOptions.split('\n');
+        const preview = inspectedLines.slice(0, 10).join('\n');
+        const suffix = inspectedLines.length > 10 ? '\n[trimmed after 10 lines]' : '';
+        log(`[Agent-FinalQueryOptions] Final options passed to SDK: ${preview}${suffix}`);
     } catch {}
 
     const result = query({

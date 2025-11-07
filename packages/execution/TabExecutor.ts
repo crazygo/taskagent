@@ -101,7 +101,12 @@ export class TabExecutor {
             }
 
             // Create MessageAdapter for event conversion
-            const adapter = new MessageAdapter(tabId, agentId, this.eventBus);
+            const adapter = new MessageAdapter(
+                tabId, 
+                agentId, 
+                this.eventBus,
+                { parentAgentId: context.parentAgentId }
+            );
             const sinks = adapter.createSinks(
                 context.canUseTool || this.defaultCanUseTool
             );

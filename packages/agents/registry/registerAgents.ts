@@ -19,7 +19,7 @@ import { DefaultPromptAgent } from '../runtime/types.js';
 /**
  * Register all built-in agents
  */
-export function registerAllAgents(options?: { eventBus?: any; tabExecutor?: any; taskManager?: any }): void {
+export function registerAllAgents(options?: { eventBus?: any; tabExecutor?: any; taskManager?: any; messageStore?: any }): void {
     // Default Agent (passthrough for Agent tab)
     globalAgentRegistry.register({
         id: 'default',
@@ -89,7 +89,8 @@ export function registerAllAgents(options?: { eventBus?: any; tabExecutor?: any;
         id: 'mediator',
         factory: () => createMediatorAgent({ 
             eventBus: options?.eventBus, 
-            tabExecutor: options?.tabExecutor 
+            tabExecutor: options?.tabExecutor,
+            messageStore: options?.messageStore
         }),
         description: 'Mediator Agent - 对话路由器，协调任务执行',
         tags: ['coordination', 'routing', 'monitor'],

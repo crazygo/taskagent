@@ -22,6 +22,7 @@ const MEDIATOR_DESCRIPTION = '对话路由器，理解用户需求并协调任�
 export async function createAgent(options?: { 
   eventBus?: EventBus;
   tabExecutor?: any;
+  messageStore?: any;
 }): Promise<RunnableAgent> {
     const agentDir = path.dirname(fileURLToPath(import.meta.url));
 
@@ -38,31 +39,29 @@ export async function createAgent(options?: {
     addLog(`[Mediator] System prompt length: ${systemPrompt?.length || 0}`);
     addLog(`[Mediator] Allowed tools: ${allowedTools}`);
 
-    // Verified: this subscription does NOT cause double Thinking (2025-11-07T02:12:26.025Z)
-    // Subscribe to Looper messages via EventBus and mirror into Mediator tab (UI-only)
-    if (options?.eventBus) {
-        options.eventBus.on('message:added', (event: any) => {
+    // Subscribe to child agent outputs via agent:text events (agent hierarchy)
+    // Mirror child agent outputs directly to Mediator tab, bypassing conversation queue
+    if (options?.eventBus && options?.messageStore) {
+        options.eventBus.on('agent:text', (event: any) => {
             try {
-                const tabId = event?.payload?.tabId;
-                const msg = event?.payload?.message;
-                const role = msg?.role;
-                const content: string = typeof msg?.content === 'string' ? msg.content : '';
-                addLog(`[Mediator] message:added seen: tab=${tabId} role=${role} len=${content.length}`);
-                if (tabId !== 'Looper') return;
-                // Mirror only assistant messages (skip tool_use/system/etc.)
-                if (!content || role !== 'assistant') {
-                    addLog(`[Mediator] skip mirror: content=${!!content} role=${role}`);
-                    return;
-                }
-                // Emit as mediator text into Mediator tab; other tabs unaffected
-                addLog(`[Mediator] mirroring Looper -> Mediator, len=${content.length}`);
-                options.eventBus!.emit({
-                    type: 'agent:text',
-                    agentId: MEDIATOR_AGENT_ID,
-                    tabId: 'Mediator',
-                    timestamp: Date.now(),
-                    payload: `[Looper] ${content}`,
-                    version: '1.0',
+                const childAgentId = event?.agentId;
+                const parentAgentId = event?.parentAgentId;
+                const chunk = typeof event.payload === 'string' ? event.payload : '';
+                
+                addLog(`[Mediator] agent:text seen: agent=${childAgentId} parentAgent=${parentAgentId} chunk.length=${chunk.length}`);
+                
+                // Only mirror direct child agents (those calling Mediator as parent)
+                if (parentAgentId !== 'mediator') return;
+                if (!chunk) return;
+                
+                // Direct write to MessageStore, bypassing conversation queue
+                addLog(`[Mediator] mirroring child agent ${childAgentId} output, len=${chunk.length}`);
+                options.messageStore.appendMessage('Mediator', {
+                    id: options.messageStore.getNextMessageId(),
+                    role: 'assistant',
+                    content: `[${childAgentId}] ${chunk}`,
+                    isPending: false,
+                    timestamp: event.timestamp || Date.now(),
                 });
             } catch (e) {
                 addLog(`[Mediator] mirror handler error: ${e instanceof Error ? e.message : String(e)}`);

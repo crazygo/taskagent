@@ -121,7 +121,8 @@ export class AgentRegistry {
         const adapter = new MessageAdapter(
             context.sourceTabId,
             agent.id,
-            eventBus
+            eventBus,
+            { parentAgentId: context.parentAgentId }
         );
         const sinks = adapter.createSinks(canUseTool);
 

@@ -17,7 +17,8 @@ export const AgentEventSchema = z.object({
     tabId: z.string().min(1),
     timestamp: z.number().positive(),
     payload: z.unknown(),
-    version: z.literal('1.0')
+    version: z.literal('1.0'),
+    parentAgentId: z.string().optional()
 });
 
 // Export type from schema

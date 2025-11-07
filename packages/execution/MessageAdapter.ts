@@ -33,7 +33,8 @@ export class MessageAdapter {
     constructor(
         private tabId: string,
         private agentId: string,
-        private eventBus: EventBus
+        private eventBus: EventBus,
+        private context?: { parentAgentId?: string }
     ) {}
 
     /**
@@ -45,7 +46,7 @@ export class MessageAdapter {
         return {
             // Text output from agent
             onText: (chunk: string) => {
-                addLog(`[MessageAdapter] onText called for agent=${agentId} tab=${tabId} chunk.length=${chunk.length}`);
+                addLog(`[MessageAdapter] onText called for agent=${agentId} tab=${tabId} chunk.length=${chunk.length} parentAgentId=${this.context?.parentAgentId}`);
                 eventBus.emit({
                     type: 'agent:text',
                     agentId,
@@ -53,6 +54,7 @@ export class MessageAdapter {
                     timestamp: Date.now(),
                     payload: chunk,
                     version: '1.0',
+                    parentAgentId: this.context?.parentAgentId,
                 });
             },
 
