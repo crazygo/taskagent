@@ -9,9 +9,8 @@ import { globalAgentRegistry } from './AgentRegistry.js';
 import { createAgent as createStoryAgent } from '../story/index.js';
 import { createAgent as createGlossaryAgent } from '../glossary/index.js';
 import { createAgent as createUiReviewAgent } from '../ui-review/index.js';
-import { createAgent as createMonitorAgent } from '../monitor/index.js';
-import { createAgent as createCoderAgent } from '../monitor/coder/index.js';
-import { createAgent as createReviewAgent } from '../monitor/review/index.js';
+import { createAgent as createCoderAgent } from '../coder/index.js';
+import { createAgent as createReviewAgent } from '../review/index.js';
 import { createAgent as createLooperAgent } from '../looper/index.js';
 import { createAgent as createMediatorAgent } from '../mediator/index.js';
 import { DefaultPromptAgent } from '../runtime/types.js';
@@ -52,14 +51,6 @@ export function registerAllAgents(options?: { eventBus?: any; tabExecutor?: any;
         tags: ['review', 'ui'],
     });
 
-    // Log Monitor Agent
-    globalAgentRegistry.register({
-        id: 'log-monitor',
-        factory: createMonitorAgent,
-        description: 'Log Monitor - Monitors debug logs and git changes',
-        tags: ['monitoring', 'logs'],
-    });
-
     // Coder Agent
     globalAgentRegistry.register({
         id: 'coder',
@@ -96,5 +87,5 @@ export function registerAllAgents(options?: { eventBus?: any; tabExecutor?: any;
         tags: ['coordination', 'routing', 'monitor'],
     });
 
-    console.log('[AgentRegistry] Registered 9 agents: default, story, glossary, ui-review, log-monitor, coder, review, looper, mediator');
+    console.log('[AgentRegistry] Registered 8 agents: default, story, glossary, ui-review, coder, review, looper, mediator');
 }

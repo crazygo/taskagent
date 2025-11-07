@@ -35,8 +35,6 @@ export const defaultPreset: PresetConfig = {
         'story',
         'glossary',
         'ui-review',
-        'monitor',
-        'log-monitor',
         'looper',
         'mediator'
     ],

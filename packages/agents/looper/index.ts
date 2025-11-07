@@ -12,9 +12,14 @@ import type { RunnableAgent, AgentStartContext, AgentStartSinks, ExecutionHandle
 import { parseCommand, type LooperCommand } from './command.js';
 import { createInitialState, LooperStatus, LooperSubStatus, canStartLoop, shouldTerminate, type LooperState } from './state.js';
 import { createJudgeAgent, parseJudgeOutput } from './judge/index.js';
+import { EventCollector } from './event-collector.js';
+import { loadAgentPipelineConfig } from '../runtime/agentLoader.js';
+import { buildPromptAgentStart } from '../runtime/runPromptAgentStart.js';
 import { getTaskLogger } from '@taskagent/shared/task-logger';
 import { addLog } from '@taskagent/shared/logger';
 import { EventEmitter } from 'node:events';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const LOOPER_AGENT_ID = 'looper';
 const LOOPER_DESCRIPTION = 'Coder-Review循环执行引擎，管理开发和审查的迭代循环';
@@ -27,6 +32,9 @@ export class LooperGraphAgent implements RunnableAgent {
     private currentSinks?: AgentStartSinks;
     private currentContext?: AgentStartContext;
     private judgeAgent?: RunnableAgent;
+    private summarizerAgent?: RunnableAgent;
+    private eventCollector: EventCollector = new EventCollector();
+    private summaryTimer?: NodeJS.Timeout;
     private taskManager?: any;  // Will be injected
 
     constructor(options?: { taskManager?: any }) {
@@ -36,6 +44,9 @@ export class LooperGraphAgent implements RunnableAgent {
     async initialize() {
         if (!this.judgeAgent) {
             this.judgeAgent = await createJudgeAgent();
+        }
+        if (!this.summarizerAgent) {
+            this.summarizerAgent = await this.createSummarizerAgent();
         }
     }
 
@@ -234,8 +245,20 @@ export class LooperGraphAgent implements RunnableAgent {
                 }
             );
 
+            // Listen to child agent events for progress summary
+            emitter.on('event', (e: any) => this.handleChildEvent(e, agentId));
+            
+            // Start summary timer
+            this.startSummaryTimer(agentId);
+
             // Wait for completion
             const result = await this.waitForTask(emitter);
+            
+            // Stop timer and generate final summary
+            this.stopSummaryTimer();
+            if (this.eventCollector.hasEvents()) {
+                await this.generateSummary(agentId);
+            }
             
             if (result.success) {
                 return { success: true, message: result.output || '' };
@@ -326,6 +349,161 @@ ${pendingMessages.map((m, i) => `${i + 1}. ${m}`).join('\n') || '(无)'}
         if (this.currentSinks) {
             this.currentSinks.onText(content + '\n');
         }
+    }
+
+    /**
+     * Handle child agent event for progress tracking
+     */
+    private handleChildEvent(event: any, agentName: string): void {
+        this.eventCollector.add(event);
+        
+        // Trigger summary if threshold reached
+        if (this.eventCollector.shouldSummarize()) {
+            this.generateSummary(agentName).catch(err => {
+                addLog(`[Looper] Summary generation failed: ${err}`);
+            });
+        }
+    }
+
+    /**
+     * Start timer for periodic summaries
+     */
+    private startSummaryTimer(agentName: string): void {
+        this.summaryTimer = setInterval(() => {
+            if (this.eventCollector.hasEvents()) {
+                this.generateSummary(agentName).catch(err => {
+                    addLog(`[Looper] Timer summary failed: ${err}`);
+                });
+            }
+        }, 30000); // 30 seconds
+    }
+
+    /**
+     * Stop summary timer
+     */
+    private stopSummaryTimer(): void {
+        if (this.summaryTimer) {
+            clearInterval(this.summaryTimer);
+            this.summaryTimer = undefined;
+        }
+    }
+
+    /**
+     * Generate summary from collected events
+     */
+    private async generateSummary(agentName: string): Promise<void> {
+        const events = this.eventCollector.flush();
+        if (events.length === 0) return;
+
+        try {
+            addLog(`[Looper] Generating summary for ${events.length} events`);
+            
+            const prompt = this.buildSummaryPrompt(events);
+            const summary = await this.callSummarizer(prompt);
+            
+            if (summary) {
+                this.pushMessage(`[${agentName}] ${summary}`);
+            }
+        } catch (error) {
+            addLog(`[Looper] Summary error: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    }
+
+    /**
+     * Build prompt for summarizer from events
+     */
+    private buildSummaryPrompt(events: any[]): string {
+        const tools: string[] = [];
+        const texts: string[] = [];
+
+        for (const event of events) {
+            if (event.data?.type === 'tool_use') {
+                const tool = event.data;
+                const name = tool.name;
+                const input = tool.input || {};
+                
+                // Format tool call
+                let toolDesc = `- ${name}`;
+                if (input.file_path) toolDesc += ` ${input.file_path}`;
+                if (input.command) toolDesc += `: ${input.command}`;
+                if (input.content) toolDesc += ` (content truncated)`;
+                
+                tools.push(toolDesc);
+            } else if (event.data?.type === 'text' && event.data?.content) {
+                texts.push(`- "${event.data.content}"`);
+            }
+        }
+
+        let prompt = '';
+        if (tools.length > 0) {
+            prompt += 'Tools:\n' + tools.join('\n') + '\n\n';
+        }
+        if (texts.length > 0) {
+            prompt += 'Text:\n' + texts.join('\n') + '\n\n';
+        }
+
+        if (!prompt) {
+            prompt = 'Agent is processing...\n\n';
+        }
+
+        return prompt;
+    }
+
+    /**
+     * Call summarizer agent to generate summary
+     */
+    private async callSummarizer(prompt: string): Promise<string> {
+        if (!this.summarizerAgent) {
+            addLog('[Looper] SummarizerAgent not initialized');
+            return '';
+        }
+
+        return new Promise((resolve) => {
+            let summary = '';
+            
+            const handle = this.summarizerAgent!.start(
+                prompt,
+                { sourceTabId: 'Looper', workspacePath: this.currentContext?.workspacePath },
+                {
+                    onText: (chunk: string) => {
+                        summary += chunk;
+                    },
+                    onReasoning: () => {},
+                    onEvent: () => {},
+                    canUseTool: async () => ({ behavior: 'allow', updatedInput: {} }),
+                }
+            );
+
+            handle.completion.then(() => {
+                resolve(summary.trim());
+            }).catch((err) => {
+                addLog(`[Looper] Summarizer execution failed: ${err}`);
+                resolve('');
+            });
+        });
+    }
+
+    /**
+     * Create summarizer agent from .agent.md
+     */
+    private async createSummarizerAgent(): Promise<RunnableAgent> {
+        const agentDir = path.dirname(fileURLToPath(import.meta.url));
+        const summarizerDir = path.join(agentDir, 'summarizer');
+
+        const { systemPrompt } = await loadAgentPipelineConfig(summarizerDir, {
+            coordinatorFileName: 'summarizer.agent.md',
+        });
+
+        const summarizerStart = buildPromptAgentStart({
+            getPrompt: (userInput: string) => userInput, // User input is the prompt
+            getSystemPrompt: () => systemPrompt || '',
+        });
+
+        return {
+            id: 'looper-summarizer',
+            description: 'Progress summarizer for Looper child agents',
+            start: summarizerStart,
+        };
     }
 }
 

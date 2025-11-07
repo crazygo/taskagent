@@ -1,11 +1,11 @@
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { loadAgentPipelineConfig } from '../../runtime/agentLoader.js';
-import { buildPromptAgentStart } from '../../runtime/runPromptAgentStart.js';
-import type { AgentContext, AgentStartContext, AgentStartSinks, ExecutionHandle, RunnableAgent } from '../../runtime/types.js';
+import { loadAgentPipelineConfig } from '../runtime/agentLoader.js';
+import { buildPromptAgentStart } from '../runtime/runPromptAgentStart.js';
+import type { AgentContext, AgentStartContext, AgentStartSinks, ExecutionHandle, RunnableAgent } from '../runtime/types.js';
 
-const REVIEW_AGENT_ID = 'review';
-const REVIEW_DESCRIPTION = 'Unified review agent for code review, progress summary, and quality monitoring';
+const CODER_AGENT_ID = 'coder';
+const CODER_DESCRIPTION = 'Backend development executor for implementing features with self-testing';
 
 export async function createAgent(): Promise<RunnableAgent> {
     const agentDir = path.dirname(fileURLToPath(import.meta.url));
@@ -15,7 +15,7 @@ export async function createAgent(): Promise<RunnableAgent> {
         agents: agentDefinitions,
         allowedTools,
     } = await loadAgentPipelineConfig(agentDir, {
-        coordinatorFileName: 'coordinator.agent.md',
+        coordinatorFileName: 'coder.agent.md',
     });
 
     const getPrompt = (userInput: string, _ctx: AgentContext | AgentStartContext) => userInput.trim();
@@ -30,8 +30,8 @@ export async function createAgent(): Promise<RunnableAgent> {
     });
 
     return {
-        id: REVIEW_AGENT_ID,
-        description: REVIEW_DESCRIPTION,
+        id: CODER_AGENT_ID,
+        description: CODER_DESCRIPTION,
         getPrompt,
         getAgentDefinitions,
         getTools,
