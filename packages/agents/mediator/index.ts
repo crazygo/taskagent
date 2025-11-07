@@ -14,6 +14,7 @@ import { loadAgentPipelineConfig } from '../runtime/agentLoader.js';
 import type { AgentContext, AgentStartContext, AgentStartSinks, ExecutionHandle, RunnableAgent } from '../runtime/types.js';
 import type { EventBus } from '@taskagent/core/event-bus';
 import { createMediatorMcpServer } from './tools.js';
+import { addLog } from '@taskagent/shared/logger';
 
 const MEDIATOR_AGENT_ID = 'mediator';
 const MEDIATOR_DESCRIPTION = '对话路由器，理解用户需求并协调任务执行';
@@ -33,19 +34,38 @@ export async function createAgent(options?: {
         coordinatorFileName: 'coordinator.agent.md',
     });
 
-    console.log('[Mediator] Loaded agent definitions:', Object.keys(agentDefinitions || {}));
-    console.log('[Mediator] System prompt length:', systemPrompt?.length || 0);
-    console.log('[Mediator] Allowed tools:', allowedTools);
+    addLog(`[Mediator] Loaded agent definitions: ${Object.keys(agentDefinitions || {})}`);
+    addLog(`[Mediator] System prompt length: ${systemPrompt?.length || 0}`);
+    addLog(`[Mediator] Allowed tools: ${allowedTools}`);
 
     // Verified: this subscription does NOT cause double Thinking (2025-11-07T02:12:26.025Z)
-    // Subscribe to Looper messages via EventBus
+    // Subscribe to Looper messages via EventBus and mirror into Mediator tab (UI-only)
     if (options?.eventBus) {
         options.eventBus.on('message:added', (event: any) => {
-            if (event.payload.tabId === 'Looper') {
-                const message = event.payload.message;
-                if (message.content.includes('[AUTO]')) {
-                    console.log(`[Mediator] Received Looper update: ${message.content}`);
+            try {
+                const tabId = event?.payload?.tabId;
+                const msg = event?.payload?.message;
+                const role = msg?.role;
+                const content: string = typeof msg?.content === 'string' ? msg.content : '';
+                addLog(`[Mediator] message:added seen: tab=${tabId} role=${role} len=${content.length}`);
+                if (tabId !== 'Looper') return;
+                // Mirror only assistant messages (skip tool_use/system/etc.)
+                if (!content || role !== 'assistant') {
+                    addLog(`[Mediator] skip mirror: content=${!!content} role=${role}`);
+                    return;
                 }
+                // Emit as mediator text into Mediator tab; other tabs unaffected
+                addLog(`[Mediator] mirroring Looper -> Mediator, len=${content.length}`);
+                options.eventBus!.emit({
+                    type: 'agent:text',
+                    agentId: MEDIATOR_AGENT_ID,
+                    tabId: 'Mediator',
+                    timestamp: Date.now(),
+                    payload: `[Looper] ${content}`,
+                    version: '1.0',
+                });
+            } catch (e) {
+                addLog(`[Mediator] mirror handler error: ${e instanceof Error ? e.message : String(e)}`);
             }
         });
     }

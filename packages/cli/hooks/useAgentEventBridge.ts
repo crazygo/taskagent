@@ -111,8 +111,28 @@ export function useAgentEventBridge(eventBus: EventBus, messageStore: MessageSto
 
   useEffect(() => {
     const handleText = (event: AgentEvent) => {
+      // Looper is independent of the conversation queue
+      if (event.tabId === 'Looper') {
+        const chunk = typeof event.payload === 'string' ? event.payload : '';
+        if (chunk) {
+          addLog(`[AgentBridge] Looper text (queue-independent) len=${chunk.length}`);
+          messageStore.appendMessage('Looper', {
+            id: messageStore.getNextMessageId(),
+            role: 'assistant',
+            content: chunk,
+            reasoning: '',
+            isPending: false,
+            timestamp: event.timestamp,
+          });
+        }
+        return; // Do not engage queue logic for Looper
+      }
+
       const entry = ensureActiveEntry(event.tabId);
-      if (!entry) return;
+      if (!entry) {
+        addLog(`[AgentBridge] No active entry for tab ${event.tabId}, dropping agent:text (len=${typeof event.payload === 'string' ? event.payload.length : 0})`);
+        return;
+      }
 
       const chunk = typeof event.payload === 'string' ? event.payload : '';
       if (!chunk) return;
@@ -243,7 +263,7 @@ export function useAgentEventBridge(eventBus: EventBus, messageStore: MessageSto
       // Safety: ensure no leftover pending placeholders remain active
       messageStore.updateActiveMessages(event.tabId, prev => prev.map(msg => ({ ...msg, isPending: false, queueState: 'completed' })));
       const ts = new Date((event as any).timestamp ?? Date.now()).toISOString();
-      appendSystemMessage(event.tabId, `◼︎ ${ts}`);
+      appendSystemMessage(event.tabId, `${ts} ◼︎`);
     };
 
     const handleFailed = (event: AgentEvent) => {

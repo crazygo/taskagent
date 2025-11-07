@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Newline, Static, Text, useStdout } from 'ink';
 import * as Types from '../types.js';
+import { addLog } from '@taskagent/shared/logger';
 
 /**
  * Thinking animation component - displays walking dots
@@ -10,10 +11,14 @@ const ThinkingAnimation: React.FC = () => {
   const frames = ['Thinking   ', 'Thinking.  ', 'Thinking.. ', 'Thinking...'];
   
   React.useEffect(() => {
+    addLog('[ThinkingAnimation] mounted');
     const timer = setInterval(() => {
       setFrame(f => (f + 1) % frames.length);
     }, 300);
-    return () => clearInterval(timer);
+    return () => {
+      clearInterval(timer);
+      addLog('[ThinkingAnimation] unmounted');
+    };
   }, []);
 
   return <Text color="gray" dimColor>{frames[frame]}</Text>;
@@ -108,8 +113,9 @@ const MessageComponent: React.FC<MessageProps> = ({ message }) => {
   const boxProps: Record<string, unknown> = {};
 
   if (message.role === 'assistant') {
-    prefix = '✦ ';
-    textColor = undefined;
+    const looperLike = /^\[(Looper|AUTO)\]/.test(normalizedContent);
+    prefix = looperLike ? '∞ ' : '✦ ';
+    textColor = looperLike ? 'cyan' : undefined;
   } else if (message.role === 'system') {
     prefix = 'i ';
     textColor = 'yellow';

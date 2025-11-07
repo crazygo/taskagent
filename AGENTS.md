@@ -211,6 +211,8 @@ OPENROUTER_BASE_URL='https://openrouter.ai/api/v1'
 - **Performance**: Memoization and throttled rendering for smooth terminal UI
 
 ### Logging and Debugging
+- **Avoid `console.log`**: Do not use `console.log` for debugging. Console messages can interfere with Ink's TUI rendering, causing visual glitches and ghosting. Use the file-based logger instead.
+- **Claude Agent SDK**: For issues related to the Claude Agent SDK, refer to the official documentation: https://docs.claude.com/en/api/agent-sdk/typescript.md
 - Real-time debug output streams to `logs/debug.log`, and older sessions remain alongside it under the `logs/` directory for easy discovery.
 - Application lifecycle tracking (start, submissions, API calls, errors)
 - Stream progress monitoring for AI responses

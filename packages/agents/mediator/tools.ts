@@ -58,7 +58,7 @@ export function createMediatorMcpServer(
           }
         );
 
-        const confirmation = `命令已发送给 Looper: ${args.command}`;
+        const confirmation = `命令已发送给 Looper: ${args.command}\nLooper 将择机执行。`;
         return {
           content: [{ type: 'text', text: confirmation }],
         };
