@@ -24,6 +24,11 @@ import { fileURLToPath } from 'node:url';
 const LOOPER_AGENT_ID = 'looper';
 const LOOPER_DESCRIPTION = 'Coder-Review循环执行引擎，管理开发和审查的迭代循环';
 
+interface LooperEvent {
+    type: 'progress' | 'result';
+    payload: any;
+}
+
 export class LooperGraphAgent implements RunnableAgent {
     readonly id = LOOPER_AGENT_ID;
     readonly description = LOOPER_DESCRIPTION;
@@ -63,9 +68,9 @@ export class LooperGraphAgent implements RunnableAgent {
         const response = this.handleCommand(command);
         addLog('[Looper] Response: ' + response);
 
-        // Push response immediately
+        // Push response immediately using emit
         if (response) {
-            sinks.onText(response);
+            this.emit({ type: 'progress', payload: response });
             setTimeout(() => sinks.onCompleted?.(response), 10);
         }
 
@@ -106,7 +111,7 @@ export class LooperGraphAgent implements RunnableAgent {
 
             // Launch loop in background
             this.runLoopAsync(task).catch(error => {
-                this.pushMessage(`[Looper] 循环执行出错: ${error}`);
+                this.emit({ type: 'progress', payload: `[Looper] 循环执行出错: ${error}` });
                 this.state.status = LooperStatus.IDLE;
             });
 
@@ -148,24 +153,24 @@ export class LooperGraphAgent implements RunnableAgent {
     private async runLoopAsync(initialTask: string): Promise<void> {
         await this.initialize();
 
-        this.pushMessage(`[AUTO] 循环开始，最大轮次: ${this.state.maxIterations}`);
+        this.emit({ type: 'progress', payload: `[AUTO] 循环开始，最大轮次: ${this.state.maxIterations}` });
 
         while (this.state.iteration < this.state.maxIterations && !this.state.shouldStop) {
             this.state.iteration++;
-            this.pushMessage(`[AUTO] === Iteration ${this.state.iteration} ===`);
-            this.pushMessage(`[AUTO] 当前任务: ${this.state.currentTask}`);
+            this.emit({ type: 'progress', payload: `[AUTO] === Iteration ${this.state.iteration} ===` });
+            this.emit({ type: 'progress', payload: `[AUTO] 当前任务: ${this.state.currentTask}` });
 
             // Step 1: Run Coder
             this.state.subStatus = LooperSubStatus.WAITING_CODER;
-            this.pushMessage(`[AUTO] 启动 Coder...`);
+            this.emit({ type: 'progress', payload: '[AUTO] 启动 Coder...' });
             
             const coderResult = await this.runAgent('coder', this.state.currentTask);
             
             if (!coderResult.success) {
-                this.pushMessage(`[AUTO] Coder 失败: ${coderResult.message}`);
+                this.emit({ type: 'progress', payload: `[AUTO] Coder 失败: ${coderResult.message}` });
                 // Proceed to JUDGE for decision
             } else {
-                this.pushMessage(`[AUTO] Coder 完成`);
+                this.emit({ type: 'progress', payload: '[AUTO] Coder 完成' });
             }
 
             // Step 2: Run Review (only if Coder succeeded)
@@ -173,32 +178,37 @@ export class LooperGraphAgent implements RunnableAgent {
             
             if (coderResult.success) {
                 this.state.subStatus = LooperSubStatus.WAITING_REVIEW;
-                this.pushMessage(`[AUTO] 启动 Review...`);
+                this.emit({ type: 'progress', payload: '[AUTO] 启动 Review...' });
                 
                 reviewResult = await this.runAgent('review', this.state.currentTask);
                 
                 if (!reviewResult.success) {
-                    this.pushMessage(`[AUTO] Review 失败: ${reviewResult.message}`);
+                    this.emit({ type: 'progress', payload: `[AUTO] Review 失败: ${reviewResult.message}` });
                 } else {
-                    this.pushMessage(`[AUTO] Review 完成`);
+                    this.emit({ type: 'progress', payload: '[AUTO] Review 完成' });
                 }
             }
 
             // Step 3: JUDGE decision
             this.state.subStatus = LooperSubStatus.JUDGE;
-            this.pushMessage(`[AUTO] JUDGE 决策中...`);
+            this.emit({ type: 'progress', payload: '[AUTO] JUDGE 决策中...' });
 
             const decision = await this.runJudge(coderResult, reviewResult);
 
             if (decision.type === 'terminate') {
-                this.pushMessage(`[AUTO] 循环终止: ${decision.reason}`);
+                this.emit({ type: 'progress', payload: `[AUTO] 循环终止: ${decision.reason}` });
+                
+                // 发送结果数据给 Mediator
+                if ('result' in decision && decision.result) {
+                    this.emit({ type: 'result', payload: decision.result });
+                }
                 break;
             }
 
             // Continue: update task
             this.state.currentTask = decision.nextTask || this.state.currentTask;
-            this.pushMessage(`[AUTO] 继续循环: ${decision.reason}`);
-            this.pushMessage(`[AUTO] 下一轮任务: ${decision.nextTask || '(保持当前任务)'}`);
+            this.emit({ type: 'progress', payload: `[AUTO] 继续循环: ${decision.reason}` });
+            this.emit({ type: 'progress', payload: `[AUTO] 下一轮任务: ${decision.nextTask || '(保持当前任务)'}` });
         }
 
         // Cleanup
@@ -206,9 +216,9 @@ export class LooperGraphAgent implements RunnableAgent {
         this.state.subStatus = undefined;
         
         if (this.state.shouldStop) {
-            this.pushMessage(`[AUTO] 循环已手动停止`);
+            this.emit({ type: 'progress', payload: '[AUTO] 循环已手动停止' });
         } else if (this.state.iteration >= this.state.maxIterations) {
-            this.pushMessage(`[AUTO] 达到最大轮次限制 (${this.state.maxIterations})，循环结束`);
+            this.emit({ type: 'progress', payload: `[AUTO] 达到最大轮次限制 (${this.state.maxIterations})，循环结束` });
         }
 
         this.currentSinks?.onCompleted?.('[Looper] 循环完成');
@@ -345,10 +355,12 @@ ${pendingMessages.map((m, i) => `${i + 1}. ${m}`).join('\n') || '(无)'}
         }
     }
 
-    private pushMessage(content: string): void {
-        if (this.currentSinks) {
-            this.currentSinks.onText(content + '\n');
-        }
+    private emit(event: LooperEvent): void {
+        this.currentSinks?.onEvent?.({
+            level: 'info',
+            message: `looper:${event.type}`,
+            ...event,
+        } as any);
     }
 
     /**
@@ -402,7 +414,7 @@ ${pendingMessages.map((m, i) => `${i + 1}. ${m}`).join('\n') || '(无)'}
             const summary = await this.callSummarizer(prompt);
             
             if (summary) {
-                this.pushMessage(`[${agentName}] ${summary}`);
+                this.emit({ type: 'progress', payload: `[${agentName}] ${summary}` });
             }
         } catch (error) {
             addLog(`[Looper] Summary error: ${error instanceof Error ? error.message : String(error)}`);

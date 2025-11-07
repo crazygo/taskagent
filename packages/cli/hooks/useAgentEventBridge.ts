@@ -128,12 +128,9 @@ export function useAgentEventBridge(eventBus: EventBus, messageStore: MessageSto
         return; // Do not engage queue logic for Looper
       }
 
-      const entry = ensureActiveEntry(event.tabId);
-      if (!entry) {
-        addLog(`[AgentBridge] No active entry for tab ${event.tabId}, dropping agent:text (len=${typeof event.payload === 'string' ? event.payload.length : 0})`);
-        return;
-      }
-
+      // Skip entry check - allow all agent outputs to be displayed
+      // (TabExecutionManager already handles concurrent execution control)
+      
       const chunk = typeof event.payload === 'string' ? event.payload : '';
       if (!chunk) return;
 
@@ -149,9 +146,8 @@ export function useAgentEventBridge(eventBus: EventBus, messageStore: MessageSto
     };
 
     const handleReasoning = (event: AgentEvent) => {
-      const entry = ensureActiveEntry(event.tabId);
-      if (!entry) return;
-
+      // Skip entry check - allow all reasoning to be displayed
+      
       const chunk = typeof event.payload === 'string' ? event.payload : '';
       if (!chunk) return;
 
@@ -245,7 +241,29 @@ export function useAgentEventBridge(eventBus: EventBus, messageStore: MessageSto
         
         if (!message) return;
 
-
+        // Handle Looper events (progress/result)
+        if (message.startsWith('looper:')) {
+          const looperPayload = (payload as any).payload;
+          
+          // looper:result - don't display, will be handled by Mediator
+          if (message === 'looper:result') {
+            addLog(`[AgentBridge] Skipping looper:result (handled by Mediator)`);
+            return;
+          }
+          
+          // looper:progress - display as assistant message
+          if (message === 'looper:progress' && looperPayload) {
+            addLog(`[AgentBridge] Forwarding looper:progress as assistant message`);
+            messageStore.appendMessage(event.tabId, {
+              id: messageStore.getNextMessageId(),
+              role: 'assistant',
+              content: String(looperPayload),
+              isPending: false,
+              timestamp: event.timestamp,
+            });
+            return;
+          }
+        }
 
         addLog(`[AgentBridge] Forwarding non-tool message, uuid=: ${(payload as any).uuid}`);
         appendSystemMessage(event.tabId, message, (payload as any).level === 'error');

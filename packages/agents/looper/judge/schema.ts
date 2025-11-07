@@ -15,6 +15,7 @@ export const JudgeDecisionSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('terminate'),
     reason: z.string().describe('为什么终止循环的理由'),
+    result: z.string().optional().describe('最终执行结果'),
   }),
 ]);
 

@@ -79,6 +79,7 @@ export class MessageAdapter {
                     timestamp: Date.now(),
                     payload: event,
                     version: '1.0',
+                    parentAgentId: this.context?.parentAgentId,
                 });
             },
 
