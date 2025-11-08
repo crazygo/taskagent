@@ -26,8 +26,7 @@ export const defaultPreset: PresetConfig = {
         'Story',
         'Glossary',
         'UI-Review',
-        'Mediator',
-        'Looper'
+        'Mediator'
     ],
     
     // All agents registered
@@ -35,7 +34,6 @@ export const defaultPreset: PresetConfig = {
         'story',
         'glossary',
         'ui-review',
-        'looper',
         'mediator'
     ],
     

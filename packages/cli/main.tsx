@@ -1371,7 +1371,7 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
         );
     }
     
-    const staticTabs = getStaticTabs();
+    const staticTabs = getStaticTabs().filter(t => t !== 'Looper');
     const taskTabs = tasks.map((_: Task, index: number) => `Task ${index + 1}`);
     
     let activeTask: Task | null = null;
