@@ -40,6 +40,7 @@ export const loadCliConfig = (): CliConfig => {
 
   const newSession = cliArgs.newSession === true;
   const autoAllowPermissions = cliArgs.autoAllow === true;
+  const autoExit = cliArgs.autoExit === true;
 
   const cfg: CliConfig = {
     prompt: cliArgs.prompt,
@@ -47,13 +48,14 @@ export const loadCliConfig = (): CliConfig => {
     workspacePath,
     newSession,
     autoAllowPermissions,
+    autoExit,
     ignoredPositionalPrompt: cliArgs.ignoredPositionalPrompt,
     preset: cliArgs.preset,
   };
 
   try {
     addLog(
-      `[CLI] Config -> driver: ${cfg.driver ?? 'undefined'}, prompt: ${cfg.prompt ?? 'undefined'}, ignoredPositionalPrompt: ${cfg.ignoredPositionalPrompt ?? 'undefined'}, workspace: ${cfg.workspacePath ?? 'undefined'}, newSession: ${cfg.newSession}, autoAllow: ${cfg.autoAllowPermissions}, preset: ${cfg.preset ?? 'undefined'}`
+      `[CLI] Config -> driver: ${cfg.driver ?? 'undefined'}, prompt: ${cfg.prompt ?? 'undefined'}, ignoredPositionalPrompt: ${cfg.ignoredPositionalPrompt ?? 'undefined'}, workspace: ${cfg.workspacePath ?? 'undefined'}, newSession: ${cfg.newSession}, autoAllow: ${cfg.autoAllowPermissions}, autoExit: ${cfg.autoExit}, preset: ${cfg.preset ?? 'undefined'}`
     );
   } catch {}
 

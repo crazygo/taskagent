@@ -1245,6 +1245,7 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
     useEffect(() => { handleSubmitRef.current = handleSubmit; }, [handleSubmit]);
 
     useEffect(() => {
+        // Auto-exit controlled by --auto-exit; -p always submits.
         if (!nonInteractiveInput || hasProcessedNonInteractiveRef.current || __nonInteractiveSubmittedOnce) return;
         const desiredTab = bootstrapConfig?.driver ? getTabByCliName(bootstrapConfig.driver) : null;
         if (desiredTab && selectedTab !== desiredTab.label) return;
@@ -1268,7 +1269,7 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
         const timeoutMs = process.env.E2E_WORKSPACE ? 7000 : 15000;
         let cancelled = false;
         const safetyTimer = setTimeout(() => {
-            addLog(`[NonInteractive] Safety timeout (${timeoutMs}ms) reached, exiting with code 0`);
+            addLog(`[AutoExit] Safety timeout (${timeoutMs}ms) reached, exiting with code 0`);
             try { process.exit(0); } catch {}
         }, timeoutMs);
 
@@ -1280,25 +1281,28 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
 
         const runNonInteractive = async () => {
             try {
+                addLog(`[AutoExit] Submitting initial prompt...`);
                 const succeeded = await handleSubmit(nonInteractiveInput);
-                await waitForStreamsToIdle({
+                addLog(`[AutoExit] Waiting for streams to idle (timeout=${timeoutMs}ms)`);
+                const idle = await waitForStreamsToIdle({
                     timeoutMs,
                     isCancelled: () => cancelled,
-                    context: 'NonInteractive',
+                    context: 'AutoExit',
                 });
-                finalizeExit(succeeded ? 0 : 1);
+                addLog(`[AutoExit] Idle wait result: idle=${idle} succeeded=${succeeded}`);
+                finalizeExit(succeeded && idle ? 0 : 1);
             } catch {
+                addLog('[AutoExit] runNonInteractive threw; exiting with code 1');
                 finalizeExit(1);
             }
         };
 
+        addLog('[AutoExit] Launching auto-exit runNonInteractive');
         void runNonInteractive();
 
-        return () => {
-            cancelled = true;
-            clearTimeout(safetyTimer);
-        };
-    }, [handleSubmit, nonInteractiveInput, selectedTab, bootstrapConfig?.driver, agentSessionId, waitForStreamsToIdle]);
+        // Note: Removed cleanup cancellation to allow auto-exit wait to complete even if deps change.
+        // (Previously early cleanup set cancelled=true causing premature idle=false.)
+    }, [handleSubmit, nonInteractiveInput, selectedTab, bootstrapConfig?.driver, agentSessionId, waitForStreamsToIdle, bootstrapConfig.autoExit]);
 
     useEffect(() => {
         if (!e2eSteps || e2eSteps.length === 0 || nonInteractiveInput || automationRanRef.current) return;
@@ -1392,48 +1396,47 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
                 sessionLabel={agentSessionId ? formatSessionId(agentSessionId) : null}
             />
 
-            {!nonInteractiveInput && (
-                <>
-                    <Box paddingY={1}>
-                        {agentPermissionPrompt ? (
-                            <AgentPermissionPromptComponent
-                                prompt={agentPermissionPrompt}
-                                onSubmit={handlePermissionPromptSubmit}
-                                isFocused={focusedControl === 'permission'}
-                            />
-                        ) : (
-                            <InputBar
-                                value={inputValue}
-                                onChange={setInputValue}
-                                onSubmit={handleSubmit}
-                                isFocused={focusedControl === 'input'}
-                                onCommandMenuChange={setIsCommandMenuShown}
-                                onEscStateChange={handleEscStateChange}
-                                commands={inputCommands}
-                            />
-                        )}
-                    </Box>
-                    {activeTask && (
-                        <TaskSpecificView
-                            task={activeTask}
-                            taskNumber={activeTaskNumber}
-                            isFocused={focusedControl === 'task'}
+            {/* Always render input & permission prompt regardless of nonInteractiveInput */}
+            <>
+                <Box paddingY={1}>
+                    {agentPermissionPrompt ? (
+                        <AgentPermissionPromptComponent
+                            prompt={agentPermissionPrompt}
+                            onSubmit={handlePermissionPromptSubmit}
+                            isFocused={focusedControl === 'permission'}
+                        />
+                    ) : (
+                        <InputBar
+                            value={inputValue}
+                            onChange={setInputValue}
+                            onSubmit={handleSubmit}
+                            isFocused={focusedControl === 'input'}
+                            onCommandMenuChange={setIsCommandMenuShown}
+                            onEscStateChange={handleEscStateChange}
+                            commands={inputCommands}
                         />
                     )}
-                    <TabView
-                        staticOptions={staticTabs}
-                        tasks={tasks}
-                        selectedTab={selectedTab}
-                        onTabChange={setSelectedTab}
-                        isFocused={focusedControl === 'tabs'}
+                </Box>
+                {activeTask && (
+                    <TaskSpecificView
+                        task={activeTask}
+                        taskNumber={activeTaskNumber}
+                        isFocused={focusedControl === 'task'}
                     />
-                    <Box paddingX={1} backgroundColor="gray">
-                        <Text>
-                            {isEscActive ? "[Press ESC again to clear input]" : "[Press Ctrl+N to switch view]"}
-                        </Text>
-                    </Box>
-                </>
-            )}
+                )}
+                <TabView
+                    staticOptions={staticTabs}
+                    tasks={tasks}
+                    selectedTab={selectedTab}
+                    onTabChange={setSelectedTab}
+                    isFocused={focusedControl === 'tabs'}
+                />
+                <Box paddingX={1} backgroundColor="gray">
+                    <Text>
+                        {(isEscActive ? "[Press ESC again to clear input]" : "Switch Driver: Ctrl+N") + ((bootstrapConfig.autoExit || bootstrapConfig.autoAllowPermissions) ? ` | Params: ${[bootstrapConfig.autoExit && '--auto-exit', bootstrapConfig.autoAllowPermissions && '--auto-allow'].filter(Boolean).join(' ')}` : '')}
+                    </Text>
+                </Box>
+            </>
         </Box>
     );
 };

@@ -14,6 +14,7 @@ export const printCliUsage = (): void => {
   console.log(`  ${pad('-w <path>', 18)}Alias for --workspace`);
   console.log(`  ${pad('--newsession', 18)}Force creation of a fresh Claude session`);
   console.log(`  ${pad('--auto-allow', 18)}Automatically approve agent tool permissions`);
+  console.log(`  ${pad('--auto-exit', 18)}Auto exit after first prompt & streams complete`);
   console.log('');
   console.log('Available drivers:');
   const DRIVER_MANIFEST = getDriverManifest();
