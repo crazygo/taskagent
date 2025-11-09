@@ -387,7 +387,7 @@ const App = () => {
     const messageStore = useMemo(() => new MessageStore({ eventBus }), [eventBus]);
     const tabExecManager = useMemo(() => new TabExecutionManager(), []);
     const tabExecutor = useMemo(() => new TabExecutor(tabExecManager, globalAgentRegistry, eventBus), [tabExecManager, eventBus]);
-    const { registerConversation, getQueueLength } = useAgentEventBridge(eventBus, messageStore);
+    const { registerConversation } = useAgentEventBridge(eventBus, messageStore);
     const [inputValue, setInputValue] = useState('');
     const [selectedTab, setSelectedTab] = useState<string>(Driver.CHAT);
     const { frozen: frozenMessages, active: activeMessages } = useMessageStoreTab(messageStore, selectedTab);
