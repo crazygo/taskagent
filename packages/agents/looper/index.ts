@@ -15,7 +15,6 @@ import { createJudgeAgent, parseJudgeOutput } from './judge/index.js';
 import { EventCollector } from './event-collector.js';
 import { loadAgentPipelineConfig } from '../runtime/agentLoader.js';
 import { buildPromptAgentStart } from '../runtime/runPromptAgentStart.js';
-import { getTaskLogger } from '@taskagent/shared/task-logger';
 import { addLog } from '@taskagent/shared/logger';
 import { EventEmitter } from 'node:events';
 import path from 'node:path';
