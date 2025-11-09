@@ -10,7 +10,7 @@
 
 import type { RunnableAgent, AgentStartContext, AgentStartSinks, ExecutionHandle } from '../runtime/types.js';
 import { parseCommand, type LooperCommand } from './command.js';
-import { createInitialState, LooperStatus, LooperSubStatus, canStartLoop, shouldTerminate, type LooperState } from './state.js';
+import { createInitialState, LooperStatus, LooperSubStatus, type LooperState } from './state.js';
 import { createJudgeAgent, parseJudgeOutput } from './judge/index.js';
 import { EventCollector } from './event-collector.js';
 import { loadAgentPipelineConfig } from '../runtime/agentLoader.js';
