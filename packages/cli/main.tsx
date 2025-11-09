@@ -44,6 +44,7 @@ import { storyTabConfig } from '@taskagent/tabs/configs/story';
 import { glossaryTabConfig } from '@taskagent/tabs/configs/glossary';
 import { uiReviewTabConfig } from '@taskagent/tabs/configs/ui-review';
 import { monitorTabConfig } from '@taskagent/tabs/configs/monitor';
+import { looperTabConfig } from '@taskagent/tabs/configs/looper';
 import { getPresetOrDefault } from '@taskagent/presets';
 import { globalAgentRegistry, registerAllAgents } from '@taskagent/agents/registry';
 import type { AgentStartContext, AgentStartSinks } from '@taskagent/agents/runtime/types.js';
@@ -52,7 +53,7 @@ import { MessageStore } from './store/MessageStore.js';
 import { useMessageStoreTab } from './hooks/useMessageStoreTab.js';
 import { useAgentEventBridge } from './hooks/useAgentEventBridge.js';
 import { TabExecutionManager, TabExecutor } from '@taskagent/execution';
-import type { ExecutionContext, ExecutionResult } from '@taskagent/execution/types.js';
+import type { ExecutionContext, ExecutionResult } from '@taskagent/execution';
 
 // Guard to prevent double submission in dev double-mount scenarios
 let __nonInteractiveSubmittedOnce = false;
@@ -318,7 +319,8 @@ const App = () => {
                 'Story': storyTabConfig,
                 'Glossary': glossaryTabConfig,
                 'UI-Review': uiReviewTabConfig,
-                'Monitor': monitorTabConfig,
+                'Mediator': monitorTabConfig,
+                'Looper': looperTabConfig,
             };
 
             // Register tabs based on preset
@@ -335,7 +337,8 @@ const App = () => {
                     storyTabConfig,
                     glossaryTabConfig,
                     uiReviewTabConfig,
-                    monitorTabConfig
+                    monitorTabConfig,
+                    looperTabConfig
                 ]);
             } else {
                 tabRegistry.registerMany(tabsToRegister);
@@ -381,10 +384,10 @@ const App = () => {
 
     // --- STATE ---
     const eventBus = useMemo(() => new EventBus(), []);
-    const messageStore = useMemo(() => new MessageStore(), []);
+    const messageStore = useMemo(() => new MessageStore({ eventBus }), [eventBus]);
     const tabExecManager = useMemo(() => new TabExecutionManager(), []);
     const tabExecutor = useMemo(() => new TabExecutor(tabExecManager, globalAgentRegistry, eventBus), [tabExecManager, eventBus]);
-    const { registerConversation, getQueueLength, getQueuedPrompts } = useAgentEventBridge(eventBus, messageStore);
+    const { registerConversation } = useAgentEventBridge(eventBus, messageStore);
     const [inputValue, setInputValue] = useState('');
     const [selectedTab, setSelectedTab] = useState<string>(Driver.CHAT);
     const { frozen: frozenMessages, active: activeMessages } = useMessageStoreTab(messageStore, selectedTab);
@@ -394,6 +397,29 @@ const App = () => {
     const [agentSessionId, setAgentSessionId] = useState<string | null>(null);
     const [, setWorkspaceSettings] = useState<WorkspaceSettings | null>(null);
     const { tasks, startBackground, waitTask, cancelTask } = useTaskStore();
+    
+    // Re-register agents with runtime dependencies (after hooks are initialized)
+    // Use a ref to track if already registered to prevent infinite loop
+    const agentsRegisteredRef = useRef(false);
+    useEffect(() => {
+        if (agentsRegisteredRef.current) {
+            return; // Already registered, skip
+        }
+        
+        const taskManager = { 
+            startBackground, 
+            waitTask,
+            cancelTask 
+        };
+        registerAllAgents({ 
+            eventBus, 
+            tabExecutor, 
+            taskManager,
+            messageStore
+        });
+        addLog('[AgentRegistry] Re-registered agents with runtime dependencies');
+        agentsRegisteredRef.current = true;
+    }, [eventBus, tabExecutor]); // Remove startBackground, waitTask, cancelTask from dependencies
     const [positionalPromptWarning, setPositionalPromptWarning] = useState<string | null>(null);
 
     const automationRanRef = useRef(false);
@@ -440,43 +466,6 @@ const App = () => {
         isStreamingRef.current = isStreaming;
     }, [isStreaming]);
 
-    // Track stream lifecycle via events to ensure non-interactive waits do not exit early
-    useEffect(() => {
-        const onCompleted = () => { isStreamingRef.current = false; maybeExitNonInteractive(); };
-        const onFailed = () => { isStreamingRef.current = false; maybeExitNonInteractive(true); };
-        // Mark streaming as true on first incoming text chunk, just in case
-        const onText = () => { isStreamingRef.current = true; };
-        try {
-            eventBus.on('agent:completed', onCompleted);
-            eventBus.on('agent:failed', onFailed);
-            eventBus.on('agent:text', onText);
-        } catch {}
-        return () => {
-            try {
-                eventBus.off('agent:completed', onCompleted);
-                eventBus.off('agent:failed', onFailed);
-                eventBus.off('agent:text', onText);
-            } catch {}
-        };
-    }, [eventBus]);
-
-    // Attempt to exit promptly in non-interactive mode once streams complete
-    const maybeExitNonInteractive = useCallback((failed = false) => {
-        const promptArg = bootstrapConfig?.prompt;
-        if (!promptArg) return; // interactive mode
-        // Defer a tick to allow queue/message mutations to settle
-        setTimeout(() => {
-            const tabId = selectedTabRef.current;
-            const noActive = messageStore.getPartitionedMessages(tabId).active.length === 0;
-            const noQueue = getQueueLength(tabId) === 0;
-            if (noActive && noQueue) {
-                addLog(`[NonInteractive] ${failed ? 'Failed' : 'Completed'} — exiting now`);
-                try { process.exit(failed ? 1 : 0); } catch {}
-            }
-        }, 150);
-    }, [bootstrapConfig?.prompt, getQueueLength, messageStore]);
-
-    const prevTasksLengthRef = useRef(tasks.length);
     const agentWorkspaceStatusRef = useRef<{ missingNotified: boolean; errorNotified: boolean }>({
         missingNotified: false,
         errorNotified: false,
@@ -543,11 +532,10 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
         const start = Date.now();
         const sleep = (ms = 0) => new Promise<void>(resolve => setTimeout(resolve, Math.max(0, ms)));
         while (!isCancelled?.()) {
+            const conversationIdle = !isStreamingRef.current && !isProcessingQueueRef.current;
             const currentTabId = selectedTabRef.current;
-            const conversationQueueIdle = getQueueLength(currentTabId) === 0;
-            const hasPendingMessages = messageStore.getPartitionedMessages(currentTabId).active.length > 0;
-            // Consider idle when no active pending messages and no queued conversations
-            if (!hasPendingMessages && conversationQueueIdle) {
+            const agentIdle = tabExecutor.isIdle(currentTabId) && tabExecManager.getQueueLength(currentTabId) === 0;
+            if (conversationIdle && agentIdle) {
                 return true;
             }
             if (Date.now() - start > limit) {
@@ -557,7 +545,7 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
             await sleep(100);
         }
         return false;
-    }, [addLog, tabExecManager, getQueueLength, messageStore]);
+    }, [addLog, tabExecManager]);
 
     useEffect(() => {
         if (!bootstrapConfig.ignoredPositionalPrompt) {
@@ -774,14 +762,6 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
     }, [agentPermissionPrompt, focusedControl]);
 
     useEffect(() => {
-        if (tasks.length > prevTasksLengthRef.current) {
-            const newTaskIndex = tasks.length - 1;
-            setSelectedTab(`Task ${newTaskIndex + 1}`);
-        }
-        prevTasksLengthRef.current = tasks.length;
-    }, [tasks]);
-
-    useEffect(() => {
         const tabInfo = getTabInfoByLabel(selectedTab);
         const needsSession = selectedTab === Driver.AGENT || (tabInfo?.requiresSession ?? false);
 
@@ -837,28 +817,34 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
     lastAnnouncedAgentSessionRef.current = agentSessionId;
 }, [selectedTab, agentSessionId, bootstrapConfig?.workspacePath]);
 
-    useInput((input, key) => {
-        if (agentPermissionPrompt || (key.tab && isCommandMenuShown)) return;
-        if (key.tab) {
-            const newFocusOrder: Array<typeof focusedControl> = ['input', 'tabs'];
-            if (activeTask) newFocusOrder.push('task');
-            const currentFocusIndex = newFocusOrder.indexOf(focusedControl);
-            const nextFocusIndex = (currentFocusIndex + 1) % newFocusOrder.length;
-            setFocusedControl(newFocusOrder[nextFocusIndex]!);
-        }
-    }, { isActive: !nonInteractiveInput });
-
-    useInput((input, key) => {
-        if (process.env.E2E_SENTINEL && (input || key.ctrl || key.shift || key.meta || key.return || key.tab)) {
-            const inputCode = input ? input.charCodeAt(0) : null;
-            addLog(`[App] RAW INPUT: input="${input}" charCode=${inputCode} ctrl=${key.ctrl} shift=${key.shift} meta=${key.meta} tab=${key.tab} return=${key.return}`);
-        }
-        if (key.ctrl && (input === 'n' || input === 'N')) {
-            if (process.env.E2E_SENTINEL) {
-                addLog(`[App] Ctrl+N detected (focusedControl=${focusedControl}, isCommandMenuShown=${isCommandMenuShown})`);
+    const InputHandlers = React.memo(() => {
+        useInput((input, key) => {
+            if (agentPermissionPrompt || (key.tab && isCommandMenuShown)) return;
+            if (key.tab) {
+                const newFocusOrder: Array<typeof focusedControl> = ['input', 'tabs'];
+                if (activeTask) newFocusOrder.push('task');
+                const currentFocusIndex = newFocusOrder.indexOf(focusedControl);
+                const nextFocusIndex = (currentFocusIndex + 1) % newFocusOrder.length;
+                setFocusedControl(newFocusOrder[nextFocusIndex]!);
             }
-        }
-    }, { isActive: !nonInteractiveInput });
+        }, { isActive: !nonInteractiveInput });
+
+        useInput((input, key) => {
+            if (process.env.E2E_SENTINEL && (input || key.ctrl || key.shift || key.meta || key.return || key.tab)) {
+                const inputCode = input ? input.charCodeAt(0) : null;
+                addLog(`[App] RAW INPUT: input="${input}" charCode=${inputCode} ctrl=${key.ctrl} shift=${key.shift} meta=${key.meta} tab=${key.tab} return=${key.return}`);
+            }
+            if (key.ctrl && (input === 'n' || input === 'N')) {
+                if (process.env.E2E_SENTINEL) {
+                    addLog(`[App] Ctrl+N detected (focusedControl=${focusedControl}, isCommandMenuShown=${isCommandMenuShown})`);
+                }
+            }
+        }, { isActive: !nonInteractiveInput });
+
+        return null;
+    });
+
+
 
     const handleEscStateChange = useCallback((isEscActive: boolean) => setIsEscActive(isEscActive), []);
 
@@ -970,7 +956,7 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
         };
         messageStore.appendMessage(tabId, assistantPlaceholder);
 
-        const queueIndex = registerConversation(tabId, userMessageId, assistantMessageId, prompt);
+        const queueIndex = registerConversation(tabId, userMessageId, assistantMessageId);
         if (queueIndex > 0) {
             messageStore.mutateMessage(tabId, userMessageId, msg => ({ ...msg, queueState: 'queued' }));
         }
@@ -991,13 +977,8 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
                     sourceTabId: tabId,
                     workspacePath: bootstrapConfig?.workspacePath,
                     session: sessionForRun,
-                    canUseTool: async (toolName: string, input: Record<string, unknown>) => {
-                        const result = await handleAgentPermissionRequest(toolName, input, { 
-                            signal: new AbortController().signal,
-                            suggestions: []
-                        });
-                        return result.behavior === 'allow';
-                    },
+                    // Forward the SDK-compatible handler so tool requests receive proper PermissionResult payloads (per https://docs.claude.com/en/api/agent-sdk/typescript.md).
+                    canUseTool: handleAgentPermissionRequest,
                 };
 
                 return await tabExecutor.execute(tabId, targetAgentId, prompt, context);
@@ -1264,69 +1245,63 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
                 }
             }
         }
-        if (bootstrapConfig?.prompt) {
-            setTimeout(() => maybeExitNonInteractive(!succeeded || flushFailed), 0);
-        }
         return succeeded && !flushFailed;
     }, [appendSystemMessage, createNewAgentSession, enqueueUserInput, flushPendingQueue, handleAgentPermissionCommand, isProcessingQueueRef, isStreaming, messageStore, nextMessageId, runAgentTurn, runDriverEntry, runStreamForUserMessage, selectedTab, setInputValue]);
 
     useEffect(() => { handleSubmitRef.current = handleSubmit; }, [handleSubmit]);
 
     useEffect(() => {
+        // Submit initial prompt once when provided via -p/--prompt.
         if (!nonInteractiveInput || hasProcessedNonInteractiveRef.current || __nonInteractiveSubmittedOnce) return;
         const desiredTab = bootstrapConfig?.driver ? getTabByCliName(bootstrapConfig.driver) : null;
         if (desiredTab && selectedTab !== desiredTab.label) return;
-        
+
         // Check if this tab requires a session
         const tabInfo = getTabInfoByLabel(selectedTab);
         const needsSession = selectedTab === Driver.AGENT || (tabInfo?.requiresSession ?? false);
-        
+
         // Wait for session to be ready if needed
         if (needsSession && !agentSessionId) {
             addLog(`[NonInteractive] Waiting for session to initialize for tab: ${selectedTab}`);
             return; // Will retry when agentSessionId changes
         }
-        
+
         hasProcessedNonInteractiveRef.current = true;
         __nonInteractiveSubmittedOnce = true;
         addLog(`Non-interactive mode: Processing input "${nonInteractiveInput}"`);
-        
-        // Safety: ensure process exits even if provider keeps streaming
-        // Use shorter timeout in test environments (7s) vs production (15s)
+
         const timeoutMs = process.env.E2E_WORKSPACE ? 7000 : 15000;
         let cancelled = false;
-        const safetyTimer = setTimeout(() => {
-            addLog(`[NonInteractive] Safety timeout (${timeoutMs}ms) reached, exiting with code 0`);
-            try { process.exit(0); } catch {}
-        }, timeoutMs);
-
-        const finalizeExit = (code: number) => {
-            if (cancelled) return;
-            clearTimeout(safetyTimer);
-            setTimeout(() => process.exit(code), 100);
-        };
 
         const runNonInteractive = async () => {
             try {
-                const succeeded = await handleSubmit(nonInteractiveInput);
-                await waitForStreamsToIdle({
-                    timeoutMs,
-                    isCancelled: () => cancelled,
-                    context: 'NonInteractive',
-                });
-                finalizeExit(succeeded ? 0 : 1);
-            } catch {
-                finalizeExit(1);
+                addLog(`[AutoSubmit] Submitting initial prompt...`);
+                const success = await handleSubmit(nonInteractiveInput);
+                if (bootstrapConfig.autoExit) {
+                    addLog(`[AutoExit] Enabled; waiting for streams to idle (timeout=${timeoutMs}ms)`);
+                    const idle = await waitForStreamsToIdle({
+                        timeoutMs,
+                        isCancelled: () => cancelled,
+                        context: 'AutoExit',
+                    });
+                    addLog(`[AutoExit] Idle wait result: idle=${idle} success=${success}`);
+                    const code = success ? 0 : (idle ? 0 : 1);
+                    setTimeout(() => process.exit(code), 100);
+                } else {
+                    addLog('[AutoSubmit] autoExit disabled; remaining in interactive mode.');
+                }
+            } catch (err) {
+                addLog(`[AutoSubmit] Error during non-interactive submission: ${err instanceof Error ? err.message : String(err)}`);
+                if (bootstrapConfig.autoExit) {
+                    setTimeout(() => process.exit(1), 100);
+                }
             }
         };
 
         void runNonInteractive();
 
-        return () => {
-            cancelled = true;
-            clearTimeout(safetyTimer);
-        };
-    }, [handleSubmit, nonInteractiveInput, selectedTab, bootstrapConfig?.driver, agentSessionId, waitForStreamsToIdle]);
+        return () => { cancelled = true; };
+    }, [handleSubmit, nonInteractiveInput, selectedTab, bootstrapConfig?.driver, agentSessionId, waitForStreamsToIdle, bootstrapConfig.autoExit]);
 
     useEffect(() => {
         if (!e2eSteps || e2eSteps.length === 0 || nonInteractiveInput || automationRanRef.current) return;
@@ -1396,7 +1371,7 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
         );
     }
     
-    const staticTabs = getStaticTabs();
+    const staticTabs = getStaticTabs().filter(t => t !== 'Looper');
     const taskTabs = tasks.map((_: Task, index: number) => `Task ${index + 1}`);
     
     let activeTask: Task | null = null;
@@ -1414,55 +1389,63 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
             <ChatPanel
                 frozenMessages={frozenMessages}
                 activeMessages={activeMessages}
-                queuedPrompts={getQueuedPrompts(selectedTab)}
                 modelName={modelName}
                 workspacePath={bootstrapConfig.workspacePath}
                 positionalPromptWarning={positionalPromptWarning}
                 sessionLabel={agentSessionId ? formatSessionId(agentSessionId) : null}
             />
 
-            {!nonInteractiveInput && (
-                <>
-                    <Box paddingY={1}>
-                        {agentPermissionPrompt ? (
-                            <AgentPermissionPromptComponent
-                                prompt={agentPermissionPrompt}
-                                onSubmit={handlePermissionPromptSubmit}
-                                isFocused={focusedControl === 'permission'}
-                            />
-                        ) : (
-                            <InputBar
-                                value={inputValue}
-                                onChange={setInputValue}
-                                onSubmit={handleSubmit}
-                                isFocused={focusedControl === 'input'}
-                                onCommandMenuChange={setIsCommandMenuShown}
-                                onEscStateChange={handleEscStateChange}
-                                commands={inputCommands}
+            {/* Render input UI and TabView only when raw mode/input is supported */}
+            {(() => {
+                const inputSupported = !!(process.stdin && (process.stdin as any).isTTY && typeof (process.stdin as any).setRawMode === 'function');
+                return (
+                    <>
+                        {inputSupported && <InputHandlers />}
+                        <Box paddingY={1}>
+                            {inputSupported && (agentPermissionPrompt ? (
+                                <AgentPermissionPromptComponent
+                                    prompt={agentPermissionPrompt}
+                                    onSubmit={handlePermissionPromptSubmit}
+                                    isFocused={focusedControl === 'permission'}
+                                />
+                            ) : (
+                                inputSupported && (
+                                    <InputBar
+                                        value={inputValue}
+                                        onChange={setInputValue}
+                                        onSubmit={handleSubmit}
+                                        isFocused={focusedControl === 'input'}
+                                        onCommandMenuChange={setIsCommandMenuShown}
+                                        onEscStateChange={handleEscStateChange}
+                                        commands={inputCommands}
+                                    />
+                                )
+                            ))}
+                        </Box>
+                        {activeTask && inputSupported && (
+                            <TaskSpecificView
+                                task={activeTask}
+                                taskNumber={activeTaskNumber}
+                                isFocused={focusedControl === 'task'}
                             />
                         )}
-                    </Box>
-                    {activeTask && (
-                        <TaskSpecificView
-                            task={activeTask}
-                            taskNumber={activeTaskNumber}
-                            isFocused={focusedControl === 'task'}
-                        />
-                    )}
-                    <TabView
-                        staticOptions={staticTabs}
-                        tasks={tasks}
-                        selectedTab={selectedTab}
-                        onTabChange={setSelectedTab}
-                        isFocused={focusedControl === 'tabs'}
-                    />
-                    <Box paddingX={1} backgroundColor="gray">
-                        <Text>
-                            {isEscActive ? "[Press ESC again to clear input]" : "[Press Ctrl+N to switch view]"}
-                        </Text>
-                    </Box>
-                </>
-            )}
+                        {inputSupported && (
+                            <TabView
+                                staticOptions={staticTabs}
+                                tasks={tasks}
+                                selectedTab={selectedTab}
+                                onTabChange={setSelectedTab}
+                                isFocused={focusedControl === 'tabs'}
+                            />
+                        )}
+                        <Box paddingX={1} backgroundColor="gray">
+                            <Text>
+                                {(isEscActive ? "[Press ESC again to clear input]" : "Switch Driver: Ctrl+N") + ((bootstrapConfig.autoExit || bootstrapConfig.autoAllowPermissions) ? ` | Params: ${[bootstrapConfig.autoExit && '--auto-exit', bootstrapConfig.autoAllowPermissions && '--auto-allow'].filter(Boolean).join(' ')}` : '')}
+                            </Text>
+                        </Box>
+                    </>
+                );
+            })()}
         </Box>
     );
 };

@@ -2,6 +2,7 @@ import type { AgentDefinition } from '@anthropic-ai/claude-agent-sdk';
 import type { Message } from '@taskagent/core/types/Message.js';
 import type { TaskEvent } from '@taskagent/core/types/TaskEvent.js';
 import type { PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
+import type { ToolUseEvent, ToolResultEvent } from './runClaudeStream.js';
 
 /**
  * Agent execution context
@@ -26,12 +27,16 @@ export type AgentStartContext = {
      * Default: false. Set to true for background (/bg) runs.
      */
     forkSession?: boolean;
+    /**
+     * Parent agent in call chain (for agent hierarchy tracking)
+     */
+    parentAgentId?: string;
 };
 
 export type AgentStartSinks = {
     onText: (chunk: string) => void;
     onReasoning?: (chunk: string) => void;
-    onEvent?: (e: TaskEvent) => void;
+    onEvent?: (e: TaskEvent | ToolUseEvent | ToolResultEvent) => void;
     onCompleted?: (fullText: string) => void;
     onFailed?: (error: string) => void;
     canUseTool: (toolName: string, input: Record<string, unknown>, options: { signal: AbortSignal; suggestions?: PermissionUpdate[] }) => Promise<unknown>;
@@ -105,12 +110,12 @@ export interface RunnableAgent {
 // and supplies sub-agents as SDK agent definitions directly when needed.
 
 /**
- * DefaultAtomicAgent - Pass-through agent for direct SDK query
+ * DefaultPromptAgent - Pass-through PromptAgent wrapped as RunnableAgent
  * Used by Chat and Agent tabs to maintain existing behavior
  */
 import { buildPromptAgentStart } from './runPromptAgentStart.js';
 
-export class DefaultAtomicAgent implements RunnableAgent {
+export class DefaultPromptAgent implements RunnableAgent {
     readonly id = 'default';
     readonly description = 'Direct query without agent wrapper';
 
@@ -127,7 +132,6 @@ export class DefaultAtomicAgent implements RunnableAgent {
     }
 
     start(userInput: string, context: AgentStartContext, sinks: AgentStartSinks): ExecutionHandle {
-        // Use the shared builder for standard prompt agent behavior
         const starter = buildPromptAgentStart({
             getPrompt: (input: string) => input,
             getSystemPrompt: () => ({ type: 'preset', preset: 'claude_code' } as const),

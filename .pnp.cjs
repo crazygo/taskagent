@@ -64,7 +64,7 @@ const RAW_RUNTIME_STATE =
         "packageLocation": "./",\
         "packageDependencies": [\
           ["@ai-sdk/openai", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:2.0.60"],\
-          ["@anthropic-ai/claude-agent-sdk", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:0.1.30"],\
+          ["@anthropic-ai/claude-agent-sdk", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:0.1.35"],\
           ["@askman-dev/task", "workspace:."],\
           ["@langchain/core", "npm:1.0.2"],\
           ["@langchain/langgraph", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:1.0.1"],\
@@ -89,7 +89,7 @@ const RAW_RUNTIME_STATE =
           ["tsx", "npm:4.20.6"],\
           ["typescript", "patch:typescript@npm%3A5.9.3#optional!builtin<compat/typescript>::version=5.9.3&hash=5786d5"],\
           ["vitest", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:4.0.6"],\
-          ["zod", "npm:4.1.12"]\
+          ["zod", "npm:3.25.76"]\
         ],\
         "linkType": "SOFT"\
       }]\
@@ -110,7 +110,7 @@ const RAW_RUNTIME_STATE =
           ["@ai-sdk/provider-utils", "virtual:74cb072a8987e96443033d6e3fbf80beafcea41cf8834cc7055498f87dfe4f96129be84510d823dcfc7702e9c19f9b24c179c6ed4136f763b51967a2464f40d7#npm:3.0.15"],\
           ["@types/zod", null],\
           ["@vercel/oidc", "npm:3.0.3"],\
-          ["zod", "npm:4.1.12"]\
+          ["zod", "npm:3.25.76"]\
         ],\
         "packagePeers": [\
           "@types/zod",\
@@ -134,7 +134,7 @@ const RAW_RUNTIME_STATE =
           ["@ai-sdk/provider", "npm:2.0.0"],\
           ["@ai-sdk/provider-utils", "virtual:74cb072a8987e96443033d6e3fbf80beafcea41cf8834cc7055498f87dfe4f96129be84510d823dcfc7702e9c19f9b24c179c6ed4136f763b51967a2464f40d7#npm:3.0.15"],\
           ["@types/zod", null],\
-          ["zod", "npm:4.1.12"]\
+          ["zod", "npm:3.25.76"]\
         ],\
         "packagePeers": [\
           "@types/zod",\
@@ -169,7 +169,7 @@ const RAW_RUNTIME_STATE =
           ["@standard-schema/spec", "npm:1.0.0"],\
           ["@types/zod", null],\
           ["eventsource-parser", "npm:3.0.6"],\
-          ["zod", "npm:4.1.12"]\
+          ["zod", "npm:3.25.76"]\
         ],\
         "packagePeers": [\
           "@types/zod",\
@@ -190,17 +190,17 @@ const RAW_RUNTIME_STATE =
       }]\
     ]],\
     ["@anthropic-ai/claude-agent-sdk", [\
-      ["npm:0.1.30", {\
-        "packageLocation": "./.yarn/unplugged/@anthropic-ai-claude-agent-sdk-virtual-6545b8f377/node_modules/@anthropic-ai/claude-agent-sdk/",\
+      ["npm:0.1.35", {\
+        "packageLocation": "./.yarn/unplugged/@anthropic-ai-claude-agent-sdk-virtual-68e6f57297/node_modules/@anthropic-ai/claude-agent-sdk/",\
         "packageDependencies": [\
-          ["@anthropic-ai/claude-agent-sdk", "npm:0.1.30"]\
+          ["@anthropic-ai/claude-agent-sdk", "npm:0.1.35"]\
         ],\
         "linkType": "SOFT"\
       }],\
-      ["virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:0.1.30", {\
-        "packageLocation": "./.yarn/unplugged/@anthropic-ai-claude-agent-sdk-virtual-6545b8f377/node_modules/@anthropic-ai/claude-agent-sdk/",\
+      ["virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:0.1.35", {\
+        "packageLocation": "./.yarn/unplugged/@anthropic-ai-claude-agent-sdk-virtual-68e6f57297/node_modules/@anthropic-ai/claude-agent-sdk/",\
         "packageDependencies": [\
-          ["@anthropic-ai/claude-agent-sdk", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:0.1.30"],\
+          ["@anthropic-ai/claude-agent-sdk", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:0.1.35"],\
           ["@img/sharp-darwin-arm64", "npm:0.33.5"],\
           ["@img/sharp-darwin-x64", "npm:0.33.5"],\
           ["@img/sharp-linux-arm", "npm:0.33.5"],\
@@ -208,7 +208,7 @@ const RAW_RUNTIME_STATE =
           ["@img/sharp-linux-x64", "npm:0.33.5"],\
           ["@img/sharp-win32-x64", "npm:0.33.5"],\
           ["@types/zod", null],\
-          ["zod", "npm:4.1.12"]\
+          ["zod", "npm:3.25.76"]\
         ],\
         "packagePeers": [\
           "@types/zod",\
@@ -222,7 +222,7 @@ const RAW_RUNTIME_STATE =
         "packageLocation": "./",\
         "packageDependencies": [\
           ["@ai-sdk/openai", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:2.0.60"],\
-          ["@anthropic-ai/claude-agent-sdk", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:0.1.30"],\
+          ["@anthropic-ai/claude-agent-sdk", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:0.1.35"],\
           ["@askman-dev/task", "workspace:."],\
           ["@langchain/core", "npm:1.0.2"],\
           ["@langchain/langgraph", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:1.0.1"],\
@@ -247,7 +247,7 @@ const RAW_RUNTIME_STATE =
           ["tsx", "npm:4.20.6"],\
           ["typescript", "patch:typescript@npm%3A5.9.3#optional!builtin<compat/typescript>::version=5.9.3&hash=5786d5"],\
           ["vitest", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:4.0.6"],\
-          ["zod", "npm:4.1.12"]\
+          ["zod", "npm:3.25.76"]\
         ],\
         "linkType": "SOFT"\
       }]\
@@ -768,7 +768,7 @@ const RAW_RUNTIME_STATE =
           ["@types/zod", null],\
           ["@types/zod-to-json-schema", null],\
           ["uuid", "npm:10.0.0"],\
-          ["zod", "npm:4.1.12"],\
+          ["zod", "npm:3.25.76"],\
           ["zod-to-json-schema", null]\
         ],\
         "packagePeers": [\
@@ -877,7 +877,7 @@ const RAW_RUNTIME_STATE =
           ["@types/ai", null],\
           ["@types/zod", null],\
           ["ai", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:5.0.86"],\
-          ["zod", "npm:4.1.12"]\
+          ["zod", "npm:3.25.76"]\
         ],\
         "packagePeers": [\
           "@types/ai",\
@@ -1136,7 +1136,7 @@ const RAW_RUNTIME_STATE =
         "packageLocation": "./packages/agents/",\
         "packageDependencies": [\
           ["@ai-sdk/openai", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:2.0.60"],\
-          ["@anthropic-ai/claude-agent-sdk", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:0.1.30"],\
+          ["@anthropic-ai/claude-agent-sdk", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:0.1.35"],\
           ["@openrouter/ai-sdk-provider", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#https://github.com/crazygo/ai-sdk-provider/releases/download/1.2.1/openrouter-ai-sdk-provider-1.2.1.tgz"],\
           ["@taskagent/agents", "workspace:packages/agents"],\
           ["@taskagent/core", "workspace:packages/core"],\
@@ -1149,7 +1149,7 @@ const RAW_RUNTIME_STATE =
           ["glob", "npm:11.0.3"],\
           ["js-yaml", "npm:4.1.0"],\
           ["typescript", "patch:typescript@npm%3A5.9.3#optional!builtin<compat/typescript>::version=5.9.3&hash=5786d5"],\
-          ["zod", "npm:4.1.12"]\
+          ["zod", "npm:3.25.76"]\
         ],\
         "linkType": "SOFT"\
       }]\
@@ -1159,7 +1159,7 @@ const RAW_RUNTIME_STATE =
         "packageLocation": "./packages/cli/",\
         "packageDependencies": [\
           ["@ai-sdk/openai", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:2.0.60"],\
-          ["@anthropic-ai/claude-agent-sdk", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:0.1.30"],\
+          ["@anthropic-ai/claude-agent-sdk", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:0.1.35"],\
           ["@openrouter/ai-sdk-provider", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#https://github.com/crazygo/ai-sdk-provider/releases/download/1.2.1/openrouter-ai-sdk-provider-1.2.1.tgz"],\
           ["@taskagent/agents", "workspace:packages/agents"],\
           ["@taskagent/cli", "workspace:packages/cli"],\
@@ -1183,7 +1183,7 @@ const RAW_RUNTIME_STATE =
           ["react", "npm:19.2.0"],\
           ["tsx", "npm:4.20.6"],\
           ["typescript", "patch:typescript@npm%3A5.9.3#optional!builtin<compat/typescript>::version=5.9.3&hash=5786d5"],\
-          ["zod", "npm:4.1.12"]\
+          ["zod", "npm:3.25.76"]\
         ],\
         "linkType": "SOFT"\
       }]\
@@ -1195,7 +1195,7 @@ const RAW_RUNTIME_STATE =
           ["@taskagent/core", "workspace:packages/core"],\
           ["@types/node", "npm:24.10.0"],\
           ["typescript", "patch:typescript@npm%3A5.9.3#optional!builtin<compat/typescript>::version=5.9.3&hash=5786d5"],\
-          ["zod", "npm:4.1.12"]\
+          ["zod", "npm:3.25.76"]\
         ],\
         "linkType": "SOFT"\
       }]\
@@ -1544,7 +1544,7 @@ const RAW_RUNTIME_STATE =
           ["@opentelemetry/api", "npm:1.9.0"],\
           ["@types/zod", null],\
           ["ai", "virtual:f0cbd1e59e07c13b8e4e1c3d41410653e788ddde93a0a60414066228154c888e2c66988978762360aa3691c90ab4c34a8a27563dd80f0dacd6b1cbe601d30129#npm:5.0.86"],\
-          ["zod", "npm:4.1.12"]\
+          ["zod", "npm:3.25.76"]\
         ],\
         "packagePeers": [\
           "@types/zod",\
@@ -3991,13 +3991,6 @@ const RAW_RUNTIME_STATE =
         "packageLocation": "../../../.yarn/berry/cache/zod-npm-3.25.76-7de26333f8-10c0.zip/node_modules/zod/",\
         "packageDependencies": [\
           ["zod", "npm:3.25.76"]\
-        ],\
-        "linkType": "HARD"\
-      }],\
-      ["npm:4.1.12", {\
-        "packageLocation": "../../../.yarn/berry/cache/zod-npm-4.1.12-8e1ffc4d68-10c0.zip/node_modules/zod/",\
-        "packageDependencies": [\
-          ["zod", "npm:4.1.12"]\
         ],\
         "linkType": "HARD"\
       }]\

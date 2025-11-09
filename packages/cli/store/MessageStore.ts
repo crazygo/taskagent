@@ -6,10 +6,13 @@
  * - Invisible tabs have configurable message limits (default: 20)
  * - Automatic separator line on tab switch
  * - Efficient message retrieval for current tab
+ * - EventBus integration for cross-tab communication
  */
 
 import { EventEmitter } from 'node:events';
 import type { Message } from '../types.js';
+import type { EventBus } from '../../core/event-bus/EventBus.js';
+import { addLog } from '@taskagent/shared/logger';
 
 export interface MessageStoreConfig {
   /**
@@ -17,6 +20,11 @@ export interface MessageStoreConfig {
    * @default 20
    */
   invisibleTabLimit?: number;
+  
+  /**
+   * Optional EventBus for cross-tab communication
+   */
+  eventBus?: EventBus;
 }
 
 interface TabMessages {
@@ -49,7 +57,8 @@ export class MessageStore {
   private tabMessages: Map<string, TabMessages> = new Map();
   private currentTabId: string = 'Chat';
   private nextMessageId: number = 1;
-  private config: Required<MessageStoreConfig>;
+  private config: Required<Pick<MessageStoreConfig, 'invisibleTabLimit'>>;
+  private eventBus?: EventBus;
   private emitter = new EventEmitter();
   private batchDepth = 0;
   private pendingChange = false;
@@ -59,6 +68,7 @@ export class MessageStore {
     this.config = {
       invisibleTabLimit: config.invisibleTabLimit ?? 20,
     };
+    this.eventBus = config.eventBus;
   }
 
   /**
@@ -109,7 +119,39 @@ export class MessageStore {
     tabData.version += 1;
     this.partitionCache.delete(tabId);
 
+    // Debug: log pending creations and current active count
+    try {
+      const { active } = this.partitionMessages(tabData.messages);
+      if (message.isPending) {
+        addLog(`[MessageStore] append pending: tab=${tabId} id=${message.id} role=${message.role} activeCount=${active.length}`);
+      } else {
+        addLog(`[MessageStore] append: tab=${tabId} id=${message.id} role=${message.role} activeCount=${active.length}`);
+      }
+    } catch {}
+
     this.markDirty();
+
+    // Emit EventBus event for cross-tab communication
+    if (this.eventBus) {
+      this.eventBus.emit({
+        type: 'message:added',
+        agentId: 'system',
+        tabId,
+        timestamp: Date.now(),
+        version: '1.0',
+        payload: {
+          tabId,
+          message: {
+            id: message.id,
+            role: message.role,
+            content: message.content,
+            isPending: message.isPending,
+            queueState: message.queueState,
+            isBoxed: message.isBoxed,
+          },
+        },
+      });
+    }
 
     // If this is not the current tab, trim immediately
     if (tabId !== this.currentTabId) {
@@ -210,10 +252,20 @@ export class MessageStore {
     if (index === -1) return;
 
     const current = tabData.messages[index]!;
+    const prevPending = !!current.isPending;
     const updated = mutator({ ...current });
     tabData.messages[index] = updated;
     tabData.version += 1;
     this.partitionCache.delete(tabId);
+
+    // Debug: log pending state transitions and active count
+    try {
+      const { active } = this.partitionMessages(tabData.messages);
+      if (prevPending !== !!updated.isPending) {
+        addLog(`[MessageStore] mutate pending->${!!updated.isPending}: tab=${tabId} id=${messageId} role=${updated.role} activeCount=${active.length}`);
+      }
+    } catch {}
+
     this.markDirty();
   }
 

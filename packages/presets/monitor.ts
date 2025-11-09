@@ -32,10 +32,7 @@ export const monitorPreset: PresetConfig = {
     ],
     
     // Only monitoring-related agents
-    agents: [
-        'monitor',
-        'log-monitor'
-    ],
+    agents: [],
     
     // Start with Monitor tab
     defaultTab: 'Monitor',

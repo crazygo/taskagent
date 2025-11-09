@@ -13,6 +13,7 @@ export interface Message {
     toolName?: string;          // Tool name (e.g., "Bash", "Read")
     toolId?: string;            // Tool call ID for tracking
     toolDescription?: string;   // Human-readable description of the tool action
+    toolIsError?: boolean;      // Whether tool execution failed
     durationMs?: number;        // Execution time (for tool_result)
     queueState?: 'queued' | 'active' | 'completed';
 }

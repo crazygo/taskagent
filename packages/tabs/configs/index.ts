@@ -10,6 +10,7 @@ export { storyTabConfig } from './story.js';
 export { glossaryTabConfig } from './glossary.js';
 export { uiReviewTabConfig } from './ui-review.js';
 export { monitorTabConfig } from './monitor.js';
+export { looperTabConfig } from './looper.js';
 
 import { chatTabConfig } from './chat.js';
 import { agentTabConfig } from './agent.js';
@@ -17,6 +18,7 @@ import { storyTabConfig } from './story.js';
 import { glossaryTabConfig } from './glossary.js';
 import { uiReviewTabConfig } from './ui-review.js';
 import { monitorTabConfig } from './monitor.js';
+import { looperTabConfig } from './looper.js';
 import type { TabConfig } from '../types.js';
 
 /**
@@ -29,5 +31,6 @@ export const defaultTabs: TabConfig[] = [
   uiReviewTabConfig,
   glossaryTabConfig,
   monitorTabConfig,
+  looperTabConfig,
 ];
 

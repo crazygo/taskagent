@@ -70,6 +70,7 @@ export class TaskManager {
       timeoutSec?: number;
       session?: { id: string; initialized: boolean };
       forkSession?: boolean;
+      parentAgentId?: string;
     }
   ): { task: TaskExtended; emitter: EventEmitter } {
     const id = crypto.randomUUID();
@@ -83,6 +84,7 @@ export class TaskManager {
     const agentContext = {
       sourceTabId: context.sourceTabId || 'unknown',
       workspacePath: context.workspacePath,
+      parentAgentId: context.parentAgentId,
     };
 
     const generatedPrompt = agent.getPrompt(userPrompt, agentContext);
@@ -175,16 +177,30 @@ export class TaskManager {
         this.handles.delete(id);
       },
       onReasoning: undefined,
-      canUseTool: async (toolName: string) => {
+      canUseTool: async (
+        toolName: string,
+        input: Record<string, unknown>,
+        _options: { signal: AbortSignal; suggestions?: any[] }
+      ) => {
         addLog(`[BG] Auto-approve tool: ${toolName}`);
-        return undefined;
+        // Return full PermissionResult so background runs satisfy the SDK contract (https://docs.claude.com/en/api/agent-sdk/typescript.md).
+        return {
+          behavior: 'allow',
+          updatedInput: input,
+        };
       },
     };
 
     const handle = maybeStart.call(
       agent,
       userPrompt,
-      { sourceTabId: context.sourceTabId, workspacePath: context.workspacePath, session: context.session, forkSession: context.forkSession },
+      { 
+        sourceTabId: context.sourceTabId, 
+        workspacePath: context.workspacePath, 
+        session: context.session, 
+        forkSession: context.forkSession,
+        parentAgentId: context.parentAgentId
+      },
       {
         ...sinks,
         onSessionId: (sid: string) => {
@@ -216,6 +232,7 @@ export class TaskManager {
       workspacePath?: string;
       session?: { id: string; initialized: boolean };
       forkSession?: boolean;
+      parentAgentId?: string;
     },
     sinks: ForegroundSinks,
   ): ForegroundHandle {
@@ -228,7 +245,13 @@ export class TaskManager {
     return maybeStart.call(
       agent,
       userPrompt,
-      { sourceTabId: context.sourceTabId, workspacePath: context.workspacePath, session: context.session, forkSession: context.forkSession },
+      { 
+        sourceTabId: context.sourceTabId, 
+        workspacePath: context.workspacePath, 
+        session: context.session, 
+        forkSession: context.forkSession,
+        parentAgentId: context.parentAgentId
+      },
       sinks,
     );
   }

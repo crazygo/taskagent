@@ -4,13 +4,13 @@ import type { EventBus } from '@taskagent/core/event-bus';
 import type { AgentEvent } from '@taskagent/core/types/AgentEvent.js';
 import type { MessageStore } from '../store/MessageStore.js';
 import type { Message } from '../types.js';
+import type { ToolUseEvent, ToolResultEvent } from '@taskagent/agents/runtime/runClaudeStream.js';
 
 type ConversationStatus = 'queued' | 'active';
 
 interface ConversationEntry {
   userMessageId: number;
   assistantMessageId: number;
-  userPrompt: string;
   status: ConversationStatus;
 }
 
@@ -21,19 +21,18 @@ export interface AgentConversationRegistry {
   registerConversation: (
     tabId: string,
     userMessageId: number,
-    assistantMessageId: number,
-    userPrompt: string
+    assistantMessageId: number
   ) => number;
   getQueueLength: (tabId: string) => number;
-  getQueuedPrompts: (tabId: string) => Array<{ id: number; prompt: string }>;
 }
 
 export function useAgentEventBridge(eventBus: EventBus, messageStore: MessageStore): AgentConversationRegistry {
   const conversationQueuesRef = useRef<Map<string, ConversationEntry[]>>(new Map());
 
   const appendSystemMessage = useCallback((tabId: string, content: string, boxed = false) => {
+    const newId = messageStore.getNextMessageId();
     const message: Message = {
-      id: messageStore.getNextMessageId(),
+      id: newId,
       role: 'system',
       content,
       isBoxed: boxed,
@@ -41,7 +40,7 @@ export function useAgentEventBridge(eventBus: EventBus, messageStore: MessageSto
       timestamp: Date.now(),
     };
     messageStore.appendMessage(tabId, message);
-    addLog(`[AgentBridge] appendSystemMessage completed for msgId=${message.id}`);
+    addLog(`[AgentBridge] appendSystemMessage completed for msgId=${newId}; raw=${JSON.stringify({ tabId, content, boxed })}`);
   }, [messageStore]);
 
   const ensureActiveEntry = useCallback((tabId: string): ConversationEntry | null => {
@@ -76,21 +75,17 @@ export function useAgentEventBridge(eventBus: EventBus, messageStore: MessageSto
     const messages = messageStore.getMessagesForTab(tabId);
     const index = messages.findIndex(m => m.id === current.assistantMessageId);
     if (index !== -1) {
-      const msg = messages[index];
-      if (!msg) {
-        addLog(`[AgentBridge] Message not found at index ${index} for tab ${tabId}`);
-        return;
-      }
-      if (msg.isPending) {
+      const msg = messages[index]!;
+      if (msg && msg.isPending) {
         // Remove from current position
         messageStore.removeMessage(tabId, current.assistantMessageId);
         
         // Create finalized version and append to end
-        const finalized = updater ? updater(msg) : {
+        const finalized: Message = updater ? updater(msg) : {
           ...msg,
           isPending: false,
           queueState: 'completed' as const,
-        };
+        } as Message;
         messageStore.appendMessage(tabId, finalized);
       } else if (updater) {
         // Already finalized, just mutate in place
@@ -116,9 +111,26 @@ export function useAgentEventBridge(eventBus: EventBus, messageStore: MessageSto
 
   useEffect(() => {
     const handleText = (event: AgentEvent) => {
-      const entry = ensureActiveEntry(event.tabId);
-      if (!entry) return;
+      // Looper is independent of the conversation queue
+      if (event.tabId === 'Looper') {
+        const chunk = typeof event.payload === 'string' ? event.payload : '';
+        if (chunk) {
+          addLog(`[AgentBridge] Looper text (queue-independent) len=${chunk.length}`);
+          messageStore.appendMessage('Looper', {
+            id: messageStore.getNextMessageId(),
+            role: 'assistant',
+            content: chunk,
+            reasoning: '',
+            isPending: false,
+            timestamp: event.timestamp,
+          });
+        }
+        return; // Do not engage queue logic for Looper
+      }
 
+      // Skip entry check - allow all agent outputs to be displayed
+      // (TabExecutionManager already handles concurrent execution control)
+      
       const chunk = typeof event.payload === 'string' ? event.payload : '';
       if (!chunk) return;
 
@@ -134,9 +146,8 @@ export function useAgentEventBridge(eventBus: EventBus, messageStore: MessageSto
     };
 
     const handleReasoning = (event: AgentEvent) => {
-      const entry = ensureActiveEntry(event.tabId);
-      if (!entry) return;
-
+      // Skip entry check - allow all reasoning to be displayed
+      
       const chunk = typeof event.payload === 'string' ? event.payload : '';
       if (!chunk) return;
 
@@ -152,77 +163,109 @@ export function useAgentEventBridge(eventBus: EventBus, messageStore: MessageSto
     };
 
     const handleAgentEvent = (event: AgentEvent) => {
-      addLog(`[AgentBridge] handleAgentEvent called for tab ${event.tabId}, event.type=${event.type}, timestamp=${event.timestamp}`);
+      addLog(`[AgentBridge] handleAgentEvent called for tab ${event.tabId}, payload=${JSON.stringify(event.payload)}`);
       ensureActiveEntry(event.tabId);
       const payload = event.payload;
 
       if (payload && typeof payload === 'object' && 'type' in payload && (payload as any).type === 'session') {
         const sessionId = (payload as any).sessionId;
-        if (typeof sessionId === 'string') {
-          addLog(`[AgentBridge] Session event received for tab ${event.tabId}: ${sessionId}`);
-        }
+        addLog(`[AgentBridge] Skip handling session event: ${sessionId}`);
         return;
       }
 
-      addLog(`[AgentBridge] received event for tab ${event.tabId}, with payload: ${JSON.stringify(payload)}`);
-
-      // Filter out SDK internal messages (type=user with message object)
-      // These are tool_result messages sent back to the model, not for UI display
-      if (payload && typeof payload === 'object' && 'type' in payload && (payload as any).type === 'user') {
-        addLog(`[AgentBridge] Ignoring SDK internal user message`);
-        return;
-      }
 
       if (payload && typeof payload === 'object' && 'result' in payload) {
         const resultText = typeof (payload as any).result === 'string'
           ? (payload as any).result
           : '';
-        addLog(`[AgentBridge] Result event received for tab ${event.tabId} (len=${resultText.length})`);
+        addLog(`[AgentBridge] Forwarding result event: ${resultText.length}`);
         finalizeConversation(event.tabId);
         return;
       }
 
-      if (payload && typeof payload === 'object' && 'message' in payload) {
-        const messageField = (payload as any).message;
-        
-        // Debug: Log message field type and content
-        addLog(`[AgentBridge] payload.message type=${typeof messageField}, value=${JSON.stringify(messageField).substring(0, 200)}`);
-        
-        const message = String(messageField ?? '');
-        if (!message) return;
+      if (payload && typeof payload === 'object' && 'type' in payload && (payload as any).type === 'tool_use') {
+        const toolUse = payload as unknown as ToolUseEvent;
+        const toolName = toolUse.name;
+        const description = toolUse.description;
+        addLog(`[ToolUI] Forwarding tool use: ${toolName}${description ? ` - ${description}` : ''}`);
+        messageStore.appendMessage(event.tabId, {
+          id: messageStore.getNextMessageId(),
+          role: 'tool_use',
+          content: toolUse?.input as string ?? '',
+          toolName: toolName || 'Tool',
+          toolDescription: description,
+          toolId: toolUse.id,
+          timestamp: event.timestamp,
+        });
+        return;
+      }
 
-        const toolUseMatch = message.match(TOOL_USE_REGEX);
-        const toolResultMatch = message.match(TOOL_RESULT_REGEX);
-
-        if (toolUseMatch) {
-          const [, toolName, description] = toolUseMatch;
-          messageStore.appendMessage(event.tabId, {
-            id: messageStore.getNextMessageId(),
-            role: 'tool_use',
-            content: '',
-            toolName: toolName || 'Tool',
-            toolDescription: description,
-            timestamp: event.timestamp,
-          });
-          addLog(`[ToolUI] Tool use: ${toolName}${description ? ` - ${description}` : ''}`);
-          return;
-        }
-
-        if (toolResultMatch) {
-          const [, toolName, durationStr] = toolResultMatch;
-          const durationMs = durationStr ? parseFloat(durationStr.replace('s', '')) * 1000 : undefined;
+      if (payload && typeof payload === 'object' && 'type' in payload && (payload as any).type === 'tool_result') {
+        const toolResult = payload as unknown as ToolResultEvent;
+          const toolName = toolResult.name;
+          const durationMs = toolResult.durationMs;
+          const content = toolResult.content ?? '';
+          const firstLine = content.split('\n')[0] ?? '';
+          let contentPreview = firstLine.slice(0, 50).trim();
+          // 如果被截断，回退到最后一个完整单词
+          if (firstLine.length > 50) {
+            const lastSpace = contentPreview.lastIndexOf(' ');
+            if (lastSpace > 0) {
+              contentPreview = contentPreview.slice(0, lastSpace);
+            }
+          }
+          if (contentPreview.endsWith(': [')) {
+            contentPreview = contentPreview.slice(0, -2);
+          }
+          if (contentPreview.endsWith(': {')) {
+            contentPreview = contentPreview.slice(0, -2);
+          }
+          if (contentPreview.endsWith(':')) {
+            contentPreview = contentPreview.slice(0, -1);
+          }
+          addLog(`[ToolUI] Forwarding tool result: ${toolName}${durationMs ? ` (${(durationMs / 1000).toFixed(1)}s)` : ''}`);
           messageStore.appendMessage(event.tabId, {
             id: messageStore.getNextMessageId(),
             role: 'tool_result',
-            content: '',
+            content: contentPreview,
             toolName: toolName || 'Tool',
+            toolIsError: toolResult.isError ?? false,
+            toolId: toolResult.id,
             durationMs,
             timestamp: event.timestamp,
           });
-          addLog(`[ToolUI] Tool result: ${toolName}${durationMs ? ` (${durationMs}ms)` : ''}`);
           return;
+      }
+      if (payload && typeof payload === 'object' && 'message' in payload) {
+        let message = String((payload as any).message ?? '');
+        
+        if (!message) return;
+
+        // Handle Looper events (progress/result)
+        if (message.startsWith('looper:')) {
+          const looperPayload = (payload as any).payload;
+          
+          // looper:result - don't display, will be handled by Mediator
+          if (message === 'looper:result') {
+            addLog(`[AgentBridge] Skipping looper:result (handled by Mediator)`);
+            return;
+          }
+          
+          // looper:progress - display as assistant message
+          if (message === 'looper:progress' && looperPayload) {
+            addLog(`[AgentBridge] Forwarding looper:progress as assistant message`);
+            messageStore.appendMessage(event.tabId, {
+              id: messageStore.getNextMessageId(),
+              role: 'assistant',
+              content: String(looperPayload),
+              isPending: false,
+              timestamp: event.timestamp,
+            });
+            return;
+          }
         }
 
+        addLog(`[AgentBridge] Forwarding non-tool message, uuid=: ${(payload as any).uuid}`);
         appendSystemMessage(event.tabId, message, (payload as any).level === 'error');
         return;
       }
@@ -235,8 +278,10 @@ export function useAgentEventBridge(eventBus: EventBus, messageStore: MessageSto
     const handleCompleted = (event: AgentEvent) => {
       addLog(`[AgentBridge] handleCompleted called for tab ${event.tabId}, timestamp=${event.timestamp}`);
       finalizeConversation(event.tabId);
-      // const ts = new Date((event as any).timestamp ?? Date.now()).toISOString();
-      // appendSystemMessage(event.tabId, `◼︎ ${ts}`);
+      // Safety: ensure no leftover pending placeholders remain active
+      messageStore.updateActiveMessages(event.tabId, prev => prev.map(msg => ({ ...msg, isPending: false, queueState: 'completed' })));
+      const ts = new Date((event as any).timestamp ?? Date.now()).toISOString();
+      appendSystemMessage(event.tabId, `${ts} ◼︎`);
     };
 
     const handleFailed = (event: AgentEvent) => {
@@ -269,13 +314,11 @@ export function useAgentEventBridge(eventBus: EventBus, messageStore: MessageSto
     tabId: string,
     userMessageId: number,
     assistantMessageId: number,
-    userPrompt: string
   ): number => {
     const queue = conversationQueuesRef.current.get(tabId) ?? [];
     const entry: ConversationEntry = {
       userMessageId,
       assistantMessageId,
-      userPrompt,
       status: queue.length === 0 ? 'active' : 'queued',
     };
 
@@ -298,22 +341,8 @@ export function useAgentEventBridge(eventBus: EventBus, messageStore: MessageSto
     return queue ? queue.length : 0;
   }, []);
 
-  const getQueuedPrompts = useCallback((tabId: string): Array<{ id: number; prompt: string }> => {
-    const queue = conversationQueuesRef.current.get(tabId);
-    if (!queue) return [];
-    
-    // Filter out the active item (first in queue), return only queued items
-    return queue
-      .filter(entry => entry.status === 'queued')
-      .map(entry => ({
-        id: entry.assistantMessageId,
-        prompt: entry.userPrompt,
-      }));
-  }, []);
-
   return {
     registerConversation,
     getQueueLength,
-    getQueuedPrompts,
   };
 }

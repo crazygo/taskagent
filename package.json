@@ -8,7 +8,7 @@
   "author": "",
   "dependencies": {
     "@ai-sdk/openai": "^2.0.48",
-    "@anthropic-ai/claude-agent-sdk": "^0.1.25",
+    "@anthropic-ai/claude-agent-sdk": "^0.1.30",
     "@langchain/core": "^1.0.1",
     "@langchain/langgraph": "^1.0.1",
     "@openrouter/ai-sdk-provider": "https://github.com/crazygo/ai-sdk-provider/releases/download/1.2.1/openrouter-ai-sdk-provider-1.2.1.tgz",
@@ -21,7 +21,7 @@
     "js-yaml": "^4.1.0",
     "minimist": "^1.2.8",
     "react": "^19.2.0",
-    "zod": "^4.1.12"
+    "zod": "^3.22.4"
   },
   "description": "",
   "devDependencies": {
@@ -47,11 +47,15 @@
     "postbuild": "node scripts/create-aliases.js",
     "prepublishOnly": "yarn build",
     "start:test": "concurrently --raw --kill-others --success first \"yarn start\" \"sleep 10\"",
-    "test:story": "yarn start -- --story -p \"Hi\" --auto-allow",
-    "test:glossary": "yarn start -- --glossary -p \"Hi\" --auto-allow",
+    "test:story": "yarn start -- --story -p \"Hi\" --auto-allow --auto-exit",
+    "test:glossary": "yarn start -- --glossary -p \"Hi\" --auto-allow --auto-exit",
     "e2e:experiment": "expect scripts/e2e-experiment.expect --",
     "test": "vitest",
     "test:ci": "vitest run",
+    "test:mediator:status": "concurrently --raw --kill-others --success first \"yarn start -- --workspace $(mktemp -d)/taskagent-tmp --newsession --mediator --auto-allow --auto-exit -p 'Hello, please use send_to_looper tool with command status'\" \"sleep 20\"",
+    "test:mediator:start": "concurrently --raw --kill-others --success first \"yarn start -- --workspace $(mktemp -d)/taskagent-tmp --newsession --mediator --auto-allow --auto-exit -p 'Hello, please use send_to_looper tool with command start and task Optimize code structure'\" \"sleep 20\"",
+    "test:mediator:add_pending": "concurrently --raw --kill-others --success first \"yarn start -- --workspace $(mktemp -d)/taskagent-tmp --newsession --mediator --auto-allow --auto-exit -p 'Hello, please use send_to_looper tool with command add_pending and task Refactor logging system'\" \"sleep 20\"",
+    "test:mediator:stop": "concurrently --raw --kill-others --success first \"yarn start -- --workspace $(mktemp -d)/taskagent-tmp --newsession --mediator --auto-allow --auto-exit -p 'Hello, please use send_to_looper tool with command stop'\" \"sleep 20\"",
     "test:watch": "vitest watch",
     "publish": "echo \"Use yarn npm publish --access public\""
   },

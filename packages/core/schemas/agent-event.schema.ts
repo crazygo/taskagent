@@ -10,13 +10,15 @@ export const AgentEventSchema = z.object({
         'agent:reasoning',
         'agent:event',
         'agent:completed',
-        'agent:failed'
+        'agent:failed',
+        'message:added'
     ]),
     agentId: z.string().min(1),
     tabId: z.string().min(1),
     timestamp: z.number().positive(),
     payload: z.unknown(),
-    version: z.literal('1.0')
+    version: z.literal('1.0'),
+    parentAgentId: z.string().optional()
 });
 
 // Export type from schema

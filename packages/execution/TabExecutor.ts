@@ -26,6 +26,7 @@ import type { AgentRegistry } from '@taskagent/agents/registry/AgentRegistry.js'
 import { TabExecutionManager } from './TabExecutionManager.js';
 import { MessageAdapter } from './MessageAdapter.js';
 import type { ExecutionContext, ExecutionResult } from './types.js';
+import type { AgentStartSinks } from '@taskagent/agents/runtime/types.js';
 
 export class TabExecutor {
     constructor(
@@ -100,7 +101,12 @@ export class TabExecutor {
             }
 
             // Create MessageAdapter for event conversion
-            const adapter = new MessageAdapter(tabId, agentId, this.eventBus);
+            const adapter = new MessageAdapter(
+                tabId, 
+                agentId, 
+                this.eventBus,
+                { parentAgentId: context.parentAgentId }
+            );
             const sinks = adapter.createSinks(
                 context.canUseTool || this.defaultCanUseTool
             );
@@ -137,11 +143,16 @@ export class TabExecutor {
      * Default tool permission handler
      * Always allows tools (can be overridden by context)
      */
-    private defaultCanUseTool = async (
-        toolName: string,
-        input: Record<string, unknown>
-    ): Promise<boolean> => {
-        return true;
+    private defaultCanUseTool: AgentStartSinks['canUseTool'] = async (
+        _toolName: string,
+        input: Record<string, unknown>,
+        _options: { signal: AbortSignal; suggestions?: any[] }
+    ) => {
+        // Auto-approve with a full PermissionResult object; booleans are invalid per https://docs.claude.com/en/api/agent-sdk/typescript.md.
+        return {
+            behavior: 'allow',
+            updatedInput: input,
+        };
     };
 
     /**

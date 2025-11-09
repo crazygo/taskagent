@@ -4,7 +4,7 @@ export const agentTabConfig: TabConfig = {
   id: 'Agent',
   label: 'Agent',
   type: 'agent',
-  agentId: 'default', // Uses DefaultAtomicAgent (passthrough)
+  agentId: 'default', // Uses PromptAgent (passthrough)
   description: 'Claude Agent SDK with full tool access',
   requiresSession: true,
   executionMode: 'foreground',

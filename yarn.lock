@@ -62,9 +62,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@anthropic-ai/claude-agent-sdk@npm:^0.1.25":
-  version: 0.1.30
-  resolution: "@anthropic-ai/claude-agent-sdk@npm:0.1.30"
+"@anthropic-ai/claude-agent-sdk@npm:^0.1.30":
+  version: 0.1.35
+  resolution: "@anthropic-ai/claude-agent-sdk@npm:0.1.35"
   dependencies:
     "@img/sharp-darwin-arm64": "npm:^0.33.5"
     "@img/sharp-darwin-x64": "npm:^0.33.5"
@@ -87,7 +87,7 @@ __metadata:
       optional: true
     "@img/sharp-win32-x64":
       optional: true
-  checksum: 10c0/644d563e761b7970b5ac973ef04a1b0cb814ceb3cf37d423ab1e453bc42d9b95667e87d229c948a17b586a4d970ccf4a5bc7d03c6820f1b8b0491ee8016dc30a
+  checksum: 10c0/c902c15641bd6575d44029af62bcaaab642db6b4c07bec049e3ea8d30963be029a0274fd7d0848fd213dfc8b8b2ce8379ac5b9f4024dcd5c27cf7b7e4f406f93
   languageName: node
   linkType: hard
 
@@ -96,7 +96,7 @@ __metadata:
   resolution: "@askman-dev/task@workspace:."
   dependencies:
     "@ai-sdk/openai": "npm:^2.0.48"
-    "@anthropic-ai/claude-agent-sdk": "npm:^0.1.25"
+    "@anthropic-ai/claude-agent-sdk": "npm:^0.1.30"
     "@langchain/core": "npm:^1.0.1"
     "@langchain/langgraph": "npm:^1.0.1"
     "@openrouter/ai-sdk-provider": "https://github.com/crazygo/ai-sdk-provider/releases/download/1.2.1/openrouter-ai-sdk-provider-1.2.1.tgz"
@@ -120,7 +120,7 @@ __metadata:
     tsx: "npm:^4.20.6"
     typescript: "npm:^5.9.3"
     vitest: "npm:^4.0.6"
-    zod: "npm:^4.1.12"
+    zod: "npm:^3.22.4"
   bin:
     taskagent: dist/packages/cli/main.js
     taskagent-monitor: dist/main-monitor.js
@@ -819,7 +819,7 @@ __metadata:
   resolution: "@taskagent/agents@workspace:packages/agents"
   dependencies:
     "@ai-sdk/openai": "npm:^2.0.48"
-    "@anthropic-ai/claude-agent-sdk": "npm:^0.1.25"
+    "@anthropic-ai/claude-agent-sdk": "npm:^0.1.30"
     "@openrouter/ai-sdk-provider": "https://github.com/crazygo/ai-sdk-provider/releases/download/1.2.1/openrouter-ai-sdk-provider-1.2.1.tgz"
     "@taskagent/core": "workspace:*"
     "@taskagent/execution": "workspace:*"
@@ -831,7 +831,7 @@ __metadata:
     glob: "npm:^11.0.3"
     js-yaml: "npm:^4.1.0"
     typescript: "npm:^5.9.3"
-    zod: "npm:^4.1.12"
+    zod: "npm:^3.22.4"
   languageName: unknown
   linkType: soft
 
@@ -840,7 +840,7 @@ __metadata:
   resolution: "@taskagent/cli@workspace:packages/cli"
   dependencies:
     "@ai-sdk/openai": "npm:^2.0.48"
-    "@anthropic-ai/claude-agent-sdk": "npm:^0.1.25"
+    "@anthropic-ai/claude-agent-sdk": "npm:^0.1.30"
     "@openrouter/ai-sdk-provider": "https://github.com/crazygo/ai-sdk-provider/releases/download/1.2.1/openrouter-ai-sdk-provider-1.2.1.tgz"
     "@taskagent/agents": "workspace:*"
     "@taskagent/core": "workspace:*"
@@ -863,7 +863,7 @@ __metadata:
     react: "npm:^19.2.0"
     tsx: "npm:^4.20.6"
     typescript: "npm:^5.9.3"
-    zod: "npm:^4.1.12"
+    zod: "npm:^3.22.4"
   bin:
     taskagent: ./dist/main.js
   languageName: unknown
@@ -875,7 +875,7 @@ __metadata:
   dependencies:
     "@types/node": "npm:^24.7.1"
     typescript: "npm:^5.9.3"
-    zod: "npm:^4.1.12"
+    zod: "npm:^3.22.4"
   languageName: unknown
   linkType: soft
 
@@ -3352,16 +3352,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"zod@npm:^3.25.76 || ^4":
+"zod@npm:^3.22.4, zod@npm:^3.25.76 || ^4":
   version: 3.25.76
   resolution: "zod@npm:3.25.76"
   checksum: 10c0/5718ec35e3c40b600316c5b4c5e4976f7fee68151bc8f8d90ec18a469be9571f072e1bbaace10f1e85cf8892ea12d90821b200e980ab46916a6166a4260a983c
-  languageName: node
-  linkType: hard
-
-"zod@npm:^4.1.12":
-  version: 4.1.12
-  resolution: "zod@npm:4.1.12"
-  checksum: 10c0/b64c1feb19e99d77075261eaf613e0b2be4dfcd3551eff65ad8b4f2a079b61e379854d066f7d447491fcf193f45babd8095551a9d47973d30b46b6d8e2c46774
   languageName: node
   linkType: hard

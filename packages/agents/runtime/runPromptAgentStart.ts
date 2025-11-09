@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import { inspect } from 'util';
 import { addLog } from '@taskagent/shared/logger';
 import { runClaudeStream } from './runClaudeStream.js';
-import type { AgentDefinition } from '@anthropic-ai/claude-agent-sdk';
+import type { AgentDefinition, McpServerConfig } from '@anthropic-ai/claude-agent-sdk';
 import type { AgentStartContext, AgentStartSinks, ExecutionHandle } from '../types.js';
 
 /**
@@ -17,6 +17,7 @@ export function buildPromptAgentStart(
     getAgentDefinitions?: () => Record<string, AgentDefinition> | undefined;
     getModel?: () => string | undefined;
     parseOutput?: (rawChunk: string) => { level: 'info'|'warning'|'error'; message: string; ts: number }[];
+    getMcpServers?: (ctx: { sourceTabId: string; workspacePath?: string; session: { id: string; initialized: boolean }; rawContext: AgentStartContext }) => Record<string, McpServerConfig> | undefined;
   }
 ): (userInput: string, context: AgentStartContext, sinks: AgentStartSinks) => ExecutionHandle {
   return (userInput: string, context: AgentStartContext, sinks: AgentStartSinks): ExecutionHandle => {
@@ -39,6 +40,16 @@ export function buildPromptAgentStart(
     // Request forking when resuming if asked by the caller (background runs)
     if (context.forkSession) {
       (options as any).forkSession = true;
+    }
+
+    const mcpServers = adapter.getMcpServers?.({
+      sourceTabId: context.sourceTabId,
+      workspacePath: context.workspacePath,
+      session,
+      rawContext: context,
+    });
+    if (mcpServers && Object.keys(mcpServers).length > 0) {
+      (options as any).mcpServers = mcpServers;
     }
 
     // Inject sub-agents if present
@@ -77,11 +88,7 @@ export function buildPromptAgentStart(
           // Forward tool use events to UI as info events
           if (sinks.onEvent) {
             try {
-              sinks.onEvent({
-                level: 'info',
-                message: `Tool: ${event.name}${event.description ? ` - ${event.description}` : ''}`,
-                ts: Date.now(),
-              });
+              sinks.onEvent(event);
             } catch {}
           }
         },
@@ -89,17 +96,12 @@ export function buildPromptAgentStart(
           // Forward tool result events to UI as info events
           if (sinks.onEvent) {
             try {
-              const duration = event.durationMs ? ` (${(event.durationMs / 1000).toFixed(1)}s)` : '';
-              sinks.onEvent({
-                level: 'info',
-                message: `Tool ${event.name} completed${duration}`,
-                ts: Date.now(),
-              });
+              sinks.onEvent(event);
             } catch {}
           }
         },
         onNonAssistantEvent: (evt: unknown) => {
-          addLog(`[RunPromptAgentStart] onNonAssistantEvent called: ${JSON.stringify(evt).substring(0, 500)}`);
+          addLog(`[RunPromptAgentStart] onNonAssistantEvent called, uuid=${(evt as any)?.uuid ? (evt as any).uuid : 'n/a'}`);
           try {
             const evtObj = evt as any;
             if (evtObj && typeof evtObj === 'object' && evtObj.type === 'result') {
@@ -110,7 +112,7 @@ export function buildPromptAgentStart(
               // Block forwarding and inject special marker to prove this path displays text
               sinks.onEvent?.({
                 level: 'info',
-                message: `duration=${dur}ms, turns=${turns}, cost=$${cost} ◼︎`,
+                message: `duration=${dur}ms, turns=${turns}, cost=$${cost}`,
                 ts: Date.now(),
               });
               return; // Don't forward the original result event

@@ -9,6 +9,7 @@ interface CliArgs {
   workspace?: string;
   newSession?: boolean;
   autoAllow?: boolean;
+  autoExit?: boolean; // added
   help?: boolean;
   ignoredPositionalPrompt?: string;
   preset?: string;
@@ -65,6 +66,7 @@ export const parseCliArgs = (): CliArgs => {
 
   const rawNewSession = coerceBoolean(argv.newsession ?? argv['new-session']);
   const rawAutoAllow = coerceBoolean(argv['auto-allow'] ?? argv.autoallow ?? argv.autoAllow);
+  const rawAutoExit = coerceBoolean(argv['auto-exit'] ?? argv.autoexit ?? argv.autoExit); // parse --auto-exit flag
   const rawHelp = coerceBoolean(argv.help ?? argv.h);
   
   const coercePrompt = () => {
@@ -122,6 +124,7 @@ export const parseCliArgs = (): CliArgs => {
     workspace: coerceWorkspace(),
     newSession: rawNewSession,
     autoAllow: rawAutoAllow,
+    autoExit: rawAutoExit,
     help: rawHelp,
     ignoredPositionalPrompt,
     preset: coercePreset(),
@@ -129,7 +132,7 @@ export const parseCliArgs = (): CliArgs => {
 
   try {
     addLog(
-      `[CLI] Parsed args -> driver: ${result.driver ?? 'undefined'}, prompt: ${result.prompt ?? 'undefined'}, ignoredPositionalPrompt: ${result.ignoredPositionalPrompt ?? 'undefined'}, workspace: ${result.workspace ?? 'undefined'}, newSession: ${result.newSession ?? 'undefined'}, autoAllow: ${result.autoAllow ?? 'undefined'}, help: ${result.help ?? 'undefined'}, preset: ${result.preset ?? 'undefined'}`
+      `[CLI] Parsed args -> driver: ${result.driver ?? 'undefined'}, prompt: ${result.prompt ?? 'undefined'}, ignoredPositionalPrompt: ${result.ignoredPositionalPrompt ?? 'undefined'}, workspace: ${result.workspace ?? 'undefined'}, newSession: ${result.newSession ?? 'undefined'}, autoAllow: ${result.autoAllow ?? 'undefined'}, autoExit: ${result.autoExit ?? 'undefined'}, help: ${result.help ?? 'undefined'}, preset: ${result.preset ?? 'undefined'}`
     );
   } catch {}
 

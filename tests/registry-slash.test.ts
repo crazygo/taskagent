@@ -16,7 +16,10 @@ describe('slash command registry wiring', () => {
       nextMessageId: () => 1,
       messageStore: { appendMessage: vi.fn() },
       finalizeMessageById: (_id: number) => {},
-      canUseTool: async () => undefined,
+      canUseTool: async (_toolName, input, _options) => ({
+        behavior: 'allow',
+        updatedInput: input,
+      }),
       sourceTabId: 'Glossary',
       workspacePath: process.cwd(),
       session: { id: 'sess-test', initialized: true },
@@ -45,7 +48,10 @@ describe('slash command registry wiring', () => {
       nextMessageId: () => 1,
       messageStore: { appendMessage: vi.fn() },
       finalizeMessageById: (_id: number) => {},
-      canUseTool: async () => undefined,
+      canUseTool: async (_toolName, input, _options) => ({
+        behavior: 'allow',
+        updatedInput: input,
+      }),
       sourceTabId: 'Glossary',
       workspacePath: process.cwd(),
       session: { id: 'sess-test', initialized: true },

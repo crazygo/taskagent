@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Newline, Static, Text, useStdout } from 'ink';
 import * as Types from '../types.js';
+import { addLog } from '@taskagent/shared/logger';
 
 /**
  * Thinking animation component - displays walking dots
@@ -10,10 +11,14 @@ const ThinkingAnimation: React.FC = () => {
   const frames = ['Thinking   ', 'Thinking.  ', 'Thinking.. ', 'Thinking...'];
   
   React.useEffect(() => {
+    addLog('[ThinkingAnimation] mounted');
     const timer = setInterval(() => {
       setFrame(f => (f + 1) % frames.length);
     }, 300);
-    return () => clearInterval(timer);
+    return () => {
+      clearInterval(timer);
+      addLog('[ThinkingAnimation] unmounted');
+    };
   }, []);
 
   return <Text color="gray" dimColor>{frames[frame]}</Text>;
@@ -77,13 +82,13 @@ const MessageComponent: React.FC<MessageProps> = ({ message }) => {
   if (message.role === 'tool_use') {
     const displayName = message.toolName || 'Tool';
     const description = message.toolDescription || '';
-    const toolIdShort = message.toolId ? ` [${message.toolId.slice(0, 8)}]` : '';
+    const content = message.content || '';
     
     return (
       <Box flexDirection="row" paddingLeft={2}>
         <Text color="gray" dimColor>○ {displayName}</Text>
         {description && <Text color="gray"> - {description}</Text>}
-        {message.toolId && <Text color="gray" dimColor>{toolIdShort}</Text>}
+        {content && <Text color="gray"> - {content}</Text>}
       </Box>
     );
   }
@@ -91,24 +96,24 @@ const MessageComponent: React.FC<MessageProps> = ({ message }) => {
   // Tool result: show tool completion with duration
   if (message.role === 'tool_result') {
     const displayName = message.toolName || 'Tool';
-    const duration = message.durationMs 
-      ? ` (${(message.durationMs / 1000).toFixed(1)}s)` 
-      : '';
-    
+    const toolIdShort = message.toolId ? ` ${message.toolId.slice(5, 10)}` : '';
+
     return (
       <Box paddingLeft={2}>
-        <Text color="gray" dimColor>✓ {displayName} completed{duration}</Text>
+        {message.toolIsError ? <Text color="red">✘ {displayName} id:{toolIdShort}</Text> : <Text color="gray" dimColor>✓</Text>}
+        {message.toolIsError && message.content && <Text color="gray"> - {message.content}</Text>}
       </Box>
     );
   }
 
   let prefix = '';
-  let textColor: 'white' | 'gray' | 'yellow' | undefined;
+  let textColor: 'white' | 'gray' | 'yellow' | 'cyan' | undefined;
   const boxProps: Record<string, unknown> = {};
 
   if (message.role === 'assistant') {
-    prefix = '✦ ';
-    textColor = undefined;
+    const looperLike = /^\[(Looper|AUTO)\]/.test(normalizedContent);
+    prefix = looperLike ? '∞ ' : '✦ ';
+    textColor = looperLike ? 'cyan' : undefined;
   } else if (message.role === 'system') {
     prefix = 'i ';
     textColor = 'yellow';
@@ -191,7 +196,7 @@ const WelcomeScreen = React.memo<WelcomeScreenProps>(({ modelName, workspacePath
 interface ChatPanelProps {
   frozenMessages: Types.Message[];
   activeMessages: Types.Message[];
-  queuedPrompts: Array<{ id: number; prompt: string }>;
+  queuedPrompts?: Array<{ id: number; prompt: string }>;
   modelName: string;
   workspacePath?: string | null;
   positionalPromptWarning?: string | null;
@@ -222,7 +227,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ frozenMessages, activeMess
       <Static items={staticItems}>
         {item => item}
       </Static>
-      {(activeMessages.length > 0 || queuedPrompts.length > 0) && (
+      {((activeMessages?.length ?? 0) > 0 || (queuedPrompts?.length ?? 0) > 0) && (
         <Box borderStyle="round" borderColor="cyan" paddingX={1} flexDirection="column">
           {/* 1. Thinking animation - show when AI is responding */}
           {activeMessages.length > 0 && (
@@ -235,10 +240,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ frozenMessages, activeMess
           <ActiveHistory messages={activeMessages} />
           
           {/* 3. Queued prompts list */}
-          {queuedPrompts.length > 0 && (
+          {(queuedPrompts?.length ?? 0) > 0 && (
             <Box flexDirection="column" marginTop={1}>
               <Text color="gray" dimColor>Queued:</Text>
-              {queuedPrompts.map((item) => (
+              {(queuedPrompts ?? []).map((item) => (
                 <Text key={item.id} dimColor>
                   - {item.prompt.substring(0, 60)}{item.prompt.length > 60 ? '...' : ''} (queued)
                 </Text>

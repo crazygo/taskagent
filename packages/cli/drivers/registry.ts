@@ -55,8 +55,13 @@ export function getDriverManifest(): readonly DriverManifestEntry[] {
             requiresSession: true,
         },
         {
-            driverId: Driver.LOG_MONITOR,
-            name: 'log-monitor',
+            driverId: Driver.MONITOR,
+            name: 'coder',
+            requiresSession: true,
+        },
+        {
+            driverId: Driver.MONITOR,
+            name: 'review',
             requiresSession: true,
         },
     ];
