@@ -11,6 +11,7 @@ export interface CliConfig {
   workspacePath: string;
   newSession: boolean;
   autoAllowPermissions: boolean;
+  autoExit: boolean; // added
   ignoredPositionalPrompt?: string;
   preset?: string; // Preset name: 'default', 'monitor', etc.
 }
@@ -40,8 +41,7 @@ export const loadCliConfig = (): CliConfig => {
 
   const newSession = cliArgs.newSession === true;
   const autoAllowPermissions = cliArgs.autoAllow === true;
-  const autoExit = cliArgs.autoExit === true;
-
+  const autoExit = cliArgs.autoExit === true; // parse auto-exit
   const cfg: CliConfig = {
     prompt: cliArgs.prompt,
     driver: cliArgs.driver,

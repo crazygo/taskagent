@@ -9,6 +9,7 @@ interface CliArgs {
   workspace?: string;
   newSession?: boolean;
   autoAllow?: boolean;
+  autoExit?: boolean; // added
   help?: boolean;
   ignoredPositionalPrompt?: string;
   preset?: string;
@@ -65,7 +66,7 @@ export const parseCliArgs = (): CliArgs => {
 
   const rawNewSession = coerceBoolean(argv.newsession ?? argv['new-session']);
   const rawAutoAllow = coerceBoolean(argv['auto-allow'] ?? argv.autoallow ?? argv.autoAllow);
-  const rawAutoExit = coerceBoolean(argv['auto-exit'] ?? argv.autoexit ?? argv.autoExit); // parse --auto-exit
+  const rawAutoExit = coerceBoolean(argv['auto-exit'] ?? argv.autoexit ?? argv.autoExit); // parse --auto-exit flag
   const rawHelp = coerceBoolean(argv.help ?? argv.h);
   
   const coercePrompt = () => {
