@@ -241,7 +241,7 @@ export class LooperGraphAgent implements RunnableAgent {
             const agent = await agentFactory();
 
             // Start background task
-            const { task: bgTask, emitter } = this.taskManager.startBackground(
+            const { emitter } = this.taskManager.startBackground(
                 agent,
                 task,
                 {
