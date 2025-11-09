@@ -83,14 +83,12 @@ const MessageComponent: React.FC<MessageProps> = ({ message }) => {
     const displayName = message.toolName || 'Tool';
     const description = message.toolDescription || '';
     const content = message.content || '';
-    const toolIdShort = message.toolId ? ` [${message.toolId.slice(5, 10)}]` : '';
     
     return (
       <Box flexDirection="row" paddingLeft={2}>
         <Text color="gray" dimColor>○ {displayName}</Text>
         {description && <Text color="gray"> - {description}</Text>}
         {content && <Text color="gray"> - {content}</Text>}
-        {/* {message.toolId && <Text color="gray" dimColor>{toolIdShort}</Text>} */}
       </Box>
     );
   }
