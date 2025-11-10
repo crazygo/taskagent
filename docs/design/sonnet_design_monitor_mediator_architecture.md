@@ -7,7 +7,7 @@
 
 ## Overview
 
-Monitor Agent 是一个具备质量监督与任务编排能力的智能代理系统，通过 **Mediator 中介模式** 实现人类对话、后台任务执行与质量审查的闭环管理。
+Monitor Agent 是一个具备质量监督与任务编排能力的智能代理系统，通过 **DevHub 中介模式** 实现人类对话、后台任务执行与质量审查的闭环管理。
 
 ---
 
@@ -21,20 +21,20 @@ Monitor Agent 是一个具备质量监督与任务编排能力的智能代理系
 - 质量监督导向的 system prompt
 - 消息收发基础能力（同 UI 层）
 - **双通道架构**：
-  - **对话通道**: Mediator ⇄ User（人机交互）
-  - **任务管理通道**: Loop Manager → Mediator（主动推送）
+  - **对话通道**: DevHub ⇄ User（人机交互）
+  - **任务管理通道**: Loop Manager → DevHub（主动推送）
 - Loop 调度权与生命周期管理
 - 子代理编排与状态汇总
 - 健康度结构化拆解与告警路由
 
 ---
 
-### 2. Mediator Agent (人机对话中介)
+### 2. DevHub Agent (人机对话中介)
 
 **角色定位**: 默认激活的人类交互接口，承担所有对话与工具调用路由。
 
 **核心能力**:
-- 人类对话的唯一入口（User ⇄ Mediator）
+- 人类对话的唯一入口（User ⇄ DevHub）
 - 路由需求到后台任务
 - 管理 Loop 生命周期
 - 汇总并反馈完成状态
@@ -46,11 +46,11 @@ Monitor Agent 是一个具备质量监督与任务编排能力的智能代理系
 - `bg:coder_agent`: 后台执行开发任务（非阻塞）
 
 **双通道机制**:
-1. **对话通道**（User → Mediator）:
+1. **对话通道**（User → DevHub）:
    - 用户主动提问/指令
    - 同步响应
    
-2. **任务推送通道**（Loop Manager → Mediator → User）:
+2. **任务推送通道**（Loop Manager → DevHub → User）:
    - 健康度告警主动推送
    - 异步插入对话流
    - 示例：`⚠️ 严重问题检测：specs_breakdown 发现 3 处规格偏离`
@@ -70,7 +70,7 @@ Monitor Agent 是一个具备质量监督与任务编排能力的智能代理系
 **触发方式**: 
 ```
 User: "做一个功能 X"
-Mediator → bg:coder_agent "实现功能 X"
+DevHub → bg:coder_agent "实现功能 X"
 ```
 
 **输出**:
@@ -79,8 +79,8 @@ Mediator → bg:coder_agent "实现功能 X"
 - 任务日志
 
 **执行特性**:
-- 后台运行，不阻塞 Mediator 对话
-- 完成后通知 Mediator 汇总
+- 后台运行，不阻塞 DevHub 对话
+- 完成后通知 DevHub 汇总
 
 ---
 
@@ -88,7 +88,7 @@ Mediator → bg:coder_agent "实现功能 X"
 
 **角色定位**: 后台定时器，周期性触发 Check Agent 执行质量检查。
 
-**默认状态**: OFF（需 Mediator 通过 `start_loop` 激活）
+**默认状态**: OFF（需 DevHub 通过 `start_loop` 激活）
 
 **退出条件**:
 - 用户消息（任意输入）
@@ -139,14 +139,14 @@ Mediator → bg:coder_agent "实现功能 X"
 │  │                                                                        │ │
 │  │  • 定时触发 ReviewAgent                                                │ │
 │  │  • 结构化拆解审查报告                                                   │ │
-│  │  • 严重问题 → 主动推送到 Mediator                                       │ │
+│  │  • 严重问题 → 主动推送到 DevHub                                        │ │
 │  └──────────────────────┬───────────────────────┬─────────────────────────┘ │
 └─────────────────────────┼───────────────────────┼───────────────────────────┘
                           │                       │
                           │ periodic trigger      │ push alerts
                           ▼                       ▼
               ┌─────────────────────┐   ┌─────────────────────────┐
-              │   ReviewAgent       │   │   Mediator Agent        │
+              │   ReviewAgent       │   │   DevHub Agent          │
               │  (单次审查执行)      │   │  (对话 & 推送中介)       │
               ├─────────────────────┤   ├─────────────────────────┤
               │ Sub-agents:         │   │ 双通道:                 │
@@ -196,7 +196,7 @@ Mediator → bg:coder_agent "实现功能 X"
 ## Interaction Flow (闭环交互)
 
 ```
-User ──"做功能 X"──► Mediator
+User ──"做功能 X"──► DevHub
                        │
                        ├──► bg:coder_agent ──► 开发任务
                        │         │                │
@@ -242,10 +242,10 @@ User ◄─────────────────┘
   
   对话通道:
     User: "进度如何？"
-    Mediator: "Coder 已完成 70%，当前无严重问题。"
+    DevHub: "Coder 已完成 70%，当前无严重问题。"
   
   推送通道:
-    [AUTO] Loop Manager → Mediator → User:
+    [AUTO] Loop Manager → DevHub → User:
     "⚠️ 检测到 git_diff 显示 3 个核心文件未测试覆盖"
 ═══════════════════════════════════════════════════════════
 ```
@@ -256,16 +256,16 @@ User ◄─────────────────┘
 
 ### Phase 1: 需求提交
 - **Actor**: User
-- **Action**: 向 Mediator 提出开发需求
+- **Action**: 向 DevHub 提出开发需求
 - **Example**: "实现用户登录功能"
 
 ### Phase 2: 任务执行
-- **Actor**: Mediator
+- **Actor**: DevHub
 - **Action**: 启动 `bg:coder_agent` 后台执行开发任务
 - **Behavior**: 非阻塞，用户可继续对话
 
 ### Phase 3: 质量监控
-- **Actor**: Mediator
+- **Actor**: DevHub
 - **Action**: 启动 `start_loop`，激活 Loop Manager
 - **Behavior**: Loop Manager 定时触发 ReviewAgent 执行单次审查
 
@@ -279,11 +279,11 @@ User ◄─────────────────┘
 - **Action**: 
   1. 结构化拆解 Audit Report
   2. 判断健康度级别（normal/warning/critical）
-  3. 如果 `critical`，主动推送到 Mediator 的任务推送通道
+  3. 如果 `critical`，主动推送到 DevHub 的任务推送通道
 - **Output**: 异步告警消息插入对话流（标记 `[AUTO]`）
 
 ### Phase 6: 结果总结
-- **Actor**: Mediator
+- **Actor**: DevHub
 - **Action**: 汇总 Coder 完成状态 + ReviewAgent 报告 + 主动告警
 - **Output**: 反馈给 User（完成状态 & 质量评估 & 风险预警）
 
@@ -303,8 +303,8 @@ User ◄─────────────────┘
 
 **特性**: 组合型代理，初始化时装配多个 PromptAgent 子代理并合并配置，执行单次审查。
 
-### Mediator-Agent (Dialog Interface)
-- **Mediator Agent**
+### DevHub-Agent (Dialog Interface)
+- **DevHub Agent**
 
 **特性**: 面向人类的对话接口，路由工具调用，管理后台任务生命周期。
 
@@ -319,11 +319,11 @@ User ◄─────────────────┘
 
 ### 1. Non-Blocking Execution
 - Coder Agent 与 Loop Process 均为后台运行
-- Mediator 保持对话响应性
+- DevHub 保持对话响应性
 - 用户可随时查询进度或终止
 
 ### 2. Separation of Concerns
-- **Mediator**: 对话路由 + 工具调用 + 双通道管理
+- **DevHub**: 对话路由 + 工具调用 + 双通道管理
 - **Coder**: 开发执行
 - **ReviewAgent**: 单次质量审查（无循环逻辑）
 - **Loop Manager (index.ts)**: 定时管理 + 健康度拆解 + 主动推送
@@ -345,7 +345,7 @@ User ◄─────────────────┘
 
 ```typescript
 interface MonitorConfig {
-  mediator: {
+  devhub: {
     defaultActive: boolean;           // 默认激活
     tools: string[];                   // 暴露的工具列表
     channels: {
@@ -392,8 +392,8 @@ packages/agents/monitor/
 │                                                   - 定时触发 ReviewAgent
 │                                                   - 健康度拆解与告警路由
 │                                                   - 生命周期管理
-├── mediator/
-│   ├── mediator.agent.md                           (Mediator 配置)
+├── devhub/
+│   ├── mediator.agent.md                           (DevHub 配置)
 │   ├── channels.ts                                 (双通道管理)
 │   ├── tools/
 │   │   ├── start_loop.ts
@@ -418,7 +418,7 @@ packages/agents/monitor/
 
 ### Integration with Existing System
 - 参考 `drivers/glossary/` 的 PromptAgent + sub-agents 装配模式（ReviewAgent 装配）
-- 复用 `drivers/story/` 的用户对话模式（Mediator 对话通道）
+- 复用 `drivers/story/` 的用户对话模式（DevHub 对话通道）
 - 集成 MCP 工具（memory read/write、git 操作）
 - 参考 Ink UI 的消息流机制实现双通道推送
 
@@ -445,7 +445,7 @@ packages/agents/monitor/
 class LoopManager {
   private intervalId: NodeJS.Timer | null = null;
   private reviewAgent: ReviewAgent;
-  private mediator: MediatorAgent;
+  private devhub: DevHubAgent;
   
   async start(config: LoopConfig) {
     this.intervalId = setInterval(async () => {
@@ -463,10 +463,10 @@ class LoopManager {
     // 3. 持久化报告
     await this.persistReport(report, health);
     
-    // 4. 严重问题主动推送到 Mediator
+    // 4. 严重问题主动推送到 DevHub
     if (health.severity === 'critical') {
       const alert = AlertFormatter.format(health);
-      await this.mediator.pushToDialogChannel({
+      await this.devhub.pushToDialogChannel({
         type: 'auto_alert',
         tag: '[AUTO]',
         content: alert,
@@ -484,11 +484,11 @@ class LoopManager {
 }
 ```
 
-### Mediator 双通道实现
+### DevHub 双通道实现
 
 ```typescript
-// packages/agents/monitor/mediator/channels.ts
-class MediatorChannels {
+// packages/agents/monitor/devhub/channels.ts
+class DevHubChannels {
   // 对话通道：用户主动交互
   async handleDialogMessage(userMsg: string): Promise<string> {
     // 正常对话处理

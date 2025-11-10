@@ -4,9 +4,9 @@
  * Exposes package-scoped agent factories for consumers.
  */
 
-// Story Agent
-export { createAgent as createStoryAgent } from './story/index.js';
-export { createFeaturesEditorAgent } from './story/features-editor.js';
+// Blueprint Agent (formerly Story)
+export { createAgent as createStoryAgent } from './blueprint/index.js';
+export { createFeaturesEditorAgent } from './blueprint/features-editor.js';
 
 // Glossary Agent
 export { createAgent as createGlossaryAgent } from './glossary/index.js';

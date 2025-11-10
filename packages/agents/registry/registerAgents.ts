@@ -6,14 +6,14 @@
  */
 
 import { globalAgentRegistry } from './AgentRegistry.js';
-import { createAgent as createStoryAgent } from '../story/index.js';
-import { createFeaturesEditorAgent } from '../story/features-editor.js';
+import { createAgent as createStoryAgent } from '../blueprint/index.js';
+import { createFeaturesEditorAgent } from '../blueprint/features-editor.js';
 import { createAgent as createGlossaryAgent } from '../glossary/index.js';
 import { createAgent as createUiReviewAgent } from '../ui-review/index.js';
 import { createAgent as createCoderAgent } from '../coder/index.js';
 import { createAgent as createReviewAgent } from '../review/index.js';
 import { createAgent as createLooperAgent } from '../looper/index.js';
-import { createAgent as createMediatorAgent } from '../mediator/index.js';
+import { createAgent as createDevHubAgent } from '../devhub/index.js';
 import { DefaultPromptAgent } from '../runtime/types.js';
 
 /**
@@ -87,17 +87,17 @@ export function registerAllAgents(options?: { eventBus?: any; tabExecutor?: any;
         tags: ['automation', 'loop', 'monitor'],
     });
 
-    // Mediator Agent
+    // DevHub Agent
     globalAgentRegistry.register({
-        id: 'mediator',
-        factory: () => createMediatorAgent({ 
+        id: 'devhub',
+        factory: () => createDevHubAgent({ 
             eventBus: options?.eventBus, 
             tabExecutor: options?.tabExecutor,
             messageStore: options?.messageStore
         }),
-        description: 'Mediator Agent - 对话路由器，协调任务执行',
-        tags: ['coordination', 'routing', 'monitor'],
+        description: 'DevHub Agent - 开发枢纽，协调开发与审查流程',
+        tags: ['coordination', 'development', 'monitor'],
     });
 
-    console.log('[AgentRegistry] Registered 9 agents: default, story, features-editor, glossary, ui-review, coder, review, looper, mediator');
+    console.log('[AgentRegistry] Registered 9 agents: default, story, features-editor, glossary, ui-review, coder, review, looper, devhub');
 }

@@ -12,7 +12,7 @@ import { buildPromptAgentStart } from '../runtime/runPromptAgentStart.js';
 import { parseAgentMdFile } from '../runtime/agentLoader.js';
 
 const FEATURES_EDITOR_AGENT_ID = 'features-editor';
-const FEATURES_EDITOR_DESCRIPTION = 'Features Editor - Build Specs YAML writer + validator';
+const FEATURES_EDITOR_DESCRIPTION = 'Features Editor - Blueprint YAML writer + validator';
 const MAX_WRITER_ATTEMPTS = 3;
 
 type PromptStarter = (userInput: string, context: AgentStartContext, sinks: AgentStartSinks) => ExecutionHandle;
@@ -32,7 +32,7 @@ export async function createFeaturesEditorAgent(): Promise<RunnableAgent> {
 
     const writerConfig = await parseAgentMdFile(path.join(agentDir, 'writer.agent.md'));
     if (!writerConfig) {
-        throw new Error('Failed to load build specs writer agent definition.');
+        throw new Error('Failed to load blueprint writer agent definition.');
     }
 
     const writerStart = buildPromptAgentStart({
@@ -96,7 +96,7 @@ class FeaturesEditorAgent implements RunnableAgent {
             this.emitProgress(sinks, '[FeaturesEditor] 正在验证 YAML 完整性…');
             const validation = await this.validateYaml(context.workspacePath, task.targetFile);
             if (validation.ok) {
-                this.emitProgress(sinks, '[FeaturesEditor] 验证通过，生成 Build Specs 完成。');
+                this.emitProgress(sinks, '[FeaturesEditor] 验证通过，Blueprint 生成完成。');
                 const resultPayload = {
                     targetFile: task.targetFile,
                     feature: validation.feature,
@@ -108,7 +108,7 @@ class FeaturesEditorAgent implements RunnableAgent {
                     payload: resultPayload,
                     ts: Date.now(),
                 } as any);
-                return `Build Specs 完成：${task.targetFile}`;
+                return `Blueprint 完成：${task.targetFile}`;
             }
 
             feedback = validation.message;
@@ -124,7 +124,7 @@ class FeaturesEditorAgent implements RunnableAgent {
     private parseTask(userInput: string): WriterTask {
         const raw = userInput.trim();
         if (!raw) {
-            throw new Error('任务描述为空，无法生成 Build Specs。');
+            throw new Error('任务描述为空，无法生成 Blueprint。');
         }
 
         const targetFile = this.extractTargetFile(raw);
@@ -172,7 +172,7 @@ class FeaturesEditorAgent implements RunnableAgent {
 
     private buildWriterPrompt(task: WriterTask, feedback?: string | null): string {
         const sections = [
-            '# Build Specs 任务',
+            '# Blueprint 任务',
             `目标文件: ${task.targetFile}`,
             '## 用户提供的需求',
             task.rawInput,

@@ -266,7 +266,7 @@ export const storyTabConfig: TabConfig = {
     executionMode: 'foreground',
     maxFrozenMessages: 20,
     isPlaceholder: false,
-    cliFlag: '--build-specs',
+    cliFlag: '--blueprint',
 };
 ```
 

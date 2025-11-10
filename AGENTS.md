@@ -162,7 +162,7 @@ To facilitate automated testing of the application's initialization and UI rende
 
 ### Automated & Non-Interactive Testing
 
-For scripting and testing purposes, it is possible to submit a prompt automatically upon application startup. This is achieved by using a combination of a driver flag (e.g., `--build-specs`) and a prompt flag (`-p` or `--prompt`).
+For scripting and testing purposes, it is possible to submit a prompt automatically upon application startup. This is achieved by using a combination of a driver flag (e.g., `--blueprint`) and a prompt flag (`-p` or `--prompt`).
 
 **Rule:** The `-p` or `--prompt` flag is **mandatory** to trigger the automatic submission workflow. Any text provided after a driver flag without `-p` will be treated as a positional argument and ignored by the submission logic.
 

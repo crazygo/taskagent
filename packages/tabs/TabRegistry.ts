@@ -108,7 +108,7 @@ export class TabRegistry {
 
   /**
    * Get tab by CLI flag
-   * @param flag CLI flag (e.g., '--build-specs', '--glossary')
+   * @param flag CLI flag (e.g., '--blueprint', '--glossary')
    * @returns Tab configuration or undefined if not found
    */
   getByCliFlag(flag: string): TabConfig | undefined {

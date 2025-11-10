@@ -1,5 +1,5 @@
 /**
- * Mediator Tools - MCP server + tool definitions
+ * DevHub Tools - MCP server + tool definitions
  *
  * Exposes the `send_to_looper` capability to Claude via the Agent SDK.
  */
@@ -10,16 +10,16 @@ import { addLog } from '@taskagent/shared/logger';
 import type { TabExecutor } from '../../execution/TabExecutor.js';
 import type { McpSdkServerConfigWithInstance } from '@anthropic-ai/claude-agent-sdk';
 
-interface CreateMediatorMcpServerOptions {
+interface CreateDevHubMcpServerOptions {
   tabExecutor?: TabExecutor;
   workspacePath?: string;
 }
 
 /**
- * Build an in-process MCP server exposing mediator-specific tools.
+ * Build an in-process MCP server exposing DevHub-specific tools.
  */
-export function createMediatorMcpServer(
-  options: CreateMediatorMcpServerOptions
+export function createDevHubMcpServer(
+  options: CreateDevHubMcpServerOptions
 ): McpSdkServerConfigWithInstance {
   const commandSchema = z.enum(['start', 'stop', 'status', 'add_pending']);
 
@@ -33,7 +33,7 @@ export function createMediatorMcpServer(
     async (args) => {
       if (!options.tabExecutor) {
         const message = 'TabExecutor 未初始化，无法发送命令。';
-        addLog(`[Mediator Tool] ${message}`);
+        addLog(`[DevHub Tool] ${message}`);
         return {
           content: [{ type: 'text', text: message }],
           isError: true,
@@ -44,7 +44,7 @@ export function createMediatorMcpServer(
 
       try {
         addLog(
-          `[Mediator Tool] Executing Looper command via TabExecutor: ${JSON.stringify(
+          `[DevHub Tool] Executing Looper command via TabExecutor: ${JSON.stringify(
             payload
           )}`
         );
@@ -54,9 +54,9 @@ export function createMediatorMcpServer(
           'looper',
           JSON.stringify(payload),
           {
-            sourceTabId: 'Mediator',
+            sourceTabId: 'DevHub',
             workspacePath: options.workspacePath,
-            parentAgentId: 'mediator',
+            parentAgentId: 'devhub',
           }
         );
 
@@ -68,7 +68,7 @@ export function createMediatorMcpServer(
         const message = `发送命令失败: ${
           error instanceof Error ? error.message : String(error)
         }`;
-        addLog(`[Mediator Tool] ${message}`);
+        addLog(`[DevHub Tool] ${message}`);
         return {
           content: [{ type: 'text', text: message }],
           isError: true,
@@ -78,7 +78,7 @@ export function createMediatorMcpServer(
   );
 
   return createSdkMcpServer({
-    name: 'mediator-tools',
+    name: 'devhub-tools',
     tools: [sendToLooper],
   });
 }

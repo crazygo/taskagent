@@ -6,7 +6,7 @@ scenarios:
     given: "The application environment is set up."
     when: "The user runs the application."
     then:
-      - "The UI displays the 'Chat', 'Agent', 'Build Specs', and 'Glossary' tabs."
+      - "The UI displays the 'Chat', 'Agent', 'Blueprint', and 'Glossary' tabs."
       - "The 'Plan-Review-DO' tab is not visible."
 
   - scenario: "The slash command menu shows commands for background and foreground tasks"
@@ -18,10 +18,10 @@ scenarios:
 
   - scenario: "A driver can be invoked directly via a CLI flag with a prompt"
     given: "The application is not running."
-    when: 'The user runs `yarn start -- --build-specs -p "Draft a story for login"`'
+    when: 'The user runs `yarn start -- --blueprint -p "Draft a story for login"`'
     then:
-      - "The application launches with the 'Build Specs' tab active."
-      - "The Build Specs agent's workflow is immediately triggered with the provided prompt."
+      - "The application launches with the 'Blueprint' tab active."
+      - "The Blueprint agent's workflow is immediately triggered with the provided prompt."
 
   - scenario: "Launching the application with the 'monitor' preset"
     given: "A 'monitor' preset exists that is configured to only show the 'Monitor' tab."

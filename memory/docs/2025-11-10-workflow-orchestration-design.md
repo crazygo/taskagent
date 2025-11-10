@@ -555,11 +555,11 @@ eventBus.on('workflow:progress', (event: WorkflowEvent) => {
 ```
 
 **系统流程：**
-1. Mediator 收到请求
+1. DevHub 收到请求
 2. 调用 Planner agent 生成 DSL
 3. 验证 DSL 并展示给用户确认
 4. 启动 TaskRuntime，返回 taskId
-5. EventBus 推送进度到 Mediator tab
+5. EventBus 推送进度到 DevHub tab
 6. 用户可随时查询状态或打断
 
 ### 场景 2: 主进程监控并干预

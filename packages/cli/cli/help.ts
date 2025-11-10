@@ -9,7 +9,7 @@ export const printCliUsage = (): void => {
   console.log(`  ${pad('-h, --help', 18)}Show this message and exit`);
   console.log(`  ${pad('-p, --prompt <text>', 18)}Submit a prompt right after launch`);
   console.log(`  ${pad('-d, --driver <name>', 18)}Select an app tab/driver explicitly`);
-  console.log(`  ${pad('--<driver>', 18)}Shortcut for --driver <driver> (e.g. --build-specs)`);
+  console.log(`  ${pad('--<driver>', 18)}Shortcut for --driver <driver> (e.g. --blueprint)`);
   console.log(`  ${pad('--workspace <path>', 18)}Override the workspace directory`);
   console.log(`  ${pad('-w <path>', 18)}Alias for --workspace`);
   console.log(`  ${pad('--newsession', 18)}Force creation of a fresh Claude session`);
@@ -25,6 +25,6 @@ export const printCliUsage = (): void => {
   }
   console.log('');
   console.log('Examples:');
-  console.log('  yarn start -- --build-specs --newsession -p "Draft the onboarding story"');
+  console.log('  yarn start -- --blueprint --newsession -p "Draft the onboarding story"');
   console.log('  yarn start -- -d agent -p "Summarize the latest tasks"');
 };

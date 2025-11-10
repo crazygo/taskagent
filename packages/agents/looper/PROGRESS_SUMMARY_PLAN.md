@@ -7,7 +7,7 @@
 
 ## Current State
 
-When Coder/Review agents execute (taking 2-5 minutes), external observers (Looper, Mediator, user) see no progress updates, causing "is it stuck?" anxiety.
+When Coder/Review agents execute (taking 2-5 minutes), external observers (Looper, DevHub, user) see no progress updates, causing "is it stuck?" anxiety.
 
 **Symptoms**:
 - User sees `[AUTO] 启动 Coder...` then silence for minutes
@@ -23,7 +23,7 @@ When Coder/Review agents execute (taking 2-5 minutes), external observers (Loope
 **Acceptance Criteria**:
 - User sees periodic progress updates (e.g., every 30s or every 10 events)
 - Updates are concise summaries, not raw tool calls
-- Updates automatically mirror to Mediator tab (via parentAgentId hierarchy)
+- Updates automatically mirror to DevHub tab (via parentAgentId hierarchy)
 - Solution scales to future child agents without code changes
 
 **Non-Goals**:
@@ -90,7 +90,7 @@ Coder emits tool_use/text
   → (30s timer OR 10 events accumulated)
   → SummarizerAgent generates summary
   → Looper.pushMessage("[Coder] 正在...")
-  → Auto-mirrors to Mediator
+  → Auto-mirrors to DevHub
 ```
 
 **Pros**:
@@ -289,10 +289,10 @@ await this.generateFinalSummary(agentName);
 ┌──────────────────┐
 │ Looper.pushMsg   │ "[Coder] 正在编写测试..."
 └──────┬───────────┘
-       │ parentAgentId='mediator'
+       │ parentAgentId='devhub'
        ↓
 ┌──────────────────┐
-│ Mediator mirrors │ User sees update
+│ DevHub mirrors   │ User sees update
 └──────────────────┘
 ```
 
@@ -382,4 +382,4 @@ await this.generateFinalSummary(agentName);
 - Looper architecture: `packages/agents/looper/index.ts`
 - TaskManager events: `packages/shared/task-manager.ts`
 - Agent hierarchy: `AGENTS.md` → "How to Work with Humans"
-- Mediator mirroring: `packages/agents/mediator/index.ts` (line 44-69)
+- DevHub mirroring: `packages/agents/devhub/index.ts` (line 44-69)

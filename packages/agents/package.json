@@ -5,7 +5,7 @@
   "exports": {
     ".": "./index.ts",
     "./runtime/*.js": "./runtime/*.ts",
-    "./story/*.js": "./story/*.ts",
+    "./blueprint/*.js": "./blueprint/*.ts",
     "./glossary/*.js": "./glossary/*.ts",
     "./ui-review/*.js": "./ui-review/*.ts",
     "./monitor/*.js": "./monitor/*.ts",

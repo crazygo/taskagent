@@ -82,7 +82,7 @@ export interface TabConfig {
   isPlaceholder?: boolean;
 
   /**
-   * CLI flag to activate this tab (e.g., '--build-specs', '--glossary')
+   * CLI flag to activate this tab (e.g., '--blueprint', '--glossary')
    */
   cliFlag?: string;
 

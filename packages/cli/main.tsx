@@ -120,7 +120,7 @@ function getTabInfoByLabel(label: string): { requiresSession: boolean; descripti
 function getTabByCliName(cliName: string): { label: string } | null {
     const normalizedCliName = cliName.replace(/^--/, '').trim().toLowerCase();
 
-    // Try matching CLI flag (e.g., '--build-specs')
+    // Try matching CLI flag (e.g., '--blueprint')
     const flagMatch = tabRegistry.getByCliFlag(`--${normalizedCliName}`);
     if (flagMatch) {
         return { label: flagMatch.label };
@@ -325,7 +325,7 @@ const App = () => {
                 'Story': storyTabConfig,
                 'Glossary': glossaryTabConfig,
                 'UI-Review': uiReviewTabConfig,
-                'Mediator': monitorTabConfig,
+                'DevHub': monitorTabConfig,
                 'Looper': looperTabConfig,
             };
 

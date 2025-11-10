@@ -245,9 +245,9 @@ export function useAgentEventBridge(eventBus: EventBus, messageStore: MessageSto
         if (message.startsWith('looper:')) {
           const looperPayload = (payload as any).payload;
           
-          // looper:result - don't display, will be handled by Mediator
+          // looper:result - don't display, will be handled by DevHub
           if (message === 'looper:result') {
-            addLog(`[AgentBridge] Skipping looper:result (handled by Mediator)`);
+            addLog(`[AgentBridge] Skipping looper:result (handled by DevHub)`);
             return;
           }
           

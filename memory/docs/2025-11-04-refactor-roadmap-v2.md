@@ -1348,7 +1348,7 @@ taskagent --preset monitor
 - [ ] `/plan-review-do` 工作
 
 **Scenario 3: Story Driver CLI**
-- [ ] `--build-specs` flag 工作
+- [ ] `--blueprint` flag 工作
 - [ ] Story Agent 正确执行
 
 **Scenario 4: Glossary Driver CLI**

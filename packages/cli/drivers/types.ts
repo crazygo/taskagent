@@ -22,11 +22,11 @@ export const DRIVER_NAMES = [
     'plan-review-do',
     'glossary',
     'story',
-    'build-specs',
+    'blueprint',
     'ui',
     'monitor',
     'looper',
-    'mediator',
+    'devhub',
 ] as const;
 
 export type DriverName = (typeof DRIVER_NAMES)[number];

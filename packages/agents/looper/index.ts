@@ -197,7 +197,7 @@ export class LooperGraphAgent implements RunnableAgent {
             if (decision.type === 'terminate') {
                 this.emit({ type: 'progress', payload: `[AUTO] 循环终止: ${decision.reason}` });
                 
-                // 发送结果数据给 Mediator
+                // 发送结果数据给 DevHub
                 if ('result' in decision && decision.result) {
                     this.emit({ type: 'result', payload: decision.result });
                 }

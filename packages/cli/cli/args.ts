@@ -84,7 +84,7 @@ export const parseCliArgs = (): CliArgs => {
     }
     if (detectedDriver === true) {
       // This case should ideally be handled by detectDriverFlag, but as a fallback
-      addLog('[CLI] Warning: --driver flag was passed (e.g. --build-specs), but no driver was detected. This may indicate a bug in driver detection logic.');
+      addLog('[CLI] Warning: --driver flag was passed (e.g. --blueprint), but no driver was detected. This may indicate a bug in driver detection logic.');
       return undefined;
     }
     return undefined;
