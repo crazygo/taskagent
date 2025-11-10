@@ -11,7 +11,9 @@ export type AgentEventType =
     | 'agent:event'         // Task event (info/warning/error)
     | 'agent:completed'     // Agent execution completed
     | 'agent:failed'        // Agent execution failed
-    | 'message:added';      // Message added to MessageStore (cross-tab communication)
+    | 'message:added'       // Message added to MessageStore (cross-tab communication)
+    | 'task:progress'       // Async task progress update
+    | 'task:result';        // Async task result
 
 export interface AgentEvent {
     type: AgentEventType;

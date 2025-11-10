@@ -1,7 +1,7 @@
 /**
  * DevHub Tools - MCP server + tool definitions
  *
- * Exposes the `send_to_looper` capability to Claude via the Agent SDK.
+ * Exposes the `dispatch_to_devloop` capability to Claude via the Agent SDK.
  */
 
 import { tool, createSdkMcpServer } from '@anthropic-ai/claude-agent-sdk';
@@ -24,7 +24,7 @@ export function createDevHubMcpServer(
   const commandSchema = z.enum(['start', 'stop', 'status', 'add_pending']);
 
   const sendToLooper = tool(
-    'send_to_looper',
+    'dispatch_to_devloop',
     '向 Looper 循环引擎发送命令或任务',
     {
       command: commandSchema,

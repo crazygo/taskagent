@@ -6,19 +6,17 @@
 
 export { chatTabConfig } from './chat.js';
 export { agentTabConfig } from './agent.js';
-export { storyTabConfig } from './story.js';
+export { blueprintTabConfig } from './blueprint.js';
 export { glossaryTabConfig } from './glossary.js';
 export { uiReviewTabConfig } from './ui-review.js';
 export { monitorTabConfig } from './monitor.js';
-export { looperTabConfig } from './looper.js';
 
 import { chatTabConfig } from './chat.js';
 import { agentTabConfig } from './agent.js';
-import { storyTabConfig } from './story.js';
+import { blueprintTabConfig } from './blueprint.js';
 import { glossaryTabConfig } from './glossary.js';
 import { uiReviewTabConfig } from './ui-review.js';
 import { monitorTabConfig } from './monitor.js';
-import { looperTabConfig } from './looper.js';
 import type { TabConfig } from '../types.js';
 
 /**
@@ -27,10 +25,9 @@ import type { TabConfig } from '../types.js';
 export const defaultTabs: TabConfig[] = [
   chatTabConfig,
   agentTabConfig,
-  storyTabConfig,
+  blueprintTabConfig,
   uiReviewTabConfig,
   glossaryTabConfig,
   monitorTabConfig,
-  looperTabConfig,
 ];
 

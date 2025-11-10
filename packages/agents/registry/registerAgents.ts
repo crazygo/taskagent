@@ -6,13 +6,12 @@
  */
 
 import { globalAgentRegistry } from './AgentRegistry.js';
-import { createAgent as createStoryAgent } from '../blueprint/index.js';
-import { createFeaturesEditorAgent } from '../blueprint/features-editor.js';
+import { createAgent as createBlueprintAgent } from '../blueprint/index.js';
+import { createAgent as createWriterAgent } from '../writer/index.js';
 import { createAgent as createGlossaryAgent } from '../glossary/index.js';
 import { createAgent as createUiReviewAgent } from '../ui-review/index.js';
 import { createAgent as createCoderAgent } from '../coder/index.js';
 import { createAgent as createReviewAgent } from '../review/index.js';
-import { createAgent as createLooperAgent } from '../looper/index.js';
 import { createAgent as createDevHubAgent } from '../devhub/index.js';
 import { DefaultPromptAgent } from '../runtime/types.js';
 
@@ -28,23 +27,25 @@ export function registerAllAgents(options?: { eventBus?: any; tabExecutor?: any;
         tags: ['default', 'passthrough'],
     });
 
-    // Story Agent
+    // Blueprint Agent
     globalAgentRegistry.register({
-        id: 'story',
-        factory: () => createStoryAgent({
+        id: 'blueprint',
+        factory: () => createBlueprintAgent({
             eventBus: options?.eventBus,
             tabExecutor: options?.tabExecutor,
             messageStore: options?.messageStore,
+            agentRegistry: globalAgentRegistry,
         }),
-        description: 'Story Coordinator - Conversational requirements + workflow orchestration',
+        description: 'Blueprint Coordinator - Conversational requirements + workflow orchestration',
         tags: ['planning', 'documentation'],
     });
 
+    // Writer Agent
     globalAgentRegistry.register({
-        id: 'features-editor',
-        factory: createFeaturesEditorAgent,
-        description: 'Features Editor - Planner + Graph + Summarizer',
-        tags: ['planning', 'automation'],
+        id: 'writer',
+        factory: createWriterAgent,
+        description: 'Writer - Write structured feature YAML files',
+        tags: ['atomic', 'writer'],
     });
 
     // Glossary Agent
@@ -79,14 +80,6 @@ export function registerAllAgents(options?: { eventBus?: any; tabExecutor?: any;
         tags: ['review', 'quality', 'monitor'],
     });
 
-    // Looper Agent
-    globalAgentRegistry.register({
-        id: 'looper',
-        factory: () => createLooperAgent({ taskManager: options?.taskManager }),
-        description: 'Looper Agent - Coder-Review循环执行引擎',
-        tags: ['automation', 'loop', 'monitor'],
-    });
-
     // DevHub Agent
     globalAgentRegistry.register({
         id: 'devhub',
@@ -99,5 +92,7 @@ export function registerAllAgents(options?: { eventBus?: any; tabExecutor?: any;
         tags: ['coordination', 'development', 'monitor'],
     });
 
-    console.log('[AgentRegistry] Registered 9 agents: default, story, features-editor, glossary, ui-review, coder, review, looper, devhub');
+    // Log registered agents dynamically
+    const registeredIds = globalAgentRegistry.getAllIds();
+    console.log(`[AgentRegistry] Registered ${registeredIds.length} agents: ${registeredIds.join(', ')}`);
 }

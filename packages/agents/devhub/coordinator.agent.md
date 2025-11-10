@@ -10,7 +10,7 @@ sub_agents: agents/*.agent.md
 
 ## 可用的子 Agent
 
-### send_to_looper
+### dispatch_to_devloop
 向包含编码与代码审查的循环引擎发送命令或任务。
 
 **使用场景**：
@@ -25,7 +25,7 @@ sub_agents: agents/*.agent.md
 
 **示例**：
 ```
-Use send_to_looper agent:
+Use dispatch_to_devloop agent:
 - command: "start"
 - task: "优化网页代码，重点检查错误处理"
 ```
@@ -34,12 +34,12 @@ Use send_to_looper agent:
 
 1. **理解用户意图**
    - 简单问答 → 直接回答
-   - 开发任务 → 使用 send_to_looper agent
-   - 状态查询 → 使用 send_to_looper (command: status)
+   - 开发任务 → 使用 dispatch_to_devloop agent
+   - 状态查询 → 使用 dispatch_to_devloop (command: status)
 
 2. **路由任务**
    - 识别关键词："实现"、"添加"、"修复"、"优化"
-   - 调用 send_to_looper agent with command: "start"
+   - 调用 dispatch_to_devloop agent with command: "start"
 
 3. **响应风格**
    - 简洁明确
@@ -49,11 +49,11 @@ Use send_to_looper agent:
 ## 示例对话
 
 **用户**: "优化网页代码"
-**你**: 使用 send_to_looper agent (command: start, task: "优化网页代码")
+**你**: 使用 dispatch_to_devloop agent (command: start, task: "优化网页代码")
 **响应**: "好的，已启动代码优化循环。Looper 将执行 Coder 和 Review 流程。"
 
 **用户**: "进展如何？"
-**你**: 使用 send_to_looper agent (command: status)
+**你**: 使用 dispatch_to_devloop agent (command: status)
 
 **用户**: "你好"
 **你**: "你好！我是 DevHub，负责协调任务执行。你可以告诉我需要做什么。"

@@ -40,11 +40,10 @@ import { loadWorkspaceSettings, writeWorkspaceSettings, type WorkspaceSettings }
 import { getGlobalTabRegistry, type TabConfig } from '@taskagent/tabs';
 import { chatTabConfig } from '@taskagent/tabs/configs/chat';
 import { agentTabConfig } from '@taskagent/tabs/configs/agent';
-import { storyTabConfig } from '@taskagent/tabs/configs/story';
+import { blueprintTabConfig } from '@taskagent/tabs/configs/blueprint';
 import { glossaryTabConfig } from '@taskagent/tabs/configs/glossary';
 import { uiReviewTabConfig } from '@taskagent/tabs/configs/ui-review';
 import { monitorTabConfig } from '@taskagent/tabs/configs/monitor';
-import { looperTabConfig } from '@taskagent/tabs/configs/looper';
 import { getPresetOrDefault } from '@taskagent/presets';
 import { globalAgentRegistry, registerAllAgents } from '@taskagent/agents/registry';
 import type { AgentStartContext, AgentStartSinks } from '@taskagent/agents/runtime/types.js';
@@ -61,8 +60,7 @@ let __nonInteractiveSubmittedOnce = false;
 // Initialize TabRegistry - tabs will be registered based on preset in App component
 const tabRegistry = getGlobalTabRegistry();
 
-// Initialize Agent Registry - register all built-in agents
-registerAllAgents();
+// Early agent registration removed - now done in App component with proper options
 
 // STATIC_TABS will be populated dynamically after tabs are registered
 function getStaticTabs(): string[] {
@@ -322,11 +320,10 @@ const App = () => {
             const tabConfigMap: Record<string, TabConfig> = {
                 'Chat': chatTabConfig,
                 'Agent': agentTabConfig,
-                'Story': storyTabConfig,
+                'Blueprint': blueprintTabConfig,
                 'Glossary': glossaryTabConfig,
                 'UI-Review': uiReviewTabConfig,
                 'DevHub': monitorTabConfig,
-                'Looper': looperTabConfig,
             };
 
             // Register tabs based on preset
@@ -340,11 +337,10 @@ const App = () => {
                 tabRegistry.registerMany([
                     chatTabConfig,
                     agentTabConfig,
-                    storyTabConfig,
+                    blueprintTabConfig,
                     glossaryTabConfig,
                     uiReviewTabConfig,
-                    monitorTabConfig,
-                    looperTabConfig
+                    monitorTabConfig
                 ]);
             } else {
                 tabRegistry.registerMany(tabsToRegister);

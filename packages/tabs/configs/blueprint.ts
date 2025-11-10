@@ -1,10 +1,10 @@
 import type { TabConfig } from '../types.js';
 
-export const storyTabConfig: TabConfig = {
-  id: 'Story',
+export const blueprintTabConfig: TabConfig = {
+  id: 'Blueprint',
   label: 'Blueprint',
   type: 'agent',
-  agentId: 'story',
+  agentId: 'blueprint',
   description: 'Blueprint orchestration · Review and document user stories',
   requiresSession: true,
   executionMode: 'foreground',
