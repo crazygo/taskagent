@@ -22,6 +22,7 @@ export const DRIVER_NAMES = [
     'plan-review-do',
     'glossary',
     'story',
+    'build-specs',
     'ui',
     'monitor',
     'looper',

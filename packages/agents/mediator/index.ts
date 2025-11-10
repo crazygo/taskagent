@@ -75,6 +75,42 @@ export async function createAgent(options?: {
             // Save context for event handlers
             currentContext = context;
             
+            const activeChildAgents = new Set<string>();
+            let handleCompleted = false;
+            let cleanupDeferred = false;
+
+            const markChildActive = (childAgentId?: string) => {
+                if (!childAgentId) return;
+                if (!activeChildAgents.has(childAgentId)) {
+                    addLog(`[Mediator] Child agent active: ${childAgentId}`);
+                }
+                activeChildAgents.add(childAgentId);
+                cleanupDeferred = true;
+            };
+
+            const markChildInactive = (childAgentId?: string) => {
+                if (!childAgentId) return;
+                if (activeChildAgents.delete(childAgentId)) {
+                    addLog(`[Mediator] Child agent inactive: ${childAgentId}`);
+                    if (handleCompleted && activeChildAgents.size === 0) {
+                        cleanupListeners();
+                    }
+                }
+            };
+
+            let listenersRegistered = false;
+            const cleanupListeners = () => {
+                if (!listenersRegistered || !options?.eventBus) {
+                    return;
+                }
+                addLog('[Mediator] Removing event listeners');
+                options.eventBus.off('agent:text', agentTextHandler);
+                options.eventBus.off('agent:event', agentEventHandler);
+                listenersRegistered = false;
+                cleanupDeferred = false;
+                activeChildAgents.clear();
+            };
+
             // Define event handlers that will be registered and cleaned up
             const agentTextHandler = (event: any) => {
                 try {
@@ -86,6 +122,7 @@ export async function createAgent(options?: {
                     
                     // Only mirror direct child agents (those calling Mediator as parent)
                     if (parentAgentId !== 'mediator') return;
+                    markChildActive(childAgentId);
                     if (!chunk) return;
                     
                     // Direct write to MessageStore, bypassing conversation queue
@@ -112,6 +149,7 @@ export async function createAgent(options?: {
                     
                     // Only handle events from direct child agents
                     if (parentAgentId !== 'mediator') return;
+                    markChildActive(childAgentId);
                     
                     // Handle looper events
                     if (payload?.message?.startsWith('looper:')) {
@@ -141,6 +179,7 @@ export async function createAgent(options?: {
                                     addLog(`[Mediator] Failed to trigger AI: ${err instanceof Error ? err.message : String(err)}`);
                                 }
                             }, 100);
+                            markChildInactive(childAgentId);
                             return;
                         }
                         
@@ -164,10 +203,11 @@ export async function createAgent(options?: {
 
             // Register event listeners only for this execution
             if (options?.eventBus && options?.messageStore) {
-                addLog('[Mediator] Registering event listeners for this execution');
-                options.eventBus.on('agent:text', agentTextHandler);
-                options.eventBus.on('agent:event', agentEventHandler);
-            }
+                    addLog('[Mediator] Registering event listeners for this execution');
+                    options.eventBus.on('agent:text', agentTextHandler);
+                    options.eventBus.on('agent:event', agentEventHandler);
+                    listenersRegistered = true;
+                }
             
             // Inject tabExecutor into context for tools
             const enhancedContext = {
@@ -181,9 +221,12 @@ export async function createAgent(options?: {
             // Cleanup event listeners when execution completes
             if (options?.eventBus && options?.messageStore) {
                 handle.completion.finally(() => {
-                    addLog('[Mediator] Cleaning up event listeners after execution completion');
-                    options.eventBus!.off('agent:text', agentTextHandler);
-                    options.eventBus!.off('agent:event', agentEventHandler);
+                    handleCompleted = true;
+                    if (!cleanupDeferred || activeChildAgents.size === 0) {
+                        cleanupListeners();
+                    } else {
+                        addLog('[Mediator] Deferring listener cleanup until child agents finish');
+                    }
                 });
             }
             

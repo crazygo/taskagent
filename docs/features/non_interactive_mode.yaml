@@ -4,10 +4,10 @@ description: "Describes how the application behaves when launched with arguments
 scenarios:
   - scenario: "Application is launched with a prompt to a specific driver"
     given:
-      - "The application is launched with arguments like '--story -p "A tale of two cities"'."
+      - "The application is launched with arguments like '--build-specs -p \"A tale of two cities\"'."
     when:
       - "The application starts."
     then:
-      - "It automatically switches to the 'Story' tab."
+      - "It automatically switches to the 'Build Specs' tab."
       - "The prompt 'A tale of two cities' is submitted."
       - "After the agent finishes, the application automatically exits."

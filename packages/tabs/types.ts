@@ -1,9 +1,9 @@
 /**
  * Tab Configuration Types
- * 
+ *
  * Defines the structure and behavior of tabs in TaskAgent.
  * Each tab is bound to an agent and has configurable execution settings.
- * 
+ *
  * IMPORTANT: This package contains ONLY data definitions, no UI dependencies.
  * The CLI layer is responsible for mapping tab configs to UI components.
  */
@@ -82,7 +82,7 @@ export interface TabConfig {
   isPlaceholder?: boolean;
 
   /**
-   * CLI flag to activate this tab (e.g., '--story', '--glossary')
+   * CLI flag to activate this tab (e.g., '--build-specs', '--glossary')
    */
   cliFlag?: string;
 
@@ -91,4 +91,3 @@ export interface TabConfig {
    */
   slashCommand?: string;
 }
-

@@ -461,7 +461,7 @@ Day 11:
 - [ ] Monitor 模式只显示 Monitor Tab
 - [ ] 命令菜单正确（根据预设）
 - [ ] `/plan-review-do` 工作
-- [ ] `--story` flag 工作
+- [ ] `--build-specs` flag 工作
 - [ ] `--glossary` flag 工作
 - [ ] Tab 切换时消息正确过滤
 - [ ] 不可见 Tab 消息限制生效

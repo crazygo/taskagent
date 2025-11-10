@@ -47,7 +47,7 @@
     "postbuild": "node scripts/create-aliases.js",
     "prepublishOnly": "yarn build",
     "start:test": "concurrently --raw --kill-others --success first \"yarn start\" \"sleep 10\"",
-    "test:story": "yarn start -- --story -p \"Hi\" --auto-allow --auto-exit",
+    "test:story": "yarn start -- --build-specs -p \"Hi\" --auto-allow --auto-exit",
     "test:glossary": "yarn start -- --glossary -p \"Hi\" --auto-allow --auto-exit",
     "e2e:experiment": "expect scripts/e2e-experiment.expect --",
     "test": "vitest",

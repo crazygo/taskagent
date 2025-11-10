@@ -10,6 +10,8 @@ import type { TabConfig } from './types.js';
 export class TabRegistry {
   private tabs: Map<string, TabConfig> = new Map();
   private tabOrder: string[] = [];
+  private labelIndex: Map<string, TabConfig> = new Map();
+  private slugIndex: Map<string, TabConfig> = new Map();
 
   /**
    * Register a tab configuration
@@ -23,6 +25,13 @@ export class TabRegistry {
 
     this.tabs.set(config.id, config);
     this.tabOrder.push(config.id);
+
+    // Index by lowercase label and slug for quick lookup
+    const normalizedLabel = config.label.toLowerCase();
+    this.labelIndex.set(normalizedLabel, config);
+
+    const slug = normalizedLabel.replace(/\s+/g, '-');
+    this.slugIndex.set(slug, config);
   }
 
   /**
@@ -42,6 +51,16 @@ export class TabRegistry {
    */
   get(id: string): TabConfig | undefined {
     return this.tabs.get(id);
+  }
+
+  /**
+   * Get tab configuration by human-readable label (case-insensitive).
+   * Supports both original label and slugified form (spaces -> hyphen).
+   */
+  getByLabel(label: string): TabConfig | undefined {
+    if (!label) return undefined;
+    const normalized = label.toLowerCase();
+    return this.labelIndex.get(normalized) ?? this.slugIndex.get(normalized.replace(/\s+/g, '-'));
   }
 
   /**
@@ -89,7 +108,7 @@ export class TabRegistry {
 
   /**
    * Get tab by CLI flag
-   * @param flag CLI flag (e.g., '--story', '--glossary')
+   * @param flag CLI flag (e.g., '--build-specs', '--glossary')
    * @returns Tab configuration or undefined if not found
    */
   getByCliFlag(flag: string): TabConfig | undefined {
@@ -111,6 +130,8 @@ export class TabRegistry {
   clear(): void {
     this.tabs.clear();
     this.tabOrder = [];
+    this.labelIndex.clear();
+    this.slugIndex.clear();
   }
 
   /**
@@ -157,4 +178,3 @@ export function getGlobalTabRegistry(): TabRegistry {
 export function resetGlobalTabRegistry(): void {
   globalRegistry = null;
 }
-

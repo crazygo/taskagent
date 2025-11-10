@@ -7,6 +7,7 @@
 
 import { globalAgentRegistry } from './AgentRegistry.js';
 import { createAgent as createStoryAgent } from '../story/index.js';
+import { createFeaturesEditorAgent } from '../story/features-editor.js';
 import { createAgent as createGlossaryAgent } from '../glossary/index.js';
 import { createAgent as createUiReviewAgent } from '../ui-review/index.js';
 import { createAgent as createCoderAgent } from '../coder/index.js';
@@ -30,9 +31,20 @@ export function registerAllAgents(options?: { eventBus?: any; tabExecutor?: any;
     // Story Agent
     globalAgentRegistry.register({
         id: 'story',
-        factory: createStoryAgent,
-        description: 'Story Builder - Creates and manages user stories',
+        factory: () => createStoryAgent({
+            eventBus: options?.eventBus,
+            tabExecutor: options?.tabExecutor,
+            messageStore: options?.messageStore,
+        }),
+        description: 'Story Coordinator - Conversational requirements + workflow orchestration',
         tags: ['planning', 'documentation'],
+    });
+
+    globalAgentRegistry.register({
+        id: 'features-editor',
+        factory: createFeaturesEditorAgent,
+        description: 'Features Editor - Planner + Graph + Summarizer',
+        tags: ['planning', 'automation'],
     });
 
     // Glossary Agent
@@ -87,5 +99,5 @@ export function registerAllAgents(options?: { eventBus?: any; tabExecutor?: any;
         tags: ['coordination', 'routing', 'monitor'],
     });
 
-    console.log('[AgentRegistry] Registered 8 agents: default, story, glossary, ui-review, coder, review, looper, mediator');
+    console.log('[AgentRegistry] Registered 9 agents: default, story, features-editor, glossary, ui-review, coder, review, looper, mediator');
 }

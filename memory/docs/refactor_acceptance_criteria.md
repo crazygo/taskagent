@@ -28,7 +28,7 @@ This document outlines the acceptance criteria for the driver architecture refac
 ## Scenario 3: Story Driver Works via CLI Flag
 
 **Given** all dependencies are installed
-**When** the user starts the application with the `--story` flag, e.g., `yarn start -- --story "Draft a story for login"`
+**When** the user starts the application with the `--build-specs` flag, e.g., `yarn start -- --build-specs "Draft a story for login"`
 **Then** the application should launch with the `Story` tab active by default
 **And** the `Story` driver's Agentic workflow should be triggered
 **And** the agent should start a conversation to draft the story, without asking for a `slug` or file path.

@@ -89,7 +89,7 @@ if (message.role === 'tool_use') {
 ```
 
 ## Testing
-- Run agent command with tool calls: `yarn start -- --story -p "list my folder"`
+- Run agent command with tool calls: `yarn start -- --build-specs -p "list my folder"`
 - Verify tools appear in real-time as separate messages
 - Confirm chronological order maintained between permissions, tools, and text
 

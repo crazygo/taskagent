@@ -90,8 +90,7 @@ const BASE_COMMANDS: readonly { name: string; description: string }[] = [
  * @returns Tab config with requiresSession and description
  */
 function getTabInfoByLabel(label: string): { requiresSession: boolean; description: string; label: string } | null {
-    // Try new TabRegistry first
-    const tabConfig = tabRegistry.get(label);
+    const tabConfig = tabRegistry.get(label) ?? tabRegistry.getByLabel(label);
     if (tabConfig) {
         return {
             requiresSession: tabConfig.requiresSession,
@@ -119,24 +118,31 @@ function getTabInfoByLabel(label: string): { requiresSession: boolean; descripti
  * @returns Tab info with label
  */
 function getTabByCliName(cliName: string): { label: string } | null {
-    const normalizedCliName = cliName.toLowerCase();
-    
-    // Try new TabRegistry first
-    const tabs = tabRegistry.getAll();
-    for (const tab of tabs) {
-        if (tab.id.toLowerCase() === normalizedCliName || 
-            tab.label.toLowerCase().replace(/\s/g, '-') === normalizedCliName ||
-            tab.cliFlag === `--${normalizedCliName}`) {
-            return { label: tab.label };
-        }
+    const normalizedCliName = cliName.replace(/^--/, '').trim().toLowerCase();
+
+    // Try matching CLI flag (e.g., '--build-specs')
+    const flagMatch = tabRegistry.getByCliFlag(`--${normalizedCliName}`);
+    if (flagMatch) {
+        return { label: flagMatch.label };
     }
-    
+
+    // Try direct ID or label (case-insensitive, slug-aware)
+    const idMatch = tabRegistry.get(cliName) ?? tabRegistry.get(normalizedCliName);
+    if (idMatch) {
+        return { label: idMatch.label };
+    }
+
+    const labelMatch = tabRegistry.getByLabel(cliName) ?? tabRegistry.getByLabel(normalizedCliName);
+    if (labelMatch) {
+        return { label: labelMatch.label };
+    }
+
     // Fallback to old Driver system
     const driverEntry = getDriverByCliName(normalizedCliName);
     if (driverEntry) {
         return { label: driverEntry.label };
     }
-    
+
     return null;
 }
 
@@ -906,7 +912,7 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
         const tabId = tabOverride ?? selectedTabRef.current;
         let targetAgentId = agentIdOverride;
         if (!targetAgentId) {
-            const tabConfig = tabRegistry.get(tabId);
+            const tabConfig = tabRegistry.get(tabId) ?? tabRegistry.getByLabel(tabId);
             targetAgentId = tabConfig?.agentId ?? 'default';
         }
 
@@ -1172,7 +1178,7 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
         setInputValue('');
         
         // Check TabRegistry first for agent tabs
-        const tabConfig = tabRegistry.get(selectedTab);
+        const tabConfig = tabRegistry.get(selectedTab) ?? tabRegistry.getByLabel(selectedTab);
         if (tabConfig && tabConfig.type === 'agent' && !tabConfig.isPlaceholder) {
             // Agent tab - use agent pipeline
             addLog(`[Tab] Routing to agent tab: ${tabConfig.label} (agentId: ${tabConfig.agentId})`);
