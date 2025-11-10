@@ -104,6 +104,7 @@ export async function createAgent(options?: {
                     const chunk = typeof event.payload === 'string' ? event.payload : '';
 
                     if (parentAgentId !== 'story') return;
+                    if (childAgentId === 'features-editor') return; // 避免重复（仅使用 progress 事件）
                     registerChild(childAgentId);
                     if (!chunk) return;
 

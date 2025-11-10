@@ -1,4 +1,6 @@
+import fs from 'fs/promises';
 import path from 'path';
+import yaml from 'js-yaml';
 import { fileURLToPath } from 'url';
 import type {
     AgentStartContext,
@@ -8,71 +10,52 @@ import type {
 } from '../runtime/types.js';
 import { buildPromptAgentStart } from '../runtime/runPromptAgentStart.js';
 import { parseAgentMdFile } from '../runtime/agentLoader.js';
-import { createGraphAgent, type StoryGraphTaskInput, type StoryWorkResult } from './graph/index.js';
 
 const FEATURES_EDITOR_AGENT_ID = 'features-editor';
-const FEATURES_EDITOR_DESCRIPTION = 'Features Editor - planner → graph → summarizer 自动写作工作流';
+const FEATURES_EDITOR_DESCRIPTION = 'Features Editor - Build Specs YAML writer + validator';
+const MAX_WRITER_ATTEMPTS = 3;
 
 type PromptStarter = (userInput: string, context: AgentStartContext, sinks: AgentStartSinks) => ExecutionHandle;
 
-type PlannerOutput = StoryGraphTaskInput;
-
-type SummarizerInput = {
-    user_input: string;
-    task: StoryGraphTaskInput;
-    work_result: StoryWorkResult;
+type WriterTask = {
+    targetFile: string;
+    rawInput: string;
+    featureName?: string;
 };
+
+type ValidationResult =
+    | { ok: true; feature: string }
+    | { ok: false; message: string };
 
 export async function createFeaturesEditorAgent(): Promise<RunnableAgent> {
     const agentDir = path.dirname(fileURLToPath(import.meta.url));
 
-    const plannerConfig = await parseAgentMdFile(path.join(agentDir, 'planner.agent.md'));
-    if (!plannerConfig) {
-        throw new Error('Failed to load story planner agent definition.');
+    const writerConfig = await parseAgentMdFile(path.join(agentDir, 'writer.agent.md'));
+    if (!writerConfig) {
+        throw new Error('Failed to load build specs writer agent definition.');
     }
 
-    const summarizerConfig = await parseAgentMdFile(path.join(agentDir, 'summarizer.agent.md'));
-    if (!summarizerConfig) {
-        throw new Error('Failed to load story summarizer agent definition.');
-    }
-
-    const plannerStart = buildPromptAgentStart({
+    const writerStart = buildPromptAgentStart({
         getPrompt: (input: string) => input.trim(),
-        getSystemPrompt: () => plannerConfig.prompt,
-        getModel: () => plannerConfig.model,
+        getSystemPrompt: () => writerConfig.prompt,
+        getAgentDefinitions: () => writerConfig.agents,
+        getModel: () => writerConfig.model,
     });
 
-    const summarizerStart = buildPromptAgentStart({
-        getPrompt: (input: string) => input.trim(),
-        getSystemPrompt: () => summarizerConfig.prompt,
-        getModel: () => summarizerConfig.model,
-    });
-
-    const graphAgent = await createGraphAgent();
-
-    return new FeaturesEditorAgent(plannerStart, summarizerStart, graphAgent);
+    return new FeaturesEditorAgent(writerStart);
 }
 
 class FeaturesEditorAgent implements RunnableAgent {
     readonly id = FEATURES_EDITOR_AGENT_ID;
     readonly description = FEATURES_EDITOR_DESCRIPTION;
 
-    constructor(
-        private readonly plannerStart: PromptStarter,
-        private readonly summarizerStart: PromptStarter,
-        private readonly graphAgent: RunnableAgent
-    ) {}
+    constructor(private readonly writerStart: PromptStarter) {}
 
     start(userInput: string, context: AgentStartContext, sinks: AgentStartSinks): ExecutionHandle {
         const controller = new AbortController();
         const completion = this.run(userInput, context, sinks, controller.signal)
             .then(summary => {
-                if (summary) {
-                    sinks.onText?.(summary);
-                    sinks.onCompleted?.(summary);
-                } else {
-                    sinks.onCompleted?.('');
-                }
+                sinks.onCompleted?.(summary);
                 return true;
             })
             .catch(error => {
@@ -97,71 +80,135 @@ class FeaturesEditorAgent implements RunnableAgent {
         if (!context.workspacePath) {
             throw new Error('Features Editor requires workspacePath.');
         }
-
-        this.emitProgress(sinks, '[FeaturesEditor] 分析需求…');
-        const planText = await this.invokePrompt(this.plannerStart, userInput, context, sinks, signal, {
-            forwardEvents: false,
-            label: 'planner',
-        });
-        const task = parsePlannerOutput(planText);
+        const task = this.parseTask(userInput);
         this.emitProgress(sinks, `[FeaturesEditor] 目标文件: ${task.targetFile}`);
+        let feedback: string | null = null;
 
-        this.emitProgress(sinks, '[FeaturesEditor] 启动写作流程 (update → diff → review)…');
-        const workResult = await this.runGraphWorkflow(task, context, sinks, signal);
-        this.emitProgress(sinks, '[FeaturesEditor] 写作完成，整理总结…');
+        for (let attempt = 1; attempt <= MAX_WRITER_ATTEMPTS; attempt++) {
+            if (signal.aborted) {
+                throw new Error('Features Editor invocation aborted.');
+            }
 
-        const summaryInput: SummarizerInput = {
-            user_input: userInput,
-            task,
-            work_result: workResult,
-        };
-        const summaryPayload = JSON.stringify(summaryInput, null, 2);
-        const summary = await this.invokePrompt(this.summarizerStart, summaryPayload, context, sinks, signal, {
-            forwardEvents: false,
-            label: 'summarizer',
-        });
+            this.emitProgress(sinks, `[FeaturesEditor] 写作迭代 ${attempt}，准备生成 YAML…`);
+            const writerPrompt = this.buildWriterPrompt(task, feedback);
+            await this.invokeWriter(writerPrompt, context, sinks, signal, attempt);
 
-        sinks.onEvent?.({
-            type: 'features:result',
-            level: 'info',
-            payload: workResult,
-            ts: Date.now(),
-        } as any);
+            this.emitProgress(sinks, '[FeaturesEditor] 正在验证 YAML 完整性…');
+            const validation = await this.validateYaml(context.workspacePath, task.targetFile);
+            if (validation.ok) {
+                this.emitProgress(sinks, '[FeaturesEditor] 验证通过，生成 Build Specs 完成。');
+                const resultPayload = {
+                    targetFile: task.targetFile,
+                    feature: validation.feature,
+                    iterations: attempt,
+                };
+                sinks.onEvent?.({
+                    type: 'features:result',
+                    level: 'info',
+                    payload: resultPayload,
+                    ts: Date.now(),
+                } as any);
+                return `Build Specs 完成：${task.targetFile}`;
+            }
 
-        return summary.trim();
+            feedback = validation.message;
+            this.emitProgress(
+                sinks,
+                `[FeaturesEditor] 验证失败：${feedback}（将重试）`
+            );
+        }
+
+        throw new Error('Features Editor 多次尝试后仍未通过验证。');
     }
 
-    private async invokePrompt(
-        starter: PromptStarter,
-        promptInput: string,
+    private parseTask(userInput: string): WriterTask {
+        const raw = userInput.trim();
+        if (!raw) {
+            throw new Error('任务描述为空，无法生成 Build Specs。');
+        }
+
+        const targetFile = this.extractTargetFile(raw);
+        const featureName = this.extractFeatureName(raw);
+        return { targetFile, rawInput: raw, featureName };
+    }
+
+    private extractTargetFile(raw: string): string {
+        const match = raw.match(/目标文件\s*[:：]\s*(.+)/i);
+        let candidate = match?.[1]?.trim();
+        if (!candidate || candidate.length === 0) {
+            const fallbackSlug = this.slugify(
+                this.extractFeatureName(raw) ?? 'feature-spec'
+            );
+            candidate = `docs/features/${fallbackSlug}.yaml`;
+        }
+
+        candidate = candidate.replace(/^['"`]/, '').replace(/['"`]$/, '');
+        if (!candidate.endsWith('.yaml')) {
+            candidate = candidate.replace(/\.(md|json|yml)$/i, '') + '.yaml';
+        }
+        if (!candidate.startsWith('docs/')) {
+            candidate = `docs/features/${candidate}`.replace(/\\/g, '/');
+        } else {
+            candidate = candidate.replace(/\\/g, '/');
+        }
+        return candidate;
+    }
+
+    private extractFeatureName(raw: string): string | undefined {
+        const match = raw.match(/(功能标题|feature)\s*[:：]\s*(.+)/i);
+        const value = match?.[2]?.trim();
+        return value && value.length > 0 ? value : undefined;
+    }
+
+    private slugify(value: string): string {
+        return value
+            .toLowerCase()
+            .replace(/[^a-z0-9\s\-]/g, '')
+            .trim()
+            .replace(/\s+/g, '-')
+            .replace(/-+/g, '-')
+            .replace(/^-+|-+$/g, '') || 'feature';
+    }
+
+    private buildWriterPrompt(task: WriterTask, feedback?: string | null): string {
+        const sections = [
+            '# Build Specs 任务',
+            `目标文件: ${task.targetFile}`,
+            '## 用户提供的需求',
+            task.rawInput,
+            '## 编写要求',
+            '- 将上述需求转换为 docs/features/*.yaml 的结构化规范。',
+            '- 顶层字段必须包含 feature, description, scenarios。',
+            '- 每个场景都要写出 scenario/given/when/then，给定/当/则可用字符串数组。',
+            '- 使用 file 工具整体写入目标文件，禁止输出 Markdown 或 JSON。',
+        ];
+
+        if (feedback) {
+            sections.push('## 验证反馈（必须修复）', feedback);
+        }
+
+        return sections.join('\n\n');
+    }
+
+    private async invokeWriter(
+        prompt: string,
         context: AgentStartContext,
         parentSinks: AgentStartSinks,
         signal: AbortSignal,
-        options?: { forwardEvents?: boolean; label?: string }
-    ): Promise<string> {
-        if (signal.aborted) {
-            throw new Error('Features Editor prompt invocation aborted.');
-        }
-
-        let buffer = '';
+        attempt: number
+    ): Promise<void> {
         let failedMessage: string | null = null;
+        const capturedEvents: any[] = [];
         const childSinks: AgentStartSinks = {
-            onText: chunk => {
-                buffer += chunk;
-                if (options?.forwardEvents) {
-                    parentSinks.onText?.(chunk);
-                }
-            },
+            onText: () => {},
             onEvent: event => {
-                if (options?.forwardEvents) {
-                    parentSinks.onEvent?.(event);
+                if (this.isToolEvent(event)) {
+                    capturedEvents.push(event);
+                    return;
                 }
+                parentSinks.onEvent?.(event);
             },
-            onReasoning: chunk => {
-                if (options?.forwardEvents) {
-                    parentSinks.onReasoning?.(chunk);
-                }
-            },
+            onReasoning: chunk => parentSinks.onReasoning?.(chunk),
             onCompleted: () => {},
             onFailed: error => {
                 failedMessage = error;
@@ -169,63 +216,91 @@ class FeaturesEditorAgent implements RunnableAgent {
             canUseTool: parentSinks.canUseTool,
         };
 
-        const handle = starter(promptInput, { ...context, forkSession: true }, childSinks);
+        const handle = this.writerStart(prompt, { ...context, forkSession: true }, childSinks);
         signal.addEventListener('abort', () => handle.cancel(), { once: true });
         const success = await handle.completion;
         if (!success || failedMessage) {
-            const label = options?.label ? `[FeaturesEditor ${options.label}] ` : '';
-            throw new Error(label + (failedMessage || 'Prompt execution failed'));
+            throw new Error(`[FeaturesEditor writer] 第 ${attempt} 次写作失败：${failedMessage ?? ''}`.trim());
         }
-        return buffer.trim();
+
+        this.emitToolSummary('writer', capturedEvents, parentSinks);
     }
 
-    private async runGraphWorkflow(
-        task: StoryGraphTaskInput,
-        context: AgentStartContext,
-        parentSinks: AgentStartSinks,
-        signal: AbortSignal
-    ): Promise<StoryWorkResult> {
-        if (signal.aborted) {
-            throw new Error('Features Editor graph run aborted.');
+    private async validateYaml(workspacePath: string, targetFile: string): Promise<ValidationResult> {
+        try {
+            const absPath = path.resolve(workspacePath, targetFile);
+            const content = await fs.readFile(absPath, 'utf-8');
+            const parsed = yaml.load(content);
+
+            if (!parsed || typeof parsed !== 'object') {
+                return { ok: false, message: 'YAML 顶层必须是对象结构。' };
+            }
+
+            const data = parsed as Record<string, unknown>;
+            const issues: string[] = [];
+
+            if (typeof data.feature !== 'string' || data.feature.trim().length === 0) {
+                issues.push('缺少 `feature` 字段或内容为空。');
+            }
+            if (typeof data.description !== 'string' || data.description.trim().length === 0) {
+                issues.push('缺少 `description` 字段或内容为空。');
+            }
+
+            if (!Array.isArray(data.scenarios) || data.scenarios.length === 0) {
+                issues.push('`scenarios` 必须是非空数组。');
+            } else {
+                (data.scenarios as unknown[]).forEach((scenarioRaw, index) => {
+                    if (!scenarioRaw || typeof scenarioRaw !== 'object') {
+                        issues.push(`场景 #${index + 1} 不是对象。`);
+                        return;
+                    }
+                    const scenario = scenarioRaw as Record<string, unknown>;
+                    if (typeof scenario.scenario !== 'string' || scenario.scenario.trim().length === 0) {
+                        issues.push(`场景 #${index + 1} 缺少 scenario 标题。`);
+                    }
+                    ['given', 'when', 'then'].forEach(key => {
+                        const value = scenario[key];
+                        if (value == null) {
+                            issues.push(`场景 #${index + 1} 缺少 ${key}。`);
+                            return;
+                        }
+                        if (typeof value === 'string') {
+                            if (value.trim().length === 0) {
+                                issues.push(`场景 #${index + 1} 的 ${key} 内容为空。`);
+                            }
+                        } else if (Array.isArray(value)) {
+                            if (value.length === 0) {
+                                issues.push(`场景 #${index + 1} 的 ${key} 数组为空。`);
+                            }
+                            for (const entry of value) {
+                                if (typeof entry !== 'string' || entry.trim().length === 0) {
+                                    issues.push(`场景 #${index + 1} 的 ${key} 数组存在非字符串或空项。`);
+                                    break;
+                                }
+                            }
+                        } else {
+                            issues.push(`场景 #${index + 1} 的 ${key} 必须是字符串或字符串数组。`);
+                        }
+                    });
+
+                    const allowedKeys = new Set(['scenario', 'given', 'when', 'then']);
+                    Object.keys(scenario).forEach(key => {
+                        if (!allowedKeys.has(key)) {
+                            issues.push(`场景 #${index + 1} 包含未识别字段 \"` + key + '\"。');
+                        }
+                    });
+                });
+            }
+
+            if (issues.length > 0) {
+                return { ok: false, message: issues.join(' ')};
+            }
+
+            return { ok: true, feature: String(data.feature) };
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            return { ok: false, message: `无法验证 YAML：${message}` };
         }
-
-        const graphInput = JSON.stringify(task);
-        let result: StoryWorkResult | null = null;
-        let failedMessage: string | null = null;
-
-        const graphSinks: AgentStartSinks = {
-            onText: chunk => parentSinks.onText?.(chunk),
-            onReasoning: chunk => parentSinks.onReasoning?.(chunk),
-            onEvent: event => {
-                parentSinks.onEvent?.(event);
-                const payloadEvent = event as any;
-                if (payloadEvent?.type === 'features:result' && payloadEvent.payload) {
-                    result = payloadEvent.payload as StoryWorkResult;
-                }
-            },
-            onCompleted: () => {},
-            onFailed: error => {
-                failedMessage = error;
-            },
-            canUseTool: parentSinks.canUseTool,
-        };
-
-        const handle = this.graphAgent.start(
-            graphInput,
-            { ...context, forkSession: true, parentAgentId: FEATURES_EDITOR_AGENT_ID },
-            graphSinks
-        );
-        signal.addEventListener('abort', () => handle.cancel(), { once: true });
-        const success = await handle.completion;
-
-        if (!success || failedMessage) {
-            throw new Error(failedMessage || 'Features Editor graph workflow failed.');
-        }
-        if (!result) {
-            throw new Error('Features Editor graph workflow completed without emitting result.');
-        }
-
-        return result;
     }
 
     private emitProgress(sinks: AgentStartSinks, message: string) {
@@ -236,41 +311,54 @@ class FeaturesEditorAgent implements RunnableAgent {
             ts: Date.now(),
         } as any);
     }
-}
 
-function parsePlannerOutput(raw: string): PlannerOutput {
-    const cleaned = extractJsonBlock(raw);
-    try {
-        const parsed = JSON.parse(cleaned);
-        if (!parsed || typeof parsed !== 'object') {
-            throw new Error('Planner output is not a JSON object.');
-        }
-        if (!parsed.targetFile || typeof parsed.targetFile !== 'string') {
-            throw new Error('Planner output is missing "targetFile".');
-        }
-        if (!parsed.instructions || typeof parsed.instructions !== 'string') {
-            throw new Error('Planner output is missing "instructions".');
-        }
-        return {
-            targetFile: parsed.targetFile.trim(),
-            instructions: parsed.instructions.trim(),
-            contextNotes:
-                typeof parsed.contextNotes === 'string' && parsed.contextNotes.trim().length > 0
-                    ? parsed.contextNotes.trim()
-                    : undefined,
-        };
-    } catch (error) {
-        throw new Error(
-            `无法解析规划结果，请确保输出 JSON 格式。错误: ${error instanceof Error ? error.message : String(error)}`
-        );
+    private isToolEvent(event: any): boolean {
+        if (!event || typeof event !== 'object') return false;
+        const type = event.type ?? event?.data?.type;
+        return type === 'tool_use' || type === 'tool_result';
     }
-}
 
-function extractJsonBlock(text: string): string {
-    const trimmed = text.trim();
-    const fencedMatch = trimmed.match(/```json([\s\S]+?)```/i);
-    if (fencedMatch) {
-        return fencedMatch[1]!.trim();
+    private emitToolSummary(stage: 'writer' | 'validator', events: any[], sinks: AgentStartSinks) {
+        if (!events || events.length === 0) return;
+        const descriptions = events
+            .map(event => this.describeToolEvent(event))
+            .filter((text): text is string => Boolean(text));
+        if (descriptions.length === 0) return;
+        this.emitProgress(sinks, `[FeaturesEditor][${stage}] ${descriptions.join('；')}`);
     }
-    return trimmed;
+
+    private describeToolEvent(event: any): string | null {
+        const type = event?.type;
+        if (type === 'tool_use') {
+            const name = event?.name || 'tool';
+            const target = this.extractTargetFromInput(event?.input);
+            return `${name} 准备处理${target ? ' ' + target : ''}`.trim();
+        }
+        if (type === 'tool_result') {
+            const name = event?.name || 'tool';
+            const target = this.extractTargetFromInput(event?.input);
+            if (event?.isError || event?.error) {
+                const detail = event?.content || event?.error;
+                return `${name} 失败${target ? '（' + target + '）' : ''}${detail ? `：${this.truncate(String(detail))}` : ''}`;
+            }
+            return `${name} 已完成${target ? ' ' + target : ''}`.trim();
+        }
+        return null;
+    }
+
+    private extractTargetFromInput(input: any): string | null {
+        if (!input || typeof input !== 'object') return null;
+        const file = input.file_path || input.path || input.target_file;
+        if (typeof file === 'string' && file.length > 0) {
+            return file;
+        }
+        if (typeof input.pattern === 'string') {
+            return `pattern=${input.pattern}`;
+        }
+        return null;
+    }
+
+    private truncate(text: string, max = 60): string {
+        return text.length > max ? `${text.slice(0, max)}…` : text;
+    }
 }

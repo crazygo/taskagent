@@ -40,6 +40,7 @@ function buildFeaturesEditorTool(params: {
         },
         async ({ task }) => {
             const targetTabId = options.tabId ?? 'Story';
+            const executionTabId = `${targetTabId}::features-editor`;
 
             if (!options.tabExecutor) {
                 const message = 'TabExecutor 未初始化，无法启动 Features Editor。';
@@ -52,7 +53,7 @@ function buildFeaturesEditorTool(params: {
 
             try {
                 addLog(`[Story Tool] ${telemetryLabel} payload: ${task}`);
-                void options.tabExecutor.execute(targetTabId, 'features-editor', task, {
+                void options.tabExecutor.execute(executionTabId, 'features-editor', task, {
                     sourceTabId: targetTabId,
                     workspacePath: options.workspacePath,
                     parentAgentId: 'story',
