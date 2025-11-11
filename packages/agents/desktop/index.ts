@@ -117,11 +117,10 @@ export async function createAgent(options?: {
                     // Only mirror direct child agents (those calling Desktop as parent)
                     if (parentAgentId !== 'desktop') return;
 
-                    // Desktop does not surface Blueprint's self-dialogue; users can view
-                    // Blueprint tab directly, so skip mirroring those assistant chunks.
-                    // Blueprint's milestone updates still emit via agentEventHandler, so
-                    // important progress is preserved.
-                    if (childAgentId === 'blueprint') return;
+                    // Desktop does not surface Blueprint's or DevHub's self-dialogue; 
+                    // users can view those tabs directly. Skip mirroring assistant chunks.
+                    // Milestone updates still emit via agentEventHandler for important progress.
+                    if (childAgentId === 'blueprint' || childAgentId === 'devhub') return;
                     markChildActive(childAgentId);
                     if (!chunk) return;
 

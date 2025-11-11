@@ -198,8 +198,53 @@ export function createDesktopMcpServer(
     }
   );
 
+  // Tool: run_devhub
+  const runDevHub = tool(
+    'run_devhub',
+    '启动 DevHub 开发枢纽，协调 Coder 和 Reviewer 循环开发流程',
+    { task: taskSchema },
+    async ({ task }) => {
+      if (!options.tabExecutor) {
+        const message = 'TabExecutor 未初始化，无法启动 DevHub';
+        addLog(`[Desktop Tool] ${message}`);
+        return {
+          content: [{ type: 'text', text: message }],
+          isError: true,
+        };
+      }
+
+      try {
+        addLog(`[Desktop Tool] Starting DevHub task: ${task.substring(0, 100)}...`);
+
+        await options.tabExecutor.execute(
+          'DevHub',
+          'devhub',
+          task,
+          {
+            sourceTabId: 'Desktop',
+            workspacePath: options.workspacePath,
+            parentAgentId: 'desktop',
+          },
+          { async: true }  // Fire-and-forget mode
+        );
+        addLog(`[Desktop Tool] DevHub task dispatched (async)`);
+
+        return {
+          content: [{ type: 'text', text: '✅ DevHub 任务已启动，后台执行中...' }],
+        };
+      } catch (error) {
+        const message = `启动 DevHub 失败: ${error instanceof Error ? error.message : String(error)}`;
+        addLog(`[Desktop Tool] ${message}`);
+        return {
+          content: [{ type: 'text', text: message }],
+          isError: true,
+        };
+      }
+    }
+  );
+
   return createSdkMcpServer({
     name: 'desktop-tools',
-    tools: [runBlueprint, runWriter, runCoder, runReviewer],
+    tools: [runBlueprint, runWriter, runCoder, runReviewer, runDevHub],
   });
 }
