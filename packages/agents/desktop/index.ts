@@ -148,6 +148,10 @@ export async function createAgent(options?: {
                     
                     // Only handle events from direct child agents
                     if (parentAgentId !== 'desktop') return;
+                    if (payload && typeof payload === 'object' && (payload.kind === 'task:progress' || payload.kind === 'task:result')) {
+                        // Progress/result events are handled by AgentBridge to keep Desktop view consistent
+                        return;
+                    }
                     markChildActive(childAgentId);
                     
                     // Mirror progress messages

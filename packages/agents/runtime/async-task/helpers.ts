@@ -63,11 +63,15 @@ export function emitProgress(
 ): void {
     addLog(`[AsyncTask] emitProgress: agentId=${agentId}, tabId=${tabId}, message=${message}`);
     eventBus.emit({
-        type: 'task:progress',
+        type: 'agent:event',
         agentId,
         tabId,
         taskId,
-        payload: { message },
+        payload: {
+            kind: 'task:progress',
+            level: 'info',
+            message,
+        },
         timestamp: Date.now(),
         version: '1.0',
         parentAgentId,
@@ -85,12 +89,22 @@ export function emitResult(
     taskId?: string,
     parentAgentId?: string
 ): void {
+    const isError = Boolean(result && typeof result === 'object' && 'error' in result);
+    const message = isError
+        ? `[result] failed: ${String(result.error ?? 'unknown error')}`
+        : '[result] completed';
+
     eventBus.emit({
-        type: 'task:result',
+        type: 'agent:event',
         agentId,
         tabId,
         taskId,
-        payload: result,
+        payload: {
+            kind: 'task:result',
+            level: isError ? 'error' : 'info',
+            message,
+            data: result,
+        },
         timestamp: Date.now(),
         version: '1.0',
         parentAgentId,

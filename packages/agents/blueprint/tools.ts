@@ -13,6 +13,7 @@ interface CreateBlueprintMcpServerOptions {
     tabId?: string;
     agentRegistry?: AgentRegistry;
     eventBus?: EventBus;
+    parentAgentId?: string;
 }
 
 export function createBlueprintMcpServer(options: CreateBlueprintMcpServerOptions) {
@@ -58,7 +59,7 @@ function buildBlueprintTaskTool(params: {
 
             try {
                 addLog(`[Blueprint Tool] ${telemetryLabel} starting async task: ${task}`);
-                emitProgress(options.eventBus, 'blueprint', targetTabId, '[log] 任务已收到');
+                emitProgress(options.eventBus, 'blueprint', targetTabId, '[log] 任务已收到', undefined, options.parentAgentId);
 
                 // 启动异步任务（立即返回 handle），并立刻播报一次进度以注册监听
                 const handle = await runBlueprintTask(task, {
@@ -67,7 +68,7 @@ function buildBlueprintTaskTool(params: {
                     tabExecutor: options.tabExecutor,
                     workspacePath: options.workspacePath,
                     sourceTabId: targetTabId,
-                    parentAgentId: 'blueprint',
+                    parentAgentId: options.parentAgentId ?? 'blueprint',
                 });
 
                 // 后台继续执行（不阻塞对话）

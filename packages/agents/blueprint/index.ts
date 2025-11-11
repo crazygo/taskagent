@@ -52,6 +52,7 @@ export async function createAgent(options?: {
                     tabId: ctx.sourceTabId,
                     agentRegistry: options.agentRegistry,
                     eventBus: options.eventBus,
+                    parentAgentId: ctx.parentAgentId ?? BLUEPRINT_AGENT_ID,
                 }),
             };
         },

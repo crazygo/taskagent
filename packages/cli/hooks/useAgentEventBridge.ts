@@ -236,6 +236,45 @@ export function useAgentEventBridge(eventBus: EventBus, messageStore: MessageSto
           });
           return;
       }
+      if (payload && typeof payload === 'object') {
+        const payloadKind = (payload as any).kind;
+
+        if (payloadKind === 'task:progress') {
+          const message = String((payload as any).message ?? '');
+          if (!message) return;
+          const agentId = event.agentId || 'unknown';
+          addLog(`[AgentBridge] Task progress (agent:event): ${message}`);
+          messageStore.appendMessage(event.tabId, {
+            id: messageStore.getNextMessageId(),
+            role: 'assistant',
+            content: `✦ [${agentId}] ${message}`,
+            isPending: false,
+            variant: event.parentAgentId ? 'worker' : undefined,
+            timestamp: event.timestamp,
+          });
+          return;
+        }
+
+        if (payloadKind === 'task:result') {
+          const data = (payload as any).data;
+          addLog(`[AgentBridge] Task result (agent:event): ${JSON.stringify(data)}`);
+          if (data && typeof data === 'object' && 'error' in data) {
+            appendSystemMessage(event.tabId, `Task failed: ${String((data as any).error)}`, true);
+          } else {
+            const summary = JSON.stringify(data ?? {}, null, 2);
+            messageStore.appendMessage(event.tabId, {
+              id: messageStore.getNextMessageId(),
+              role: 'assistant',
+              content: `✓ Task completed\n${summary}`,
+              isPending: false,
+              variant: event.parentAgentId ? 'worker' : undefined,
+              timestamp: event.timestamp,
+            });
+          }
+          return;
+        }
+      }
+
       if (payload && typeof payload === 'object' && 'message' in payload) {
         let message = String((payload as any).message ?? '');
         
@@ -295,48 +334,11 @@ export function useAgentEventBridge(eventBus: EventBus, messageStore: MessageSto
       appendSystemMessage(event.tabId, `[Agent] Failed: ${errorMessage}`, true);
     };
 
-    const handleTaskProgress = (event: AgentEvent) => {
-      const payload = event.payload;
-      if (payload && typeof payload === 'object' && 'message' in payload) {
-        const message = String((payload as any).message);
-        const agentId = event.agentId || 'unknown';
-        addLog(`[AgentBridge] Task progress: ${message}`);
-        messageStore.appendMessage(event.tabId, {
-          id: messageStore.getNextMessageId(),
-          role: 'assistant',
-          content: `✦ [${agentId}] ${message}`,
-          isPending: false,
-          timestamp: event.timestamp,
-        });
-      }
-    };
-
-    const handleTaskResult = (event: AgentEvent) => {
-      const payload = event.payload;
-      addLog(`[AgentBridge] Task result: ${JSON.stringify(payload)}`);
-      if (payload && typeof payload === 'object') {
-        if ('error' in payload) {
-          appendSystemMessage(event.tabId, `Task failed: ${(payload as any).error}`, true);
-        } else {
-          const summary = JSON.stringify(payload, null, 2);
-          messageStore.appendMessage(event.tabId, {
-            id: messageStore.getNextMessageId(),
-            role: 'assistant',
-            content: `✓ Task completed\n${summary}`,
-            isPending: false,
-            timestamp: event.timestamp,
-          });
-        }
-      }
-    };
-
     eventBus.on('agent:text', handleText);
     eventBus.on('agent:reasoning', handleReasoning);
     eventBus.on('agent:event', handleAgentEvent);
     eventBus.on('agent:completed', handleCompleted);
     eventBus.on('agent:failed', handleFailed);
-    eventBus.on('task:progress', handleTaskProgress);
-    eventBus.on('task:result', handleTaskResult);
 
     return () => {
       eventBus.off('agent:text', handleText);
@@ -344,8 +346,6 @@ export function useAgentEventBridge(eventBus: EventBus, messageStore: MessageSto
       eventBus.off('agent:event', handleAgentEvent);
       eventBus.off('agent:completed', handleCompleted);
       eventBus.off('agent:failed', handleFailed);
-      eventBus.off('task:progress', handleTaskProgress);
-      eventBus.off('task:result', handleTaskResult);
     };
   }, [appendSystemMessage, ensureActiveEntry, finalizeConversation, eventBus, messageStore]);
 

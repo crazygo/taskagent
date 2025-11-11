@@ -11,9 +11,7 @@ export type AgentEventType =
     | 'agent:event'         // Task event (info/warning/error)
     | 'agent:completed'     // Agent execution completed
     | 'agent:failed'        // Agent execution failed
-    | 'message:added'       // Message added to MessageStore (cross-tab communication)
-    | 'task:progress'       // Async task progress update
-    | 'task:result';        // Async task result
+    | 'message:added';      // Message added to MessageStore (cross-tab communication)
 
 export interface AgentEvent {
     type: AgentEventType;
@@ -22,6 +20,7 @@ export interface AgentEvent {
     timestamp: number;
     payload: unknown;       // Event-specific payload
     version: '1.0';         // Protocol version (fixed, no wildcards)
+    taskId?: string;        // Optional task identifier for async workflows
     parentAgentId?: string; // Parent agent in call chain (e.g., 'devhub' calls 'looper')
 }
 
@@ -60,4 +59,3 @@ export interface MessageAddedPayload {
         isBoxed?: boolean;
     };
 }
-

@@ -39,7 +39,7 @@ export async function runBlueprintTask(
             const agentId = 'blueprint';
             const tabId = context.sourceTabId || 'Blueprint';
 
-            emitProgress(context.eventBus, agentId, tabId, `[log] 目标文件: ${task.targetFile}`, taskId);
+            emitProgress(context.eventBus, agentId, tabId, `[log] 目标文件: ${task.targetFile}`, taskId, context.parentAgentId);
 
             let feedback: string | null = null;
 
@@ -48,31 +48,31 @@ export async function runBlueprintTask(
                     throw new Error('Task cancelled');
                 }
 
-                emitProgress(context.eventBus, agentId, tabId, `[log] 写作迭代 ${attempt}，准备生成 YAML…`, taskId);
+                emitProgress(context.eventBus, agentId, tabId, `[log] 写作迭代 ${attempt}，准备生成 YAML…`, taskId, context.parentAgentId);
 
                 const writerPrompt = buildWriterPrompt(task, feedback);
-                emitProgress(context.eventBus, agentId, tabId, '[log] 正在调用 Writer Agent 生成内容…', taskId);
+                emitProgress(context.eventBus, agentId, tabId, '[log] 正在调用 Writer Agent 生成内容…', taskId, context.parentAgentId);
 
                 await runAgent('writer', writerPrompt, context);
 
-                emitProgress(context.eventBus, agentId, tabId, '[log] Writer Agent 完成，开始验证…', taskId);
+                emitProgress(context.eventBus, agentId, tabId, '[log] Writer Agent 完成，开始验证…', taskId, context.parentAgentId);
 
-                emitProgress(context.eventBus, agentId, tabId, '[log] 正在验证 YAML 完整性…', taskId);
+                emitProgress(context.eventBus, agentId, tabId, '[log] 正在验证 YAML 完整性…', taskId, context.parentAgentId);
                 const validation = await validateYaml(context.workspacePath, task.targetFile);
 
                 if (validation.ok) {
-                    emitProgress(context.eventBus, agentId, tabId, '[log] 验证通过，Blueprint 生成完成。', taskId);
+                    emitProgress(context.eventBus, agentId, tabId, '[log] 验证通过，Blueprint 生成完成。', taskId, context.parentAgentId);
                     const result = {
                         targetFile: task.targetFile,
                         feature: validation.feature,
                         iterations: attempt,
                     };
-                    emitResult(context.eventBus, agentId, tabId, result, taskId);
+                    emitResult(context.eventBus, agentId, tabId, result, taskId, context.parentAgentId);
                     return true;
                 }
 
                 feedback = validation.message || '';
-                emitProgress(context.eventBus, agentId, tabId, `[log] 验证失败：${feedback}（将重试）`, taskId);
+                emitProgress(context.eventBus, agentId, tabId, `[log] 验证失败：${feedback}（将重试）`, taskId, context.parentAgentId);
             }
 
             throw new Error('多次尝试后仍未通过验证');
@@ -80,7 +80,7 @@ export async function runBlueprintTask(
             const message = error instanceof Error ? error.message : String(error);
             const agentId = 'blueprint';
             const tabId = context.sourceTabId || 'Blueprint';
-            emitResult(context.eventBus, agentId, tabId, { error: message }, taskId);
+            emitResult(context.eventBus, agentId, tabId, { error: message }, taskId, context.parentAgentId);
             return false;
         }
     })();
