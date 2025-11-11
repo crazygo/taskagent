@@ -26,8 +26,8 @@ interface ValidationResult {
 
 export function defineRefineFeatureSpecWorkflow(): WorkflowToolDefinition {
     return {
-        name: 'refine_feature_spec_yaml',
-        description: '编辑并验证 docs/features/*.yaml，自动驱动 Writer 迭代直到通过校验。',
+        name: BLUEPRINT_AGENT_ID,
+        description: '整理需求并编辑 docs/features/*.yaml，自动驱动 Writer 迭代直到通过校验。',
         parameters: {
             task: z
                 .string()
@@ -47,7 +47,7 @@ export function defineRefineFeatureSpecWorkflow(): WorkflowToolDefinition {
                 };
             }
 
-            addLog(`[Blueprint Workflow] refine_feature_spec_yaml starting: ${task}`);
+            addLog(`[Blueprint Workflow] ${BLUEPRINT_AGENT_ID} tool starting: ${task}`);
             emitProgress(context.eventBus, BLUEPRINT_AGENT_ID, targetTabId, '[log] 任务已收到', undefined, context.parentAgentId);
 
             const taskHandle = launchBackgroundTask(

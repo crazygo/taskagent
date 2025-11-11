@@ -29,24 +29,32 @@ export async function createAgent(options?: { tabExecutor?: TabExecutor }): Prom
 
     const workflowToolset = createWorkflowToolset({
         agentId: WRITER_AGENT_ID,
-        serverName: 'writer-tools',
         sharedDependencies: {
             tabExecutor: options?.tabExecutor,
             defaultParentAgentId: WRITER_AGENT_ID,
         },
-        tools: [createRunWriterWorkflow()],
+        tool: defineWriterTool(),
     });
+
+    const resolveMcpTool = (ctx: { sourceTabId?: string; workspacePath?: string; parentAgentId?: string }) =>
+        workflowToolset.asMcpTool({
+            sourceTabId: ctx.sourceTabId,
+            workspacePath: ctx.workspacePath,
+            parentAgentId: ctx.parentAgentId ?? WRITER_AGENT_ID,
+        });
 
     const start = buildPromptAgentStart({
         getPrompt: (userInput: string, ctx: { sourceTabId: string; workspacePath?: string }) => getPrompt(userInput, ctx),
         getSystemPrompt,
         getAgentDefinitions,
-        getMcpServers: (ctx) =>
-            workflowToolset.asMcpServer({
+        getMcpTools: (ctx) => {
+            const tool = resolveMcpTool({
                 sourceTabId: ctx.sourceTabId,
                 workspacePath: ctx.workspacePath,
                 parentAgentId: ctx.rawContext?.parentAgentId ?? WRITER_AGENT_ID,
-            }),
+            });
+            return tool ? { [WRITER_AGENT_ID]: tool } : undefined;
+        },
     });
 
     return {
@@ -55,8 +63,8 @@ export async function createAgent(options?: { tabExecutor?: TabExecutor }): Prom
         getPrompt,
         getAgentDefinitions,
         getTools,
-        asMcpServer: (ctx) =>
-            workflowToolset.asMcpServer({
+        asMcpTool: (ctx) =>
+            resolveMcpTool({
                 sourceTabId: ctx.sourceTabId,
                 workspacePath: ctx.workspacePath,
                 parentAgentId: ctx.parentAgentId ?? WRITER_AGENT_ID,
@@ -65,10 +73,10 @@ export async function createAgent(options?: { tabExecutor?: TabExecutor }): Prom
     };
 }
 
-function createRunWriterWorkflow(): WorkflowToolDefinition {
+function defineWriterTool(): WorkflowToolDefinition {
     return {
-        name: 'WriterAgent',
-        description: '直接调用 Writer Agent 创建或编辑文件',
+        name: WRITER_AGENT_ID,
+        description: '调用 Writer Agent 创建或编辑文档（docs/features/*.yaml 等）',
         parameters: {
             task: z.string().min(1).describe('写作任务描述，包含目标文件和内容要求'),
         },
@@ -92,7 +100,7 @@ function createRunWriterWorkflow(): WorkflowToolDefinition {
                     'writer',
                     task,
                     {
-                        sourceTabId: context.sourceTabId ?? 'Desktop',
+                        sourceTabId: context.sourceTabId ?? 'Start',
                         workspacePath: context.workspacePath,
                         parentAgentId: context.parentAgentId ?? WRITER_AGENT_ID,
                     },

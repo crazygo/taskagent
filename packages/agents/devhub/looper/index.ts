@@ -8,13 +8,13 @@
  * - 支持命令：start, stop, status, add_pending
  */
 
-import type { RunnableAgent, AgentStartContext, AgentStartSinks, ExecutionHandle } from '../runtime/types.js';
+import type { RunnableAgent, AgentStartContext, AgentStartSinks, ExecutionHandle } from '../../runtime/types.js';
 import { parseCommand, type LooperCommand } from './command.js';
 import { createInitialState, LooperStatus, LooperSubStatus, type LooperState } from './state.js';
 import { createJudgeAgent, parseJudgeOutput } from './judge/index.js';
 import { EventCollector } from './event-collector.js';
-import { loadAgentPipelineConfig } from '../runtime/agentLoader.js';
-import { buildPromptAgentStart } from '../runtime/runPromptAgentStart.js';
+import { loadAgentPipelineConfig } from '../../runtime/agentLoader.js';
+import { buildPromptAgentStart } from '../../runtime/runPromptAgentStart.js';
 import { addLog } from '@taskagent/shared/logger';
 import { EventEmitter } from 'node:events';
 import path from 'node:path';
@@ -230,7 +230,7 @@ export class LooperGraphAgent implements RunnableAgent {
 
         try {
             // Get agent from registry
-            const { getGlobalAgentRegistry } = await import('../registry/index.js');
+            const { getGlobalAgentRegistry } = await import('../../registry/index.js');
             const registry = getGlobalAgentRegistry();
             const agentFactory = registry.getFactory(agentId);
 

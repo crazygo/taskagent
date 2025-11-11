@@ -39,26 +39,34 @@ export async function createAgent(options?: {
 
     const workflowToolset = createWorkflowToolset({
         agentId: BLUEPRINT_AGENT_ID,
-        serverName: 'blueprint-tools',
         sharedDependencies: {
             tabExecutor: options?.tabExecutor,
             agentRegistry: options?.agentRegistry,
             eventBus: options?.eventBus,
             defaultParentAgentId: BLUEPRINT_AGENT_ID,
         },
-        tools: [defineRefineFeatureSpecWorkflow()],
+        tool: defineRefineFeatureSpecWorkflow(),
     });
+
+    const resolveMcpTool = (ctx: { sourceTabId?: string; workspacePath?: string; parentAgentId?: string }) =>
+        workflowToolset.asMcpTool({
+            sourceTabId: ctx.sourceTabId,
+            workspacePath: ctx.workspacePath,
+            parentAgentId: ctx.parentAgentId ?? BLUEPRINT_AGENT_ID,
+        });
 
     const startPrompt = buildPromptAgentStart({
         getPrompt: (userInput: string, ctx: { sourceTabId: string; workspacePath?: string }) => getPrompt(userInput),
         getSystemPrompt,
         getAgentDefinitions,
-        getMcpServers: (ctx) =>
-            workflowToolset.asMcpServer({
+        getMcpTools: (ctx) => {
+            const tool = resolveMcpTool({
                 sourceTabId: ctx.sourceTabId,
                 workspacePath: ctx.workspacePath,
                 parentAgentId: ctx.rawContext?.parentAgentId ?? BLUEPRINT_AGENT_ID,
-            }),
+            });
+            return tool ? { [BLUEPRINT_AGENT_ID]: tool } : undefined;
+        },
     });
 
     return {
@@ -67,8 +75,8 @@ export async function createAgent(options?: {
         getPrompt,
         getAgentDefinitions,
         getTools,
-        asMcpServer: (ctx) =>
-            workflowToolset.asMcpServer({
+        asMcpTool: (ctx) =>
+            resolveMcpTool({
                 sourceTabId: ctx.sourceTabId,
                 workspacePath: ctx.workspacePath,
                 parentAgentId: ctx.parentAgentId ?? BLUEPRINT_AGENT_ID,

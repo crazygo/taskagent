@@ -1,48 +1,39 @@
 import { z } from 'zod';
 import { addLog } from '@taskagent/shared/logger';
-import type { WorkflowToolDefinition } from '../runtime/workflowTools.js';
+import type { WorkflowRuntimeContext, WorkflowToolDefinition } from '../runtime/workflowTools.js';
+import type { LooperCommand, LooperCommandType } from './looper/command.js';
 
-export function getDevHubWorkflowDefinitions(): WorkflowToolDefinition[] {
-    return [createRunDevHubWorkflow(), createDispatchToDevloopWorkflow()];
+const DEV_HUB_AGENT_ID = 'devhub';
+
+export interface DevLoopBridge {
+    startLoop: (task: string, context: WorkflowRuntimeContext) => Promise<{ message: string; isError?: boolean }>;
+    sendCommand: (command: LooperCommand, context: WorkflowRuntimeContext) => Promise<{ message: string; isError?: boolean }>;
 }
 
-function createRunDevHubWorkflow(): WorkflowToolDefinition {
+export function getDevHubToolDefinitions(looper: DevLoopBridge): WorkflowToolDefinition {
+    return createDevHubTool(looper);
+}
+
+export function getDevHubOperatorToolDefinitions(looper: DevLoopBridge): WorkflowToolDefinition {
+    return createDevHubCommandTool(looper);
+}
+
+function createDevHubTool(looper: DevLoopBridge): WorkflowToolDefinition {
     return {
-        name: 'run_devhub',
-        description: '启动 DevHub 开发枢纽，协调 Coder 和 Reviewer 的循环开发流程',
+        name: DEV_HUB_AGENT_ID,
+        description: '调用 DevHub Agent，协调 Coder / Reviewer 循环直至满足需求',
         parameters: {
             task: z.string().min(1).describe('开发任务描述'),
         },
         run: async (args, context) => {
             const task = typeof args.task === 'string' ? args.task : String(args.task ?? '');
 
-            if (!context.tabExecutor) {
-                const message = 'TabExecutor 未初始化，无法启动 DevHub';
-                addLog(`[DevHub Workflow] ${message}`);
-                return {
-                    content: [{ type: 'text', text: message }],
-                    isError: true,
-                };
-            }
-
             try {
-                addLog(`[DevHub Workflow] Starting DevHub task: ${task.substring(0, 100)}...`);
-
-                await context.tabExecutor.execute(
-                    'DevHub',
-                    'devhub',
-                    task,
-                    {
-                        sourceTabId: context.sourceTabId ?? 'Desktop',
-                        workspacePath: context.workspacePath,
-                        parentAgentId: context.parentAgentId ?? 'devhub',
-                    },
-                    { async: true }
-                );
-                addLog('[DevHub Workflow] DevHub task dispatched (async)');
-
+                addLog(`[DevHub Workflow] Dispatching DevLoop start: ${task.substring(0, 100)}...`);
+                const result = await looper.startLoop(task, context);
                 return {
-                    content: [{ type: 'text', text: '✅ DevHub 任务已启动，后台执行中...' }],
+                    content: [{ type: 'text', text: result.message }],
+                    isError: result.isError,
                 };
             } catch (error) {
                 const message = `启动 DevHub 失败: ${error instanceof Error ? error.message : String(error)}`;
@@ -56,11 +47,11 @@ function createRunDevHubWorkflow(): WorkflowToolDefinition {
     };
 }
 
-function createDispatchToDevloopWorkflow(): WorkflowToolDefinition {
+function createDevHubCommandTool(looper: DevLoopBridge): WorkflowToolDefinition {
     const commandSchema = z.enum(['start', 'stop', 'status', 'add_pending']);
 
     return {
-        name: 'dispatch_to_devloop',
+        name: 'devhub_command_tool',
         description: '向 Looper 循环引擎发送命令或任务',
         parameters: {
             command: commandSchema,
@@ -69,15 +60,6 @@ function createDispatchToDevloopWorkflow(): WorkflowToolDefinition {
         run: async (args, context) => {
             const command = typeof args.command === 'string' ? args.command : undefined;
             const task = typeof args.task === 'string' ? args.task : undefined;
-
-            if (!context.tabExecutor) {
-                const message = 'TabExecutor 未初始化，无法发送命令。';
-                addLog(`[DevHub Tool] ${message}`);
-                return {
-                    content: [{ type: 'text', text: message }],
-                    isError: true,
-                };
-            }
 
             if (!command) {
                 const message = '缺少必要的 command 参数。';
@@ -88,25 +70,17 @@ function createDispatchToDevloopWorkflow(): WorkflowToolDefinition {
                 };
             }
 
-            const payload: Record<string, string> = task ? { type: command, task } : { type: command };
+            const payload: LooperCommand = task
+                ? { type: command as LooperCommandType, task }
+                : { type: command as LooperCommandType };
 
             try {
-                addLog(`[DevHub Tool] Executing Looper command via TabExecutor: ${JSON.stringify(payload)}`);
-
-                await context.tabExecutor.execute(
-                    'Looper',
-                    'looper',
-                    JSON.stringify(payload),
-                    {
-                        sourceTabId: 'DevHub',
-                        workspacePath: context.workspacePath,
-                        parentAgentId: context.parentAgentId ?? 'devhub',
-                    }
-                );
-
-                const confirmation = `命令已发送给 Looper: ${command}\nLooper 将择机执行。`;
+                addLog(`[DevHub Tool] Sending Looper command: ${JSON.stringify(payload)}`);
+                const result = await looper.sendCommand(payload, context);
+                const confirmation = result.message || `命令已发送给 Looper: ${command}`;
                 return {
                     content: [{ type: 'text', text: confirmation }],
+                    isError: result.isError,
                 };
             } catch (error) {
                 const message = `发送命令失败: ${error instanceof Error ? error.message : String(error)}`;

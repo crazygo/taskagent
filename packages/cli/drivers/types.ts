@@ -19,7 +19,7 @@ export enum Driver {
 export const DRIVER_NAMES = [
     'chat',
     'agent',
-    'desktop',
+    'start',
     'glossary',
     'blueprint',
     'ui-review',

@@ -1,5 +1,5 @@
 /**
- * Desktop Agent - Unified interface for dispatching to atomic and composite agents
+ * Start Agent - Unified interface for dispatching to atomic and composite agents
  * 
  * Capabilities:
  * - Dialog with user
@@ -12,14 +12,14 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { buildPromptAgentStart } from '../runtime/runPromptAgentStart.js';
 import { loadAgentPipelineConfig } from '../runtime/agentLoader.js';
-import type { McpServerConfig } from '@anthropic-ai/claude-agent-sdk';
+import type { tool as createSdkTool } from '@anthropic-ai/claude-agent-sdk';
 import type { AgentContext, AgentStartContext, AgentStartSinks, ExecutionHandle, RunnableAgent } from '../runtime/types.js';
 import type { EventBus } from '@taskagent/core/event-bus';
 import { addLog } from '@taskagent/shared/logger';
 import type { AgentRegistry } from '../registry/AgentRegistry.js';
 
-const DESKTOP_AGENT_ID = 'desktop';
-const DESKTOP_DESCRIPTION = 'Desktop - Unified interface for dispatching tasks to atomic and composite agents';
+const START_AGENT_ID = 'start';
+const START_DESCRIPTION = 'Start - Unified interface for dispatching tasks to atomic and composite agents';
 
 export async function createAgent(options?: { 
   eventBus?: EventBus;
@@ -38,9 +38,9 @@ export async function createAgent(options?: {
         coordinatorFileName: 'coordinator.agent.md',
     });
 
-    addLog(`[Desktop] Loaded agent definitions: ${Object.keys(agentDefinitions || {})}`);
-    addLog(`[Desktop] System prompt length: ${systemPrompt?.length || 0}`);
-    addLog(`[Desktop] Allowed tools: ${allowedTools}`);
+    addLog(`[Start] Loaded agent definitions: ${Object.keys(agentDefinitions || {})}`);
+    addLog(`[Start] System prompt length: ${systemPrompt?.length || 0}`);
+    addLog(`[Start] Allowed tools: ${allowedTools}`);
 
     const getPrompt = (userInput: string) => userInput.trim();
     const getSystemPrompt = () => systemPrompt;
@@ -56,42 +56,49 @@ export async function createAgent(options?: {
             if (agent) {
                 childAgents.set(id, agent);
             } else {
-                addLog(`[Desktop] Warning: ${id} agent unavailable; corresponding workflow tools disabled.`);
+                addLog(`[Start] Warning: ${id} agent unavailable; corresponding workflow tools disabled.`);
             }
         }
     }
+
+    const buildChildToolMap = (ctx: { sourceTabId: string; workspacePath?: string; rawContext?: AgentStartContext }) => {
+        if (childAgents.size === 0) {
+            return undefined;
+        }
+
+        const tools: Record<string, ReturnType<typeof createSdkTool>> = {};
+        const parentAgentId = ctx.rawContext?.parentAgentId ?? START_AGENT_ID;
+
+        for (const [id, agent] of childAgents.entries()) {
+            if (!agent.asMcpTool) continue;
+            const childTool = agent.asMcpTool({
+                sourceTabId: ctx.sourceTabId,
+                workspacePath: ctx.workspacePath,
+                parentAgentId,
+            });
+            if (childTool) {
+                tools[id] = childTool;
+            }
+        }
+
+        return Object.keys(tools).length ? tools : undefined;
+    };
 
     const start = buildPromptAgentStart({
         getPrompt: (userInput: string, ctx: { sourceTabId: string; workspacePath?: string }) => getPrompt(userInput),
         getSystemPrompt,
         getAgentDefinitions,
-        getMcpServers: (ctx) => {
-            if (childAgents.size === 0) {
-                return undefined;
-            }
-
-            const servers: Record<string, McpServerConfig> = {};
-            const parentAgentId = ctx.rawContext?.parentAgentId ?? DESKTOP_AGENT_ID;
-
-            for (const agent of childAgents.values()) {
-                if (!agent.asMcpServer) continue;
-                const childServers = agent.asMcpServer({
-                    sourceTabId: ctx.sourceTabId,
-                    workspacePath: ctx.workspacePath,
-                    parentAgentId,
-                });
-                if (childServers) {
-                    Object.assign(servers, childServers);
-                }
-            }
-
-            return Object.keys(servers).length ? servers : undefined;
-        },
+        getMcpTools: (ctx) =>
+            buildChildToolMap({
+                sourceTabId: ctx.sourceTabId,
+                workspacePath: ctx.workspacePath,
+                rawContext: ctx.rawContext,
+            }),
     });
 
     return {
-        id: DESKTOP_AGENT_ID,
-        description: DESKTOP_DESCRIPTION,
+        id: START_AGENT_ID,
+        description: START_DESCRIPTION,
         getPrompt,
         getAgentDefinitions,
         getTools,
@@ -103,7 +110,7 @@ export async function createAgent(options?: {
             const markChildActive = (childAgentId?: string) => {
                 if (!childAgentId) return;
                 if (!activeChildAgents.has(childAgentId)) {
-                    addLog(`[Desktop] Child agent active: ${childAgentId}`);
+                    addLog(`[Start] Child agent active: ${childAgentId}`);
                 }
                 activeChildAgents.add(childAgentId);
                 cleanupDeferred = true;
@@ -112,7 +119,7 @@ export async function createAgent(options?: {
             const markChildInactive = (childAgentId?: string) => {
                 if (!childAgentId) return;
                 if (activeChildAgents.delete(childAgentId)) {
-                    addLog(`[Desktop] Child agent inactive: ${childAgentId}`);
+                    addLog(`[Start] Child agent inactive: ${childAgentId}`);
                     if (handleCompleted && activeChildAgents.size === 0) {
                         cleanupListeners();
                     }
@@ -124,7 +131,7 @@ export async function createAgent(options?: {
                 if (!listenersRegistered || !options?.eventBus) {
                     return;
                 }
-                addLog('[Desktop] Removing event listeners');
+                addLog('[Start] Removing event listeners');
                 options.eventBus.off('agent:text', agentTextHandler);
                 options.eventBus.off('agent:event', agentEventHandler);
                 options.eventBus.off('agent:completed', agentCompletedHandler);
@@ -140,10 +147,10 @@ export async function createAgent(options?: {
                     const parentAgentId = event?.parentAgentId;
                     const chunk = typeof event.payload === 'string' ? event.payload : '';
                     
-                    // Only mirror direct child agents (those calling Desktop as parent)
-                    if (parentAgentId !== 'desktop') return;
+                    // Only mirror direct child agents (those calling Start as parent)
+                    if (parentAgentId !== 'start') return;
 
-                    // Desktop does not surface Blueprint's or DevHub's self-dialogue; 
+                    // Start does not surface Blueprint's or DevHub's self-dialogue; 
                     // users can view those tabs directly. Skip mirroring assistant chunks.
                     // Milestone updates still emit via agentEventHandler for important progress.
                     if (childAgentId === 'blueprint' || childAgentId === 'devhub') return;
@@ -151,8 +158,8 @@ export async function createAgent(options?: {
                     if (!chunk) return;
 
                     // Direct write to MessageStore
-                    addLog(`[Desktop][agentTextHandler] mirroring child agent ${childAgentId} output, len=${chunk.length}`);
-                    options?.messageStore?.appendMessage('Desktop', {
+                    addLog(`[Start][agentTextHandler] mirroring child agent ${childAgentId} output, len=${chunk.length}`);
+                    options?.messageStore?.appendMessage('Start', {
                         id: options.messageStore.getNextMessageId(),
                         role: 'assistant',
                         content: `[${childAgentId}] ${chunk}`,
@@ -161,7 +168,7 @@ export async function createAgent(options?: {
                         timestamp: event.timestamp || Date.now(),
                     });
                 } catch (e) {
-                    addLog(`[Desktop] mirror handler error: ${e instanceof Error ? e.message : String(e)}`);
+                    addLog(`[Start] mirror handler error: ${e instanceof Error ? e.message : String(e)}`);
                 }
             };
 
@@ -172,17 +179,17 @@ export async function createAgent(options?: {
                     const payload = event?.payload;
                     
                     // Only handle events from direct child agents
-                    if (parentAgentId !== 'desktop') return;
+                    if (parentAgentId !== 'start') return;
                     if (payload && typeof payload === 'object' && (payload.kind === 'task:progress' || payload.kind === 'task:result')) {
-                        // Progress/result events are handled by AgentBridge to keep Desktop view consistent
+                        // Progress/result events are handled by AgentBridge to keep Start view consistent
                         return;
                     }
                     markChildActive(childAgentId);
                     
                     // Mirror progress messages
                     if (payload?.message) {
-                        addLog(`[Desktop][agentEventHandler] mirroring event from ${childAgentId}: ${payload.message}`);
-                        options?.messageStore?.appendMessage('Desktop', {
+                        addLog(`[Start][agentEventHandler] mirroring event from ${childAgentId}: ${payload.message}`);
+                        options?.messageStore?.appendMessage('Start', {
                             id: options.messageStore.getNextMessageId(),
                             role: 'assistant',
                             content: `[${childAgentId}] ${payload.message}`,
@@ -192,7 +199,7 @@ export async function createAgent(options?: {
                         });
                     }
                 } catch (e) {
-                    addLog(`[Desktop] agent:event handler error: ${e instanceof Error ? e.message : String(e)}`);
+                    addLog(`[Start] agent:event handler error: ${e instanceof Error ? e.message : String(e)}`);
                 }
             };
 
@@ -201,17 +208,17 @@ export async function createAgent(options?: {
                     const childAgentId = event?.agentId;
                     const parentAgentId = event?.parentAgentId;
                     
-                    if (parentAgentId !== 'desktop') return;
-                    addLog(`[Desktop] Child agent completed: ${childAgentId}`);
+                    if (parentAgentId !== 'start') return;
+                    addLog(`[Start] Child agent completed: ${childAgentId}`);
                     markChildInactive(childAgentId);
                 } catch (e) {
-                    addLog(`[Desktop] agent:completed handler error: ${e instanceof Error ? e.message : String(e)}`);
+                    addLog(`[Start] agent:completed handler error: ${e instanceof Error ? e.message : String(e)}`);
                 }
             };
 
             // Register event listeners
             if (options?.eventBus && options?.messageStore) {
-                addLog('[Desktop] Registering event listeners for this execution');
+                addLog('[Start] Registering event listeners for this execution');
                 options.eventBus.on('agent:text', agentTextHandler);
                 options.eventBus.on('agent:event', agentEventHandler);
                 options.eventBus.on('agent:completed', agentCompletedHandler);
@@ -234,7 +241,7 @@ export async function createAgent(options?: {
                     if (!cleanupDeferred || activeChildAgents.size === 0) {
                         cleanupListeners();
                     } else {
-                        addLog('[Desktop] Deferring listener cleanup until child agents finish');
+                        addLog('[Start] Deferring listener cleanup until child agents finish');
                     }
                 });
             }

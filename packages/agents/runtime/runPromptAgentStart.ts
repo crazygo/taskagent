@@ -2,8 +2,11 @@ import crypto from 'crypto';
 import { inspect } from 'util';
 import { addLog } from '@taskagent/shared/logger';
 import { runClaudeStream } from './runClaudeStream.js';
-import type { AgentDefinition, McpServerConfig } from '@anthropic-ai/claude-agent-sdk';
+import { createSdkMcpServer } from '@anthropic-ai/claude-agent-sdk';
+import type { AgentDefinition, McpServerConfig, tool as createSdkTool } from '@anthropic-ai/claude-agent-sdk';
 import type { AgentStartContext, AgentStartSinks, ExecutionHandle } from '../types.js';
+
+type McpTool = ReturnType<typeof createSdkTool>;
 
 /**
  * Build a default start() implementation for PromptAgent-style objects.
@@ -17,7 +20,7 @@ export function buildPromptAgentStart(
     getAgentDefinitions?: () => Record<string, AgentDefinition> | undefined;
     getModel?: () => string | undefined;
     parseOutput?: (rawChunk: string) => { level: 'info'|'warning'|'error'; message: string; ts: number }[];
-    getMcpServers?: (ctx: { sourceTabId: string; workspacePath?: string; session: { id: string; initialized: boolean }; rawContext: AgentStartContext }) => Record<string, McpServerConfig> | undefined;
+    getMcpTools?: (ctx: { sourceTabId: string; workspacePath?: string; session: { id: string; initialized: boolean }; rawContext: AgentStartContext }) => Record<string, McpTool> | undefined;
   }
 ): (userInput: string, context: AgentStartContext, sinks: AgentStartSinks) => ExecutionHandle {
   return (userInput: string, context: AgentStartContext, sinks: AgentStartSinks): ExecutionHandle => {
@@ -42,13 +45,14 @@ export function buildPromptAgentStart(
       (options as any).forkSession = true;
     }
 
-    const mcpServers = adapter.getMcpServers?.({
+    const mcpTools = adapter.getMcpTools?.({
       sourceTabId: context.sourceTabId,
       workspacePath: context.workspacePath,
       session,
       rawContext: context,
     });
-    if (mcpServers && Object.keys(mcpServers).length > 0) {
+    const mcpServers = convertToolsToServers(mcpTools);
+    if (mcpServers) {
       (options as any).mcpServers = mcpServers;
     }
 
@@ -147,4 +151,29 @@ export function buildPromptAgentStart(
       completion,
     };
   };
+}
+
+function convertToolsToServers(tools?: Record<string, McpTool>): Record<string, McpServerConfig> | undefined {
+  if (!tools) {
+    return undefined;
+  }
+
+  const entries = Object.entries(tools);
+  if (entries.length === 0) {
+    return undefined;
+  }
+
+  const servers: Record<string, McpServerConfig> = {};
+  for (const [name, toolDefinition] of entries) {
+    if (!toolDefinition) {
+      continue;
+    }
+    const server = createSdkMcpServer({
+      name,
+      tools: [toolDefinition],
+    });
+    servers[name] = server as McpServerConfig;
+  }
+
+  return Object.keys(servers).length ? servers : undefined;
 }

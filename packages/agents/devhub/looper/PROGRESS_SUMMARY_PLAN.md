@@ -154,7 +154,7 @@ class EventCollector {
 
 #### 2. SummarizerAgent (PromptAgent)
 
-**Definition**: `packages/agents/looper/summarizer/summarizer.agent.md`
+**Definition**: `packages/agents/devhub/looper/summarizer/summarizer.agent.md`
 
 **Prompt**:
 ```
@@ -379,7 +379,7 @@ await this.generateFinalSummary(agentName);
 
 ## References
 
-- Looper architecture: `packages/agents/looper/index.ts`
+- Looper architecture: `packages/agents/devhub/looper/index.ts`
 - TaskManager events: `packages/shared/task-manager.ts`
 - Agent hierarchy: `AGENTS.md` → "How to Work with Humans"
 - DevHub mirroring: `packages/agents/devhub/index.ts` (line 44-69)

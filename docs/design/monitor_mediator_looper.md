@@ -277,10 +277,10 @@ Looper.start() 解析为 { type: 'start', task: '优化登录页面' }
 ### 影响范围
 
 **新增文件**：
-- `packages/agents/looper/index.ts` - LooperGraphAgent 类
-- `packages/agents/looper/state.ts` - 状态机定义
-- `packages/agents/looper/command.ts` - 命令解析
-- `packages/agents/looper/judge/` - JUDGE Agent（PromptAgent）
+- `packages/agents/devhub/looper/index.ts` - LooperGraphAgent 类
+- `packages/agents/devhub/looper/state.ts` - 状态机定义
+- `packages/agents/devhub/looper/command.ts` - 命令解析
+- `packages/agents/devhub/looper/judge/` - JUDGE Agent（PromptAgent）
   - `judge.agent.md` - JUDGE System Prompt
   - `index.ts` - JUDGE Agent 实现
   - `schema.ts` - 结构化输出 Schema
@@ -403,7 +403,7 @@ type JudgeDecision =
 
 **在 Looper 中调用 JUDGE**：
 ```typescript
-// packages/agents/looper/index.ts
+// packages/agents/devhub/looper/index.ts
 import { createJudgeAgent } from './judge/index.js';
 
 class LooperGraphAgent {
@@ -446,9 +446,9 @@ class LooperGraphAgent {
 ### 影响范围
 
 **新增文件**：
-- `packages/agents/looper/judge/judge.agent.md` - System Prompt
-- `packages/agents/looper/judge/index.ts` - JUDGE Agent 实现
-- `packages/agents/looper/judge/schema.ts` - JudgeDecision 类型定义
+- `packages/agents/devhub/looper/judge/judge.agent.md` - System Prompt
+- `packages/agents/devhub/looper/judge/index.ts` - JUDGE Agent 实现
+- `packages/agents/devhub/looper/judge/schema.ts` - JudgeDecision 类型定义
 
 **依赖**：
 - 复用 `buildPromptAgentStart` 工厂函数
@@ -901,7 +901,7 @@ yarn start -- --workspace $TEST_WORKSPACE --devhub
 
 #### Looper 状态机测试
 ```bash
-# packages/agents/looper/state.test.ts
+# packages/agents/devhub/looper/state.test.ts
 - 测试 IDLE → RUNNING 转换
 - 测试候补队列 push/pop
 - 测试终止条件判断
@@ -909,13 +909,13 @@ yarn start -- --workspace $TEST_WORKSPACE --devhub
 
 #### 命令解析测试
 ```bash
-# packages/agents/looper/command.test.ts
+# packages/agents/devhub/looper/command.test.ts
 - parseCommand('{"type":"start","task":"xxx"}')
 ```
 
 #### JUDGE 节点测试
 ```bash
-# packages/agents/looper/judge/judge.test.ts
+# packages/agents/devhub/looper/judge/judge.test.ts
 - 输入组装格式验证
 - Prompt 构建验证
 - 结构化输出解析（continue vs terminate）
@@ -990,7 +990,7 @@ eventBus.on('message:added', (event) => {
 | TaskManager | `packages/shared/task-manager.ts` |
 | AgentRegistry | `packages/agents/registry/registerAgents.ts` |
 | DevHub Agent | `packages/agents/devhub/` |
-| Looper Agent | `packages/agents/looper/` |
+| Looper Agent | `packages/agents/devhub/looper/` |
 | Coder Agent | `packages/agents/coder/` |
 | Review Agent | `packages/agents/review/` |
 
@@ -1021,7 +1021,7 @@ eventBus.on('message:added', (event) => {
 **目标**: 完成 Looper 状态机、循环逻辑、JUDGE 节点
 
 **任务列表**:
-- [ ] 实现 LooperGraphAgent 类（packages/agents/looper/index.ts）
+- [ ] 实现 LooperGraphAgent 类（packages/agents/devhub/looper/index.ts）
 - [ ] 实现状态机管理（state.ts）
 - [ ] 实现命令解析器（command.ts）
 - [ ] 实现 JUDGE Agent（judge/ 目录）

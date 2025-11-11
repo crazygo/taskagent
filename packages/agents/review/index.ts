@@ -29,24 +29,32 @@ export async function createAgent(options?: { tabExecutor?: TabExecutor }): Prom
 
     const workflowToolset = createWorkflowToolset({
         agentId: REVIEW_AGENT_ID,
-        serverName: 'review-tools',
         sharedDependencies: {
             tabExecutor: options?.tabExecutor,
             defaultParentAgentId: REVIEW_AGENT_ID,
         },
-        tools: [createRunReviewerWorkflow()],
+        tool: defineReviewerTool(),
     });
+
+    const resolveMcpTool = (ctx: { sourceTabId?: string; workspacePath?: string; parentAgentId?: string }) =>
+        workflowToolset.asMcpTool({
+            sourceTabId: ctx.sourceTabId,
+            workspacePath: ctx.workspacePath,
+            parentAgentId: ctx.parentAgentId ?? REVIEW_AGENT_ID,
+        });
 
     const start = buildPromptAgentStart({
         getPrompt: (userInput: string, ctx: { sourceTabId: string; workspacePath?: string }) => getPrompt(userInput, ctx),
         getSystemPrompt,
         getAgentDefinitions,
-        getMcpServers: (ctx) =>
-            workflowToolset.asMcpServer({
+        getMcpTools: (ctx) => {
+            const tool = resolveMcpTool({
                 sourceTabId: ctx.sourceTabId,
                 workspacePath: ctx.workspacePath,
                 parentAgentId: ctx.rawContext?.parentAgentId ?? REVIEW_AGENT_ID,
-            }),
+            });
+            return tool ? { [REVIEW_AGENT_ID]: tool } : undefined;
+        },
     });
 
     return {
@@ -55,8 +63,8 @@ export async function createAgent(options?: { tabExecutor?: TabExecutor }): Prom
         getPrompt,
         getAgentDefinitions,
         getTools,
-        asMcpServer: (ctx) =>
-            workflowToolset.asMcpServer({
+        asMcpTool: (ctx) =>
+            resolveMcpTool({
                 sourceTabId: ctx.sourceTabId,
                 workspacePath: ctx.workspacePath,
                 parentAgentId: ctx.parentAgentId ?? REVIEW_AGENT_ID,
@@ -65,10 +73,10 @@ export async function createAgent(options?: { tabExecutor?: TabExecutor }): Prom
     };
 }
 
-function createRunReviewerWorkflow(): WorkflowToolDefinition {
+function defineReviewerTool(): WorkflowToolDefinition {
     return {
-        name: 'ReviewAgent',
-        description: '调用 Reviewer Agent 进行代码审查',
+        name: REVIEW_AGENT_ID,
+        description: '调用 Reviewer Agent 进行代码审查与反馈',
         parameters: {
             task: z.string().min(1).describe('审查任务描述'),
         },
@@ -92,7 +100,7 @@ function createRunReviewerWorkflow(): WorkflowToolDefinition {
                     'review',
                     task,
                     {
-                        sourceTabId: context.sourceTabId ?? 'Desktop',
+                        sourceTabId: context.sourceTabId ?? 'Start',
                         workspacePath: context.workspacePath,
                         parentAgentId: context.parentAgentId ?? REVIEW_AGENT_ID,
                     },

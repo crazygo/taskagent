@@ -6,7 +6,7 @@
  */
 
 import { globalAgentRegistry } from './AgentRegistry.js';
-import { createAgent as createDesktopAgent } from '../desktop/index.js';
+import { createAgent as createStartAgent } from '../desktop/index.js';
 import { createAgent as createBlueprintAgent } from '../blueprint/index.js';
 import { createAgent as createWriterAgent } from '../writer/index.js';
 import { createAgent as createGlossaryAgent } from '../glossary/index.js';
@@ -28,16 +28,16 @@ export function registerAllAgents(options?: { eventBus?: any; tabExecutor?: any;
         tags: ['default', 'passthrough'],
     });
 
-    // Desktop Agent
+    // Start Agent
     globalAgentRegistry.register({
-        id: 'desktop',
-        factory: () => createDesktopAgent({
+        id: 'start',
+        factory: () => createStartAgent({
             eventBus: options?.eventBus,
             tabExecutor: options?.tabExecutor,
             messageStore: options?.messageStore,
             agentRegistry: globalAgentRegistry,
         }),
-        description: 'Desktop - Unified interface for dispatching tasks to agents',
+        description: 'Start - Unified interface for dispatching tasks to agents',
         tags: ['coordination', 'orchestration'],
     });
 
@@ -106,7 +106,8 @@ export function registerAllAgents(options?: { eventBus?: any; tabExecutor?: any;
         factory: () => createDevHubAgent({ 
             eventBus: options?.eventBus, 
             tabExecutor: options?.tabExecutor,
-            messageStore: options?.messageStore
+            messageStore: options?.messageStore,
+            taskManager: options?.taskManager,
         }),
         description: 'DevHub Agent - 开发枢纽，协调开发与审查流程',
         tags: ['coordination', 'development', 'monitor'],

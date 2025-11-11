@@ -14,7 +14,7 @@
 
 ### 文件清单
 ```
-packages/agents/looper/
+packages/agents/devhub/looper/
 ├── index.ts (326行) - Looper GraphAgent 主逻辑
 ├── state.ts (48行) - 状态机定义
 ├── command.ts (46行) - 命令解析器

@@ -764,5 +764,5 @@ async executeNode(node: WorkflowNode, state: State): Promise<State> {
 - [AWS Step Functions ASL 规范](https://states-language.net/spec.html)
 - TaskAgent 现有实现：
   - `packages/agents/story/features-editor.ts` - 三段式流水线
-  - `packages/agents/looper/index.ts` - 硬编码循环
+  - `packages/agents/devhub/looper/index.ts` - 硬编码循环
   - `packages/execution/TabExecutor.ts` - 后台任务执行

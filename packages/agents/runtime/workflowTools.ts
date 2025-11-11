@@ -1,5 +1,4 @@
-import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk';
-import type { McpServerConfig } from '@anthropic-ai/claude-agent-sdk';
+import { tool } from '@anthropic-ai/claude-agent-sdk';
 import type { TabExecutor } from '../../execution/TabExecutor.js';
 import type { AgentRegistry } from '../registry/AgentRegistry.js';
 import type { EventBus } from '@taskagent/core/event-bus';
@@ -31,9 +30,8 @@ export interface WorkflowToolDefinition<TSchema extends Record<string, ZodTypeAn
 
 export interface WorkflowToolsetOptions {
     agentId: string;
-    serverName?: string;
     sharedDependencies: WorkflowSharedDependencies;
-    tools: WorkflowToolDefinition[];
+    tool: WorkflowToolDefinition;
 }
 
 export interface WorkflowServerRequestContext {
@@ -43,11 +41,7 @@ export interface WorkflowServerRequestContext {
 }
 
 export function createWorkflowToolset(options: WorkflowToolsetOptions) {
-    const serverName = options.serverName ?? `${options.agentId}-workflows`;
-
-    const asMcpServer = (
-        runtimeCtx: WorkflowServerRequestContext
-    ): Record<string, McpServerConfig> | undefined => {
+    const asMcpTool = (runtimeCtx: WorkflowServerRequestContext) => {
         const baseContext: WorkflowRuntimeContext = {
             agentId: options.agentId,
             tabExecutor: options.sharedDependencies.tabExecutor,
@@ -58,17 +52,12 @@ export function createWorkflowToolset(options: WorkflowToolsetOptions) {
             parentAgentId: runtimeCtx.parentAgentId ?? options.sharedDependencies.defaultParentAgentId,
         };
 
-        const server = createSdkMcpServer({
-            name: serverName,
-            tools: options.tools.map((definition) =>
-                tool(definition.name, definition.description, definition.parameters, async (args) => {
-                    return definition.run(args, baseContext);
-                })
-            ),
-        });
+        const definition = options.tool;
 
-        return { [serverName]: server as McpServerConfig };
+        return tool(definition.name, definition.description, definition.parameters, async (args) => {
+            return definition.run(args, baseContext);
+        });
     };
 
-    return { asMcpServer };
+    return { asMcpTool };
 }

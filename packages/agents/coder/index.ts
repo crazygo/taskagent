@@ -29,24 +29,32 @@ export async function createAgent(options?: { tabExecutor?: TabExecutor }): Prom
 
     const workflowToolset = createWorkflowToolset({
         agentId: CODER_AGENT_ID,
-        serverName: 'coder-tools',
         sharedDependencies: {
             tabExecutor: options?.tabExecutor,
             defaultParentAgentId: CODER_AGENT_ID,
         },
-        tools: [createRunCoderWorkflow()],
+        tool: defineCoderTool(),
     });
+
+    const resolveMcpTool = (ctx: { sourceTabId?: string; workspacePath?: string; parentAgentId?: string }) =>
+        workflowToolset.asMcpTool({
+            sourceTabId: ctx.sourceTabId,
+            workspacePath: ctx.workspacePath,
+            parentAgentId: ctx.parentAgentId ?? CODER_AGENT_ID,
+        });
 
     const start = buildPromptAgentStart({
         getPrompt: (userInput: string, ctx: { sourceTabId: string; workspacePath?: string }) => getPrompt(userInput, ctx),
         getSystemPrompt,
         getAgentDefinitions,
-        getMcpServers: (ctx) =>
-            workflowToolset.asMcpServer({
+        getMcpTools: (ctx) => {
+            const tool = resolveMcpTool({
                 sourceTabId: ctx.sourceTabId,
                 workspacePath: ctx.workspacePath,
                 parentAgentId: ctx.rawContext?.parentAgentId ?? CODER_AGENT_ID,
-            }),
+            });
+            return tool ? { [CODER_AGENT_ID]: tool } : undefined;
+        },
     });
 
     return {
@@ -55,8 +63,8 @@ export async function createAgent(options?: { tabExecutor?: TabExecutor }): Prom
         getPrompt,
         getAgentDefinitions,
         getTools,
-        asMcpServer: (ctx) =>
-            workflowToolset.asMcpServer({
+        asMcpTool: (ctx) =>
+            resolveMcpTool({
                 sourceTabId: ctx.sourceTabId,
                 workspacePath: ctx.workspacePath,
                 parentAgentId: ctx.parentAgentId ?? CODER_AGENT_ID,
@@ -65,10 +73,10 @@ export async function createAgent(options?: { tabExecutor?: TabExecutor }): Prom
     };
 }
 
-function createRunCoderWorkflow(): WorkflowToolDefinition {
+function defineCoderTool(): WorkflowToolDefinition {
     return {
-        name: 'CoderAgent',
-        description: '调用 Coder Agent 实现代码功能',
+        name: CODER_AGENT_ID,
+        description: '调用 Coder Agent 实现/修改代码并自测',
         parameters: {
             task: z.string().min(1).describe('编码任务描述'),
         },
@@ -92,7 +100,7 @@ function createRunCoderWorkflow(): WorkflowToolDefinition {
                     'coder',
                     task,
                     {
-                        sourceTabId: context.sourceTabId ?? 'Desktop',
+                        sourceTabId: context.sourceTabId ?? 'Start',
                         workspacePath: context.workspacePath,
                         parentAgentId: context.parentAgentId ?? CODER_AGENT_ID,
                     },
