@@ -6,11 +6,9 @@ import { addLog } from '@taskagent/shared/logger';
 import { emitProgress, emitResult, runAgent } from '../runtime/async-task/helpers.js';
 import type { WorkflowToolDefinition } from '../runtime/workflowTools.js';
 import type { AsyncTaskContext } from '../runtime/async-task/types.js';
-import { launchBackgroundTask } from './backgroundTask.js';
 
 const BLUEPRINT_AGENT_ID = 'blueprint';
 const MAX_WRITER_ATTEMPTS = 3;
-
 
 interface WriterTask {
     targetFile: string;
@@ -24,7 +22,7 @@ interface ValidationResult {
     feature?: string;
 }
 
-export function defineRefineFeatureSpecWorkflow(): WorkflowToolDefinition {
+export function defineBlueprintTool(): WorkflowToolDefinition {
     return {
         name: BLUEPRINT_AGENT_ID,
         description: '整理需求并编辑 docs/features/*.yaml，自动驱动 Writer 迭代直到通过校验。',
@@ -50,24 +48,20 @@ export function defineRefineFeatureSpecWorkflow(): WorkflowToolDefinition {
             addLog(`[Blueprint Workflow] ${BLUEPRINT_AGENT_ID} tool starting: ${task}`);
             emitProgress(context.eventBus, BLUEPRINT_AGENT_ID, targetTabId, '[log] 任务已收到', undefined, context.parentAgentId);
 
-            const taskHandle = launchBackgroundTask(
-                task,
-                {
-                    agentRegistry: context.agentRegistry,
-                    eventBus: context.eventBus,
-                    tabExecutor: context.tabExecutor,
-                    workspacePath: context.workspacePath,
-                    sourceTabId: targetTabId,
-                    parentAgentId: context.parentAgentId ?? BLUEPRINT_AGENT_ID,
-                },
-                async ({ input, context: taskContext, taskId, isCancelled }) => {
-                    await executeRefineFeatureSpecPipeline(input, taskContext, taskId, isCancelled);
-                }
-            );
+            const flowContext: AsyncTaskContext = {
+                agentRegistry: context.agentRegistry,
+                eventBus: context.eventBus,
+                tabExecutor: context.tabExecutor,
+                workspacePath: context.workspacePath,
+                sourceTabId: targetTabId,
+                parentAgentId: context.parentAgentId ?? BLUEPRINT_AGENT_ID,
+            };
 
-            void taskHandle.completion.catch(error => {
-                const message = `[log]  workflow 后台执行失败: ${error instanceof Error ? error.message : String(error)}`;
+            const taskId = `blueprint-task-${Date.now()}`;
+            void runEditValidateFlow(task, flowContext, taskId).catch((error) => {
+                const message = `[log] workflow 后台执行失败: ${error instanceof Error ? error.message : String(error)}`;
                 addLog(`[Blueprint Workflow] ${message}`);
+                emitResult(flowContext.eventBus, BLUEPRINT_AGENT_ID, flowContext.sourceTabId || 'Blueprint', { error: message }, taskId, flowContext.parentAgentId);
             });
 
             return {
@@ -77,11 +71,11 @@ export function defineRefineFeatureSpecWorkflow(): WorkflowToolDefinition {
     };
 }
 
-async function executeRefineFeatureSpecPipeline(
+async function runEditValidateFlow(
     input: string,
     context: AsyncTaskContext,
     taskId: string,
-    isCancelled: () => boolean
+    isCancelled: () => boolean = () => false
 ) {
     if (!context.workspacePath) {
         throw new Error('Blueprint task requires workspacePath');
@@ -93,8 +87,10 @@ async function executeRefineFeatureSpecPipeline(
     emitProgress(context.eventBus, BLUEPRINT_AGENT_ID, tabId, `[log] 目标文件: ${task.targetFile}`, taskId, context.parentAgentId);
 
     let feedback: string | null = null;
+    let attempt = 0;
 
-    for (let attempt = 1; attempt <= MAX_WRITER_ATTEMPTS; attempt++) {
+    while (attempt < MAX_WRITER_ATTEMPTS) {
+        attempt++;
         if (isCancelled()) {
             throw new Error('Task cancelled');
         }
@@ -110,20 +106,32 @@ async function executeRefineFeatureSpecPipeline(
         emitProgress(context.eventBus, BLUEPRINT_AGENT_ID, tabId, '[log] 正在验证 YAML 完整性…', taskId, context.parentAgentId);
 
         const validation = await validateYaml(context.workspacePath, task.targetFile);
-
         if (validation.ok) {
             emitProgress(context.eventBus, BLUEPRINT_AGENT_ID, tabId, '[log] 验证通过，Blueprint 生成完成。', taskId, context.parentAgentId);
-            const result = {
-                targetFile: task.targetFile,
-                feature: validation.feature,
-                iterations: attempt,
-            };
-            emitResult(context.eventBus, BLUEPRINT_AGENT_ID, tabId, result, taskId, context.parentAgentId);
+            emitResult(
+                context.eventBus,
+                BLUEPRINT_AGENT_ID,
+                tabId,
+                {
+                    targetFile: task.targetFile,
+                    feature: validation.feature,
+                    iterations: attempt,
+                },
+                taskId,
+                context.parentAgentId
+            );
             return;
         }
 
         feedback = validation.message || '';
-        emitProgress(context.eventBus, BLUEPRINT_AGENT_ID, tabId, `[log] 验证失败：${feedback}（将重试）`, taskId, context.parentAgentId);
+        emitProgress(
+            context.eventBus,
+            BLUEPRINT_AGENT_ID,
+            tabId,
+            `[log] 验证失败：${feedback}（将重试）`,
+            taskId,
+            context.parentAgentId
+        );
     }
 
     throw new Error('多次尝试后仍未通过验证');
@@ -167,13 +175,15 @@ function extractFeatureName(raw: string): string | undefined {
 }
 
 function slugify(value: string): string {
-    return value
-        .toLowerCase()
-        .replace(/[^a-z0-9\s\-]/g, '')
-        .trim()
-        .replace(/\s+/g, '-')
-        .replace(/-+/g, '-')
-        .replace(/^-+|-+$/g, '') || 'feature';
+    return (
+        value
+            .toLowerCase()
+            .replace(/[^a-z0-9\s\-]/g, '')
+            .trim()
+            .replace(/\s+/g, '-')
+            .replace(/-+/g, '-')
+            .replace(/^-+|-+$/g, '') || 'feature'
+    );
 }
 
 function buildWriterPrompt(task: WriterTask, feedback?: string | null): string {
@@ -198,67 +208,29 @@ function buildWriterPrompt(task: WriterTask, feedback?: string | null): string {
 
 async function validateYaml(workspacePath: string, targetFile: string): Promise<ValidationResult> {
     const absPath = path.resolve(workspacePath, targetFile);
-    const content = await fs.readFile(absPath, 'utf-8');
-    const parsed = yaml.load(content);
+    let content: string;
 
-    if (!parsed || typeof parsed !== 'object') {
-        return { ok: false, message: 'YAML 顶层必须是对象结构。' };
+    try {
+        content = await fs.readFile(absPath, 'utf-8');
+    } catch (error) {
+        return {
+            ok: false,
+            message: `读取 ${targetFile} 失败：${error instanceof Error ? error.message : String(error)}`,
+        };
     }
 
-    const data = parsed as Record<string, unknown>;
-    const issues: string[] = [];
+    try {
+        const data = yaml.load(content);
+        const feature = typeof data === 'object' && data !== null && 'feature' in data ? (data as any).feature : undefined;
 
-    if (typeof data.feature !== 'string' || data.feature.trim().length === 0) {
-        issues.push('缺少 `feature` 字段或内容为空。');
+        return {
+            ok: true,
+            feature: typeof feature === 'string' ? feature : undefined,
+        };
+    } catch (error) {
+        return {
+            ok: false,
+            message: `解析 YAML 失败：${error instanceof Error ? error.message : String(error)}`,
+        };
     }
-    if (typeof data.description !== 'string' || data.description.trim().length === 0) {
-        issues.push('缺少 `description` 字段或内容为空。');
-    }
-
-    if (!Array.isArray(data.scenarios) || data.scenarios.length === 0) {
-        issues.push('`scenarios` 必须是非空数组。');
-    } else {
-        (data.scenarios as unknown[]).forEach((scenarioRaw, index) => {
-            if (!scenarioRaw || typeof scenarioRaw !== 'object') {
-                issues.push(`场景 #${index + 1} 不是对象。`);
-                return;
-            }
-            const scenario = scenarioRaw as Record<string, unknown>;
-            if (typeof scenario.scenario !== 'string' || scenario.scenario.trim().length === 0) {
-                issues.push(`场景 #${index + 1} 缺少 scenario 标题。`);
-            }
-            ['given', 'when', 'then'].forEach(key => {
-                const value = scenario[key];
-                if (value == null) {
-                    issues.push(`场景 #${index + 1} 缺少 ${key}。`);
-                    return;
-                }
-                if (typeof value === 'string') {
-                    if (!value.trim()) {
-                        issues.push(`场景 #${index + 1} 的 ${key} 为空。`);
-                    }
-                } else if (Array.isArray(value)) {
-                    if (value.length === 0) {
-                        issues.push(`场景 #${index + 1} 的 ${key} 为空数组。`);
-                    }
-                    value.forEach((entry, entryIndex) => {
-                        if (typeof entry !== 'string' || !entry.trim()) {
-                            issues.push(`场景 #${index + 1} 的 ${key}[${entryIndex}] 不是非空字符串。`);
-                        }
-                    });
-                } else {
-                    issues.push(`场景 #${index + 1} 的 ${key} 必须是字符串或字符串数组。`);
-                }
-            });
-        });
-    }
-
-    if (issues.length > 0) {
-        return { ok: false, message: issues.join('\n') };
-    }
-
-    return {
-        ok: true,
-        feature: typeof data.feature === 'string' ? data.feature : undefined,
-    };
 }

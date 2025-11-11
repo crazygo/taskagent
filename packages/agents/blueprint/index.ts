@@ -11,7 +11,7 @@ import type {
 } from '../runtime/types.js';
 import type { EventBus } from '@taskagent/core/event-bus';
 import { createWorkflowToolset } from '../runtime/workflowTools.js';
-import { defineRefineFeatureSpecWorkflow } from './workflows.js';
+import { defineBlueprintTool } from './workflows.js';
 
 const BLUEPRINT_AGENT_ID = 'blueprint';
 const BLUEPRINT_DESCRIPTION = 'Blueprint coordinator agent (dialog + workflow orchestration)';
@@ -45,7 +45,7 @@ export async function createAgent(options?: {
             eventBus: options?.eventBus,
             defaultParentAgentId: BLUEPRINT_AGENT_ID,
         },
-        tool: defineRefineFeatureSpecWorkflow(),
+        tool: defineBlueprintTool(),
     });
 
     const resolveMcpTool = (ctx: { sourceTabId?: string; workspacePath?: string; parentAgentId?: string }) =>
