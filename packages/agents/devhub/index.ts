@@ -13,7 +13,8 @@ import { buildPromptAgentStart } from '../runtime/runPromptAgentStart.js';
 import { loadAgentPipelineConfig } from '../runtime/agentLoader.js';
 import type { AgentContext, AgentStartContext, AgentStartSinks, ExecutionHandle, RunnableAgent } from '../runtime/types.js';
 import type { EventBus } from '@taskagent/core/event-bus';
-import { createDevHubMcpServer } from './tools.js';
+import { createWorkflowToolset } from '../runtime/workflowTools.js';
+import { getDevHubWorkflowDefinitions } from './workflows.js';
 import { addLog } from '@taskagent/shared/logger';
 
 const DEV_HUB_AGENT_ID = 'devhub';
@@ -47,22 +48,26 @@ export async function createAgent(options?: {
     const getAgentDefinitions = () => agentDefinitions;
     const getTools = () => allowedTools ?? [];
 
+    const workflowToolset = createWorkflowToolset({
+        agentId: DEV_HUB_AGENT_ID,
+        serverName: 'devhub-tools',
+        sharedDependencies: {
+            tabExecutor: options?.tabExecutor,
+            defaultParentAgentId: DEV_HUB_AGENT_ID,
+        },
+        tools: getDevHubWorkflowDefinitions(),
+    });
+
     const start = buildPromptAgentStart({
         getPrompt: (userInput: string, ctx: { sourceTabId: string; workspacePath?: string }) => getPrompt(userInput),
         getSystemPrompt,
         getAgentDefinitions,
-        getMcpServers: (ctx) => {
-            if (!options?.tabExecutor) {
-                return undefined;
-            }
-            const server = createDevHubMcpServer({
-                tabExecutor: options.tabExecutor,
+        getMcpServers: (ctx) =>
+            workflowToolset.asMcpServer({
+                sourceTabId: ctx.sourceTabId,
                 workspacePath: ctx.workspacePath,
-            });
-            return {
-                'devhub-tools': server,
-            };
-        },
+                parentAgentId: ctx.rawContext?.parentAgentId ?? DEV_HUB_AGENT_ID,
+            }),
     });
 
     return {
@@ -71,6 +76,12 @@ export async function createAgent(options?: {
         getPrompt,
         getAgentDefinitions,
         getTools,
+        asMcpServer: (ctx) =>
+            workflowToolset.asMcpServer({
+                sourceTabId: ctx.sourceTabId,
+                workspacePath: ctx.workspacePath,
+                parentAgentId: ctx.parentAgentId ?? DEV_HUB_AGENT_ID,
+            }),
         start: (userInput: string, context: AgentStartContext, sinks: AgentStartSinks): ExecutionHandle => {
             // Save context for event handlers
             currentContext = context;

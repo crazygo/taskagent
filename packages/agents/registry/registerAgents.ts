@@ -35,6 +35,7 @@ export function registerAllAgents(options?: { eventBus?: any; tabExecutor?: any;
             eventBus: options?.eventBus,
             tabExecutor: options?.tabExecutor,
             messageStore: options?.messageStore,
+            agentRegistry: globalAgentRegistry,
         }),
         description: 'Desktop - Unified interface for dispatching tasks to agents',
         tags: ['coordination', 'orchestration'],
@@ -56,7 +57,9 @@ export function registerAllAgents(options?: { eventBus?: any; tabExecutor?: any;
     // Writer Agent
     globalAgentRegistry.register({
         id: 'writer',
-        factory: createWriterAgent,
+        factory: () => createWriterAgent({
+            tabExecutor: options?.tabExecutor,
+        }),
         description: 'Writer - Write structured feature YAML files',
         tags: ['atomic', 'writer'],
     });
@@ -80,7 +83,9 @@ export function registerAllAgents(options?: { eventBus?: any; tabExecutor?: any;
     // Coder Agent
     globalAgentRegistry.register({
         id: 'coder',
-        factory: createCoderAgent,
+        factory: () => createCoderAgent({
+            tabExecutor: options?.tabExecutor,
+        }),
         description: 'Coder Agent - Backend development executor with self-testing',
         tags: ['development', 'coding', 'monitor'],
     });
@@ -88,7 +93,9 @@ export function registerAllAgents(options?: { eventBus?: any; tabExecutor?: any;
     // Review Agent
     globalAgentRegistry.register({
         id: 'review',
-        factory: createReviewAgent,
+        factory: () => createReviewAgent({
+            tabExecutor: options?.tabExecutor,
+        }),
         description: 'Review Agent - Unified code review, progress summary, and quality monitoring',
         tags: ['review', 'quality', 'monitor'],
     });

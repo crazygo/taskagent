@@ -12,10 +12,11 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { buildPromptAgentStart } from '../runtime/runPromptAgentStart.js';
 import { loadAgentPipelineConfig } from '../runtime/agentLoader.js';
+import type { McpServerConfig } from '@anthropic-ai/claude-agent-sdk';
 import type { AgentContext, AgentStartContext, AgentStartSinks, ExecutionHandle, RunnableAgent } from '../runtime/types.js';
 import type { EventBus } from '@taskagent/core/event-bus';
-import { createDesktopMcpServer } from './tools.js';
 import { addLog } from '@taskagent/shared/logger';
+import type { AgentRegistry } from '../registry/AgentRegistry.js';
 
 const DESKTOP_AGENT_ID = 'desktop';
 const DESKTOP_DESCRIPTION = 'Desktop - Unified interface for dispatching tasks to atomic and composite agents';
@@ -24,6 +25,7 @@ export async function createAgent(options?: {
   eventBus?: EventBus;
   tabExecutor?: any;
   messageStore?: any;
+  agentRegistry?: AgentRegistry;
 }): Promise<RunnableAgent> {
     const agentDir = path.dirname(fileURLToPath(import.meta.url));
 
@@ -45,21 +47,45 @@ export async function createAgent(options?: {
     const getAgentDefinitions = () => agentDefinitions;
     const getTools = () => allowedTools ?? [];
 
+    const childAgentIds = ['blueprint', 'devhub', 'writer', 'coder', 'review'] as const;
+    const childAgents = new Map<string, RunnableAgent>();
+
+    if (options?.agentRegistry) {
+        for (const id of childAgentIds) {
+            const agent = await options.agentRegistry.createAgent(id);
+            if (agent) {
+                childAgents.set(id, agent);
+            } else {
+                addLog(`[Desktop] Warning: ${id} agent unavailable; corresponding workflow tools disabled.`);
+            }
+        }
+    }
+
     const start = buildPromptAgentStart({
         getPrompt: (userInput: string, ctx: { sourceTabId: string; workspacePath?: string }) => getPrompt(userInput),
         getSystemPrompt,
         getAgentDefinitions,
         getMcpServers: (ctx) => {
-            if (!options?.tabExecutor) {
+            if (childAgents.size === 0) {
                 return undefined;
             }
-            const server = createDesktopMcpServer({
-                tabExecutor: options.tabExecutor,
-                workspacePath: ctx.workspacePath,
-            });
-            return {
-                'desktop-tools': server,
-            };
+
+            const servers: Record<string, McpServerConfig> = {};
+            const parentAgentId = ctx.rawContext?.parentAgentId ?? DESKTOP_AGENT_ID;
+
+            for (const agent of childAgents.values()) {
+                if (!agent.asMcpServer) continue;
+                const childServers = agent.asMcpServer({
+                    sourceTabId: ctx.sourceTabId,
+                    workspacePath: ctx.workspacePath,
+                    parentAgentId,
+                });
+                if (childServers) {
+                    Object.assign(servers, childServers);
+                }
+            }
+
+            return Object.keys(servers).length ? servers : undefined;
         },
     });
 

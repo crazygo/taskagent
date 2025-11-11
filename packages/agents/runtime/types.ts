@@ -1,4 +1,4 @@
-import type { AgentDefinition } from '@anthropic-ai/claude-agent-sdk';
+import type { AgentDefinition, McpServerConfig } from '@anthropic-ai/claude-agent-sdk';
 import type { Message } from '@taskagent/core/types/Message.js';
 import type { TaskEvent } from '@taskagent/core/types/TaskEvent.js';
 import type { PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
@@ -103,6 +103,10 @@ export interface RunnableAgent {
     getModel?: () => string | undefined;
     parseOutput?: (rawChunk: string) => TaskEvent[];
     getAgentDefinitions?: () => Record<string, AgentDefinition> | undefined;
+    asMcpServer?: (ctx: { sourceTabId?: string; workspacePath?: string; parentAgentId?: string }) => Record<
+        string,
+        McpServerConfig
+    > | undefined;
     start: (userInput: string, context: AgentStartContext, sinks: AgentStartSinks) => ExecutionHandle;
 }
 

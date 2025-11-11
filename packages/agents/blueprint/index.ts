@@ -10,8 +10,8 @@ import type {
     RunnableAgent,
 } from '../runtime/types.js';
 import type { EventBus } from '@taskagent/core/event-bus';
-import { createBlueprintMcpServer } from './tools.js';
-import { addLog } from '@taskagent/shared/logger';
+import { createWorkflowToolset } from '../runtime/workflowTools.js';
+import { defineRefineFeatureSpecWorkflow } from './workflows.js';
 
 const BLUEPRINT_AGENT_ID = 'blueprint';
 const BLUEPRINT_DESCRIPTION = 'Blueprint coordinator agent (dialog + workflow orchestration)';
@@ -37,25 +37,28 @@ export async function createAgent(options?: {
     const getAgentDefinitions = () => agentDefinitions;
     const getTools = () => allowedTools ?? [];
 
+    const workflowToolset = createWorkflowToolset({
+        agentId: BLUEPRINT_AGENT_ID,
+        serverName: 'blueprint-tools',
+        sharedDependencies: {
+            tabExecutor: options?.tabExecutor,
+            agentRegistry: options?.agentRegistry,
+            eventBus: options?.eventBus,
+            defaultParentAgentId: BLUEPRINT_AGENT_ID,
+        },
+        tools: [defineRefineFeatureSpecWorkflow()],
+    });
+
     const startPrompt = buildPromptAgentStart({
         getPrompt: (userInput: string, ctx: { sourceTabId: string; workspacePath?: string }) => getPrompt(userInput),
         getSystemPrompt,
         getAgentDefinitions,
-        getMcpServers: (ctx) => {
-            if (!options?.tabExecutor) {
-                return undefined;
-            }
-            return {
-                'blueprint-tools': createBlueprintMcpServer({
-                    tabExecutor: options.tabExecutor,
-                    workspacePath: ctx.workspacePath,
-                    tabId: ctx.sourceTabId,
-                    agentRegistry: options.agentRegistry,
-                    eventBus: options.eventBus,
-                    parentAgentId: ctx.parentAgentId ?? BLUEPRINT_AGENT_ID,
-                }),
-            };
-        },
+        getMcpServers: (ctx) =>
+            workflowToolset.asMcpServer({
+                sourceTabId: ctx.sourceTabId,
+                workspacePath: ctx.workspacePath,
+                parentAgentId: ctx.rawContext?.parentAgentId ?? BLUEPRINT_AGENT_ID,
+            }),
     });
 
     return {
@@ -64,6 +67,12 @@ export async function createAgent(options?: {
         getPrompt,
         getAgentDefinitions,
         getTools,
+        asMcpServer: (ctx) =>
+            workflowToolset.asMcpServer({
+                sourceTabId: ctx.sourceTabId,
+                workspacePath: ctx.workspacePath,
+                parentAgentId: ctx.parentAgentId ?? BLUEPRINT_AGENT_ID,
+            }),
         start: (userInput: string, context: AgentStartContext, sinks: AgentStartSinks): ExecutionHandle => {
             // Minimal start: no event-bus mirroring to avoid duplicate messages
             const enhancedContext: AgentStartContext = {
