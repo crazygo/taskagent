@@ -9,6 +9,7 @@ export interface Message {
     reasoning?: string;
     sourceTabId?: string;      // Tab isolation support
     timestamp?: number;         // Event timestamp
+    variant?: 'default' | 'worker';
     // Tool call specific fields
     toolName?: string;          // Tool name (e.g., "Bash", "Read")
     toolId?: string;            // Tool call ID for tracking

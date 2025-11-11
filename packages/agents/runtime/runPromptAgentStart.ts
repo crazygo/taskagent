@@ -111,7 +111,7 @@ export function buildPromptAgentStart(
               addLog(`[RunPromptAgentStart] RESULT EVENT CAPTURED: cost=${cost}, duration=${dur}ms, turns=${turns}`);
               // Block forwarding and inject special marker to prove this path displays text
               sinks.onEvent?.({
-                level: 'info',
+                level: 'debug',
                 message: `duration=${dur}ms, turns=${turns}, cost=$${cost}`,
                 ts: Date.now(),
               });

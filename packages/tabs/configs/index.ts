@@ -29,8 +29,7 @@ export const defaultTabs: TabConfig[] = [
   agentTabConfig,
   desktopTabConfig,
   blueprintTabConfig,
-  uiReviewTabConfig,
-  glossaryTabConfig,
   monitorTabConfig,
+  glossaryTabConfig,
+  uiReviewTabConfig,
 ];
-

@@ -299,11 +299,12 @@ export function useAgentEventBridge(eventBus: EventBus, messageStore: MessageSto
       const payload = event.payload;
       if (payload && typeof payload === 'object' && 'message' in payload) {
         const message = String((payload as any).message);
+        const agentId = event.agentId || 'unknown';
         addLog(`[AgentBridge] Task progress: ${message}`);
         messageStore.appendMessage(event.tabId, {
           id: messageStore.getNextMessageId(),
           role: 'assistant',
-          content: `✦ ${message}`,
+          content: `✦ [${agentId}] ${message}`,
           isPending: false,
           timestamp: event.timestamp,
         });

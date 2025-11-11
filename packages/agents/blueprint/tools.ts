@@ -58,6 +58,7 @@ function buildBlueprintTaskTool(params: {
 
             try {
                 addLog(`[Blueprint Tool] ${telemetryLabel} starting async task: ${task}`);
+                emitProgress(options.eventBus, 'blueprint', targetTabId, '[log] 任务已收到');
 
                 // 启动异步任务（立即返回 handle），并立刻播报一次进度以注册监听
                 const handle = await runBlueprintTask(task, {
@@ -68,16 +69,15 @@ function buildBlueprintTaskTool(params: {
                     sourceTabId: targetTabId,
                     parentAgentId: 'blueprint',
                 });
-                emitProgress(options.eventBus, 'blueprint', targetTabId, 'Blueprint 任务已启动', handle.taskId);
 
                 // 后台继续执行（不阻塞对话）
                 void handle.completion.catch(error => {
-                    const message = `Blueprint 任务后台执行失败: ${error instanceof Error ? error.message : String(error)}`;
+                    const message = `[log]  任务后台执行失败: ${error instanceof Error ? error.message : String(error)}`;
                     addLog(`[Blueprint Tool] ${message}`);
                 });
 
                 return {
-                    content: [{ type: 'text', text: '✅ Blueprint 任务已启动，稍后会同步进度。你可以继续对话。' }],
+                    content: [{ type: 'text', text: '✅ 任务已启动，稍后会同步进度。你可以继续对话。' }],
                 };
             } catch (error) {
                 const message = `启动 Blueprint 任务失败: ${error instanceof Error ? error.message : String(error)}`;

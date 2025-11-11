@@ -116,16 +116,23 @@ export async function createAgent(options?: {
                     
                     // Only mirror direct child agents (those calling Desktop as parent)
                     if (parentAgentId !== 'desktop') return;
+
+                    // Desktop does not surface Blueprint's self-dialogue; users can view
+                    // Blueprint tab directly, so skip mirroring those assistant chunks.
+                    // Blueprint's milestone updates still emit via agentEventHandler, so
+                    // important progress is preserved.
+                    if (childAgentId === 'blueprint') return;
                     markChildActive(childAgentId);
                     if (!chunk) return;
-                    
+
                     // Direct write to MessageStore
-                    addLog(`[Desktop] mirroring child agent ${childAgentId} output, len=${chunk.length}`);
+                    addLog(`[Desktop][agentTextHandler] mirroring child agent ${childAgentId} output, len=${chunk.length}`);
                     options?.messageStore?.appendMessage('Desktop', {
                         id: options.messageStore.getNextMessageId(),
                         role: 'assistant',
                         content: `[${childAgentId}] ${chunk}`,
                         isPending: false,
+                        variant: 'worker',
                         timestamp: event.timestamp || Date.now(),
                     });
                 } catch (e) {
@@ -145,12 +152,13 @@ export async function createAgent(options?: {
                     
                     // Mirror progress messages
                     if (payload?.message) {
-                        addLog(`[Desktop] mirroring event from ${childAgentId}: ${payload.message}`);
+                        addLog(`[Desktop][agentEventHandler] mirroring event from ${childAgentId}: ${payload.message}`);
                         options?.messageStore?.appendMessage('Desktop', {
                             id: options.messageStore.getNextMessageId(),
                             role: 'assistant',
                             content: `[${childAgentId}] ${payload.message}`,
                             isPending: false,
+                            variant: 'worker',
                             timestamp: event.timestamp || Date.now(),
                         });
                     }

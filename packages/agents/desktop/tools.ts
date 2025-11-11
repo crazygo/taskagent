@@ -47,8 +47,10 @@ export function createDesktopMcpServer(
             sourceTabId: 'Desktop',
             workspacePath: options.workspacePath,
             parentAgentId: 'desktop',
-          }
+          },
+          { async: true }  // Fire-and-forget mode
         );
+        addLog(`[Desktop Tool] Blueprint task dispatched (async)`);
 
         return {
           content: [{ type: 'text', text: '✅ Blueprint 任务已启动，后台执行中...' }],
@@ -82,7 +84,7 @@ export function createDesktopMcpServer(
       try {
         addLog(`[Desktop Tool] Starting Writer task: ${task.substring(0, 100)}...`);
 
-        await options.tabExecutor.execute(
+        const result = await options.tabExecutor.execute(
           'Writer',
           'writer',
           task,
@@ -90,11 +92,12 @@ export function createDesktopMcpServer(
             sourceTabId: 'Desktop',
             workspacePath: options.workspacePath,
             parentAgentId: 'desktop',
-          }
+          },
+          { async: false }  // Wait for result
         );
 
         return {
-          content: [{ type: 'text', text: '✅ Writer 任务已启动，后台执行中...' }],
+          content: [{ type: 'text', text: `✅ Writer 完成\n\n${result}` }],
         };
       } catch (error) {
         const message = `启动 Writer 失败: ${error instanceof Error ? error.message : String(error)}`;
@@ -125,7 +128,7 @@ export function createDesktopMcpServer(
       try {
         addLog(`[Desktop Tool] Starting Coder task: ${task.substring(0, 100)}...`);
 
-        await options.tabExecutor.execute(
+        const result = await options.tabExecutor.execute(
           'Coder',
           'coder',
           task,
@@ -133,11 +136,12 @@ export function createDesktopMcpServer(
             sourceTabId: 'Desktop',
             workspacePath: options.workspacePath,
             parentAgentId: 'desktop',
-          }
+          },
+          { async: false }  // Wait for result
         );
 
         return {
-          content: [{ type: 'text', text: '✅ Coder 任务已启动，后台执行中...' }],
+          content: [{ type: 'text', text: `✅ Coder 完成\n\n${result}` }],
         };
       } catch (error) {
         const message = `启动 Coder 失败: ${error instanceof Error ? error.message : String(error)}`;
@@ -168,7 +172,7 @@ export function createDesktopMcpServer(
       try {
         addLog(`[Desktop Tool] Starting Reviewer task: ${task.substring(0, 100)}...`);
 
-        await options.tabExecutor.execute(
+        const result = await options.tabExecutor.execute(
           'Review',
           'review',
           task,
@@ -176,11 +180,12 @@ export function createDesktopMcpServer(
             sourceTabId: 'Desktop',
             workspacePath: options.workspacePath,
             parentAgentId: 'desktop',
-          }
+          },
+          { async: false }  // Wait for result
         );
 
         return {
-          content: [{ type: 'text', text: '✅ Reviewer 任务已启动，后台执行中...' }],
+          content: [{ type: 'text', text: `✅ Reviewer 完成\n\n${result}` }],
         };
       } catch (error) {
         const message = `启动 Reviewer 失败: ${error instanceof Error ? error.message : String(error)}`;
