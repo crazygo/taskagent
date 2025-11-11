@@ -22,7 +22,8 @@ export const defaultPreset: PresetConfig = {
     // All tabs available
     tabs: [
         'Chat',
-        'Agent', 
+        'Agent',
+        'Desktop',
         'Blueprint',
         'Glossary',
         'UI-Review',
@@ -31,6 +32,7 @@ export const defaultPreset: PresetConfig = {
     
     // All agents registered
     agents: [
+        'desktop',
         'blueprint',
         'writer',
         'glossary',

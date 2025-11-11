@@ -40,6 +40,7 @@ import { loadWorkspaceSettings, writeWorkspaceSettings, type WorkspaceSettings }
 import { getGlobalTabRegistry, type TabConfig } from '@taskagent/tabs';
 import { chatTabConfig } from '@taskagent/tabs/configs/chat';
 import { agentTabConfig } from '@taskagent/tabs/configs/agent';
+import { desktopTabConfig } from '@taskagent/tabs/configs/desktop';
 import { blueprintTabConfig } from '@taskagent/tabs/configs/blueprint';
 import { glossaryTabConfig } from '@taskagent/tabs/configs/glossary';
 import { uiReviewTabConfig } from '@taskagent/tabs/configs/ui-review';
@@ -320,6 +321,7 @@ const App = () => {
             const tabConfigMap: Record<string, TabConfig> = {
                 'Chat': chatTabConfig,
                 'Agent': agentTabConfig,
+                'Desktop': desktopTabConfig,
                 'Blueprint': blueprintTabConfig,
                 'Glossary': glossaryTabConfig,
                 'UI-Review': uiReviewTabConfig,
@@ -337,6 +339,7 @@ const App = () => {
                 tabRegistry.registerMany([
                     chatTabConfig,
                     agentTabConfig,
+                    desktopTabConfig,
                     blueprintTabConfig,
                     glossaryTabConfig,
                     uiReviewTabConfig,

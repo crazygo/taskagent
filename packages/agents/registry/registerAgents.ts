@@ -6,6 +6,7 @@
  */
 
 import { globalAgentRegistry } from './AgentRegistry.js';
+import { createAgent as createDesktopAgent } from '../desktop/index.js';
 import { createAgent as createBlueprintAgent } from '../blueprint/index.js';
 import { createAgent as createWriterAgent } from '../writer/index.js';
 import { createAgent as createGlossaryAgent } from '../glossary/index.js';
@@ -25,6 +26,18 @@ export function registerAllAgents(options?: { eventBus?: any; tabExecutor?: any;
         factory: async () => new DefaultPromptAgent(),
         description: 'Default Agent - Direct Claude Code access',
         tags: ['default', 'passthrough'],
+    });
+
+    // Desktop Agent
+    globalAgentRegistry.register({
+        id: 'desktop',
+        factory: () => createDesktopAgent({
+            eventBus: options?.eventBus,
+            tabExecutor: options?.tabExecutor,
+            messageStore: options?.messageStore,
+        }),
+        description: 'Desktop - Unified interface for dispatching tasks to agents',
+        tags: ['coordination', 'orchestration'],
     });
 
     // Blueprint Agent
