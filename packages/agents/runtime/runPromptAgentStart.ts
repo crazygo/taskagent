@@ -116,7 +116,7 @@ export function buildPromptAgentStart(
               // Block forwarding and inject special marker to prove this path displays text
               sinks.onEvent?.({
                 level: 'debug',
-                message: `duration=${dur}ms, turns=${turns}, cost=$${cost}`,
+                message: `duration=${dur}ms, turns=${turns}, cost=$${cost} ◼︎`,
                 ts: Date.now(),
               });
               return; // Don't forward the original result event

@@ -323,8 +323,8 @@ export function useAgentEventBridge(eventBus: EventBus, messageStore: MessageSto
       finalizeConversation(event.tabId);
       // Safety: ensure no leftover pending placeholders remain active
       messageStore.updateActiveMessages(event.tabId, prev => prev.map(msg => ({ ...msg, isPending: false, queueState: 'completed' })));
-      const ts = new Date((event as any).timestamp ?? Date.now()).toISOString();
-      appendSystemMessage(event.tabId, `${ts} ◼︎`);
+      // const ts = new Date((event as any).timestamp ?? Date.now()).toISOString();
+      // appendSystemMessage(event.tabId, `${ts} ◼︎`);
     };
 
     const handleFailed = (event: AgentEvent) => {
