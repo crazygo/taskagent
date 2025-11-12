@@ -166,7 +166,7 @@ export class BlueprintAgent extends PromptAgent implements RunnableAgent {
             const writerPrompt = this.buildWriterPrompt(task, feedback);
             emitProgress(context.eventBus, BLUEPRINT_AGENT_ID, tabId, '[log] 正在调用 Writer Agent 生成内容…', taskId, context.parentAgentId);
 
-            await runAgent('writer', writerPrompt, context);
+            await runAgent('feature-writer', writerPrompt, context);
 
             emitProgress(context.eventBus, BLUEPRINT_AGENT_ID, tabId, '[log] Writer Agent 完成，开始验证…', taskId, context.parentAgentId);
             emitProgress(context.eventBus, BLUEPRINT_AGENT_ID, tabId, '[log] 正在验证 YAML 完整性…', taskId, context.parentAgentId);
