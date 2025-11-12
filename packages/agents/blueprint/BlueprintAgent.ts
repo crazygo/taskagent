@@ -35,17 +35,6 @@ interface BlueprintAgentDeps {
 export class BlueprintAgent extends PromptAgent implements RunnableAgent {
     readonly id = BLUEPRINT_AGENT_ID;
     readonly description = 'Blueprint Agent - 分析需求并生成结构化的功能规范文档 (docs/features/*.yaml)';
-    
-    protected readonly inputSchema = {
-        task_id: z
-            .string()
-            .min(1)
-            .describe('任务ID，格式：YYYYMMDD-HHMM-描述（全小写，用减号连接）'),
-        task: z
-            .string()
-            .min(1)
-            .describe('需求描述，Blueprint 将整理并生成规范的 YAML 文档'),
-    };
 
     constructor(private deps: BlueprintAgentDeps) {
         super();
@@ -95,56 +84,8 @@ export class BlueprintAgent extends PromptAgent implements RunnableAgent {
         return startFn(userInput, context, sinks);
     }
 
-    protected async execute(args: { task_id: string; task: string }, context: AgentToolContext): Promise<{ content: Array<{ type: 'text'; text: string }> }> {
-        const task_id = typeof args.task_id === 'string' ? args.task_id : String(args.task_id ?? '');
-        const task = typeof args.task === 'string' ? args.task : String(args.task ?? '');
-        const targetTabId = context.sourceTabId ?? 'Blueprint';
-
-        if (!context.agentRegistry || !context.eventBus || !context.tabExecutor) {
-            const message = '缺少必要依赖，无法执行 Blueprint workflow。';
-            addLog(`[Blueprint] ${message}`);
-            return {
-                content: [{ type: 'text', text: message }],
-            };
-        }
-
-        addLog(`[${this.id}] tool starting: task_id=${task_id}, task=${task.substring(0, 100)}`);
-        emitProgress(context.eventBus, BLUEPRINT_AGENT_ID, targetTabId, `[log] 任务已收到 (task_id: ${task_id})`, undefined, context.parentAgentId);
-
-        const flowContext: AsyncTaskContext = {
-            agentRegistry: context.agentRegistry,
-            eventBus: context.eventBus,
-            tabExecutor: context.tabExecutor,
-            workspacePath: context.workspacePath,
-            sourceTabId: targetTabId,
-            parentAgentId: context.parentAgentId ?? BLUEPRINT_AGENT_ID,
-        };
-
-        const taskId = `blueprint-task-${Date.now()}`;
-        
-        // Start workflow in background - do NOT await
-        this.runEditValidateFlow(task_id, task, flowContext, taskId)
-            .then((result) => {
-                addLog(`[${this.id}] Workflow completed successfully`);
-                if (result?.targetFile) {
-                    emitProgress(context.eventBus, BLUEPRINT_AGENT_ID, targetTabId, `✅ Blueprint 完成！文件已生成：${result.targetFile}`, taskId, context.parentAgentId);
-                }
-            })
-            .catch((error) => {
-                const message = `[log] 执行失败: ${error instanceof Error ? error.message : String(error)}`;
-                addLog(`[${this.id}] ${message}`);
-                emitResult(flowContext.eventBus, BLUEPRINT_AGENT_ID, flowContext.sourceTabId || 'Blueprint', { error: message }, taskId, flowContext.parentAgentId);
-            });
-        
-        // Return immediately with "task started" message
-        return {
-            content: [{ type: 'text', text: `✅ Blueprint 任务已启动 (task_id: ${task_id})，正在后台生成 YAML 文档，请稍候...` }],
-        };
-    }
-
     private async runEditValidateFlow(
-        task_id: string,
-        input: string,
+        prompt: string,
         context: AsyncTaskContext,
         taskId: string,
         isCancelled: () => boolean = () => false
@@ -153,7 +94,9 @@ export class BlueprintAgent extends PromptAgent implements RunnableAgent {
             throw new Error('Blueprint task requires workspacePath');
         }
 
-        const task = this.parseTask(task_id, input);
+        // Extract task_id from prompt
+        const task_id = this.extractTaskId(prompt) || `blueprint-${Date.now()}`;
+        const task = this.parseTask(task_id, prompt);
         const tabId = context.sourceTabId || 'Blueprint';
         
         const taskDir = `tasks/${task_id}`;
@@ -219,6 +162,11 @@ export class BlueprintAgent extends PromptAgent implements RunnableAgent {
         }
         
         return { task_id, task };
+    }
+    
+    private extractTaskId(prompt: string): string | undefined {
+        const match = prompt.match(/^Task ID:\s*([a-z0-9\-]+)/im);
+        return match?.[1];
     }
 
     private buildWriterPrompt(writerTask: WriterTask, feedback?: string | null): string {

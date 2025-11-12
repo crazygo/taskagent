@@ -10,6 +10,7 @@
 
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { z } from 'zod';
 import { buildPromptAgentStart } from '../runtime/runPromptAgentStart.js';
 import { loadAgentPipelineConfig } from '../runtime/agentLoader.js';
 import type { tool as createSdkTool } from '@anthropic-ai/claude-agent-sdk';
@@ -71,17 +72,44 @@ export async function createAgent(options?: {
 
         for (const [id, agent] of childAgents.entries()) {
             if (!agent.asMcpTool) continue;
-            const childTool = agent.asMcpTool({
-                sourceTabId: ctx.sourceTabId,
-                workspacePath: ctx.workspacePath,
-                parentAgentId,
-            });
+            
+            let childTool: ReturnType<typeof createSdkTool> | undefined;
+            
+            // Blueprint and DevHub need task_id parameter
+            if ((id === 'blueprint' || id === 'devhub') && agent.asMcpToolWithSchema) {
+                childTool = agent.asMcpToolWithSchema(
+                    {
+                        task_id: z.string()
+                            .min(1)
+                            .regex(/^\d{8}-\d{4}-[a-z0-9\-]+$/)
+                            .describe('任务ID，格式：YYYYMMDD-HHMM-描述（全小写，减号连接）'),
+                        task: z.string().min(1).describe('任务描述')
+                    },
+                    (args: { task_id: string; task: string }) => {
+                        return `Task ID: ${args.task_id}\n\n${args.task}`;
+                    },
+                    {
+                        sourceTabId: ctx.sourceTabId,
+                        workspacePath: ctx.workspacePath,
+                        parentAgentId,
+                    },
+                    { async: true }  // Blueprint and DevHub run in background
+                );
+            } else {
+                // Other agents use standard single prompt parameter
+                childTool = agent.asMcpTool({
+                    sourceTabId: ctx.sourceTabId,
+                    workspacePath: ctx.workspacePath,
+                    parentAgentId,
+                });
+            }
+            
             if (childTool) {
                 tools[id] = childTool;
             }
         }
 
-        addLog(`[Start] Built child tool map: ${JSON.stringify(tools, null, 2)}`);
+        addLog(`[Start] Built child tool map: ${JSON.stringify(Object.keys(tools))}`);
         return Object.keys(tools).length ? tools : undefined;
     };
 

@@ -11,17 +11,13 @@ interface ReviewAgentDeps {
     systemPrompt?: any;
     agentDefinitions?: Record<string, AgentDefinition>;
     allowedTools?: string[];
-    eventBus?: EventBus;
-    agentRegistry?: AgentRegistry;
+    eventBus?: any;
+    agentRegistry?: any;
 }
 
 export class ReviewAgent extends PromptAgent implements RunnableAgent {
     readonly id = REVIEW_AGENT_ID;
     readonly description = 'Unified review agent for code review, progress summary, and quality monitoring';
-    
-    protected readonly inputSchema = {
-        task: z.string().min(1).describe('审查任务描述'),
-    };
 
     constructor(private deps: ReviewAgentDeps) {
         super();
@@ -68,41 +64,4 @@ export class ReviewAgent extends PromptAgent implements RunnableAgent {
         return startFn(userInput, context, sinks);
     }
 
-    protected async execute(args: { task: string }, context: AgentToolContext): Promise<{ content: Array<{ type: 'text'; text: string }> }> {
-        const task = typeof args.task === 'string' ? args.task : String(args.task ?? '');
-
-        if (!context.tabExecutor) {
-            const message = 'TabExecutor 未初始化，无法启动 Reviewer';
-            addLog(`[Review] ${message}`);
-            return {
-                content: [{ type: 'text', text: message }],
-            };
-        }
-
-        try {
-            addLog(`[Review] Starting task: ${task.substring(0, 100)}...`);
-
-            const result = await context.tabExecutor.execute(
-                'Review',
-                'review',
-                task,
-                {
-                    sourceTabId: context.sourceTabId ?? 'Start',
-                    workspacePath: context.workspacePath,
-                    parentAgentId: context.parentAgentId ?? REVIEW_AGENT_ID,
-                },
-                { async: false }
-            );
-
-            return {
-                content: [{ type: 'text', text: `✅ Reviewer 完成\n\n${result}` }],
-            };
-        } catch (error) {
-            const message = `启动 Reviewer 失败: ${error instanceof Error ? error.message : String(error)}`;
-            addLog(`[Review] ${message}`);
-            return {
-                content: [{ type: 'text', text: message }],
-            };
-        }
-    }
 }

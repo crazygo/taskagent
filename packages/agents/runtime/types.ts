@@ -5,7 +5,7 @@ import type { TaskEvent } from '@taskagent/core/types/TaskEvent.js';
 import type { PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
 import type { ToolUseEvent, ToolResultEvent } from './runClaudeStream.js';
 import { addLog } from '@taskagent/shared/logger';
-
+import { z } from 'zod';
 /**
  * Agent execution context
  */
@@ -81,26 +81,12 @@ export abstract class PromptAgent {
     abstract readonly description: string;
 
     /**
-     * Input schema for this agent when exposed as a tool
-     * Subclasses should define their specific input requirements
-     */
-    protected abstract readonly inputSchema: Record<string, any>;
-
-    /**
      * Generate the prompt for SDK query
      * @param userInput - Raw user input
      * @param context - Execution context
      * @returns Prompt string to send to LLM
      */
     abstract getPrompt(userInput: string, context: AgentContext): string;
-
-    /**
-     * Execute the agent's workflow
-     * @param args - Tool input arguments matching inputSchema
-     * @param context - Execution context with dependencies
-     * @returns Tool result with content array
-     */
-    protected abstract execute(args: Record<string, any>, context: AgentToolContext): Promise<{ content: Array<{ type: 'text'; text: string }> }>;
 
     /**
      * Optional: Tools required by this agent
@@ -134,11 +120,41 @@ export abstract class PromptAgent {
     }
 
     /**
-     * Convert this agent into an MCP tool callable by other agents
-     * Uses instance dependencies + runtime context
+     * Convert this agent into an MCP tool callable by other agents (standard version)
+     * Uses single 'prompt' parameter by default
      * @param ctx - Runtime context (sourceTabId, workspacePath, parentAgentId)
      */
     asMcpTool(ctx?: { sourceTabId?: string; workspacePath?: string; parentAgentId?: string }): ReturnType<typeof createSdkTool> | undefined {
+        return this.asMcpToolWithSchema(
+            { prompt: z.string().min(1).describe('自然语言输入') },
+            (args: { prompt: string }) => args.prompt,
+            ctx
+        );
+    }
+
+    /**
+     * Convert this agent into an MCP tool with custom schema
+     * Allows structured parameters to be converted to a single prompt
+     * 
+     * @param schema - Custom input schema (e.g., { task_id: z.string(), task: z.string() })
+     * @param concater - Function to convert structured args to prompt string
+     * @param ctx - Runtime context
+     * @param options - Execution options (async: true for fire-and-forget background execution)
+     * 
+     * @example
+     * agent.asMcpToolWithSchema(
+     *   { task_id: z.string(), task: z.string() },
+     *   (args) => `Task ID: ${args.task_id}\n\n${args.task}`,
+     *   ctx,
+     *   { async: true }  // For background tasks like Blueprint
+     * )
+     */
+    asMcpToolWithSchema<T extends Record<string, any>>(
+        schema: Record<string, any>,
+        concater: (args: T) => string,
+        ctx?: { sourceTabId?: string; workspacePath?: string; parentAgentId?: string },
+        options?: { async?: boolean }
+    ): ReturnType<typeof createSdkTool> | undefined {
         // Set runtime context if provided
         if (ctx) {
             this.setRuntimeContext(ctx);
@@ -154,18 +170,36 @@ export abstract class PromptAgent {
         return createSdkTool(
             this.id,
             this.description,
-            this.inputSchema,
+            schema,
             async (args: Record<string, any>) => {
                 addLog(`[${this.id}] MCP tool handler called with args: ${JSON.stringify(args).slice(0, 200)}`);
-                const result = await this.execute(args, fullContext);
-                const returnText = result.content[0]?.text ?? '';
-                addLog(`[${this.id}] MCP tool handler returning text: ${returnText.slice(0, 200)}`);
-                // SDK expects CallToolResult format: { content: [...] }
-                const callToolResult = {
-                    content: result.content.map(c => ({ type: 'text' as const, text: c.text }))
+                
+                // 1. Convert structured args to prompt
+                const prompt = concater(args as T);
+                addLog(`[${this.id}] Converted to prompt: ${prompt.slice(0, 100)}...`);
+                
+                // 2. Execute via tabExecutor → start()
+                const result = await fullContext.tabExecutor.execute(
+                    this.id,
+                    this.id,
+                    prompt,
+                    {
+                        sourceTabId: fullContext.sourceTabId,
+                        workspacePath: fullContext.workspacePath,
+                        parentAgentId: fullContext.parentAgentId,
+                    },
+                    { async: options?.async }  // Pass async option to tabExecutor
+                );
+                
+                addLog(`[${this.id}] MCP tool handler completed`);
+                
+                // 3. Return result in CallToolResult format
+                return {
+                    content: [{ 
+                        type: 'text' as const, 
+                        text: result.output || result.result || '完成' 
+                    }]
                 };
-                addLog(`[${this.id}] MCP tool handler returning CallToolResult with ${callToolResult.content.length} content blocks`);
-                return callToolResult;
             }
         ) as any;
     }
@@ -196,6 +230,12 @@ export interface RunnableAgent {
     asMcpTool?: (ctx: { sourceTabId?: string; workspacePath?: string; parentAgentId?: string }) => ReturnType<
         typeof createSdkTool
     > | undefined;
+    asMcpToolWithSchema?: <T extends Record<string, any>>(
+        schema: Record<string, any>,
+        concater: (args: T) => string,
+        ctx?: { sourceTabId?: string; workspacePath?: string; parentAgentId?: string },
+        options?: { async?: boolean }
+    ) => ReturnType<typeof createSdkTool> | undefined;
     start: (userInput: string, context: AgentStartContext, sinks: AgentStartSinks) => ExecutionHandle;
 }
 

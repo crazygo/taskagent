@@ -26,9 +26,6 @@ export class CoderAgent extends PromptAgent implements RunnableAgent {
     readonly id = CODER_AGENT_ID;
     readonly description = 'Backend development executor for implementing features with self-testing';
     
-    protected readonly inputSchema = {
-        task: z.string().min(1).describe('编码任务描述'),
-    };
 
     constructor(private deps: CoderAgentDeps) {
         super();
@@ -73,43 +70,5 @@ export class CoderAgent extends PromptAgent implements RunnableAgent {
         });
         
         return startFn(userInput, context, sinks);
-    }
-
-    protected async execute(args: { task: string }, context: AgentToolContext): Promise<{ content: Array<{ type: 'text'; text: string }> }> {
-        const task = typeof args.task === 'string' ? args.task : String(args.task ?? '');
-
-        if (!context.tabExecutor) {
-            const message = 'TabExecutor 未初始化，无法启动 Coder';
-            addLog(`[Coder] ${message}`);
-            return {
-                content: [{ type: 'text', text: message }],
-            };
-        }
-
-        try {
-            addLog(`[Coder] Starting task: ${task.substring(0, 100)}...`);
-
-            const result = await context.tabExecutor.execute(
-                'Coder',
-                'coder',
-                task,
-                {
-                    sourceTabId: context.sourceTabId ?? 'Start',
-                    workspacePath: context.workspacePath,
-                    parentAgentId: context.parentAgentId ?? CODER_AGENT_ID,
-                },
-                { async: false }
-            );
-
-            return {
-                content: [{ type: 'text', text: `✅ Coder 完成\n\n${result}` }],
-            };
-        } catch (error) {
-            const message = `启动 Coder 失败: ${error instanceof Error ? error.message : String(error)}`;
-            addLog(`[Coder] ${message}`);
-            return {
-                content: [{ type: 'text', text: message }],
-            };
-        }
     }
 }
