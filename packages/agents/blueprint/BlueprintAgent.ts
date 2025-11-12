@@ -173,27 +173,8 @@ export class BlueprintAgent extends PromptAgent implements RunnableAgent {
             const writerPrompt = this.buildWriterPrompt(task, feedback);
             emitProgress(context.eventBus, BLUEPRINT_AGENT_ID, tabId, '[log] 正在调用 Writer Agent 生成内容…', taskId, context.parentAgentId);
 
-            // Call Feature Writer as MCP tool with structured parameters
-            const writerAgent = await context.agentRegistry.createAgent('feature-writer');
-            if (!writerAgent) {
-                throw new Error('Feature Writer agent not found');
-            }
-            
-            const writerTool = writerAgent.asMcpTool({
-                sourceTabId: context.sourceTabId,
-                workspacePath: context.workspacePath,
-                parentAgentId: context.parentAgentId,
-            });
-            
-            if (!writerTool) {
-                throw new Error('Failed to create Feature Writer MCP tool');
-            }
-            
-            // Call the tool with structured parameters (will validate task_id via schema)
-            await writerTool.handler({
-                task_id: task_id,
-                task: writerPrompt,
-            });
+            // Call Feature Writer through runAgent (will extract task_id from prompt)
+            await runAgent('feature-writer', writerPrompt, context);
 
             emitProgress(context.eventBus, BLUEPRINT_AGENT_ID, tabId, '[log] Writer Agent 完成，开始验证…', taskId, context.parentAgentId);
             emitProgress(context.eventBus, BLUEPRINT_AGENT_ID, tabId, '[log] 正在验证 YAML 完整性…', taskId, context.parentAgentId);

@@ -25,7 +25,6 @@ export class FeatureWriterAgent extends PromptAgent implements RunnableAgent {
     readonly description = FEATURE_WRITER_DESCRIPTION;
     
     protected readonly inputSchema = {
-        task_id: z.string().min(1).describe('任务ID'),
         task: z.string().min(1).describe('写作任务描述，包含目标文件和内容要求'),
     };
 
@@ -74,14 +73,17 @@ export class FeatureWriterAgent extends PromptAgent implements RunnableAgent {
         return startFn(userInput, context, sinks);
     }
 
-    protected async execute(args: { task_id: string; task: string }, context: AgentToolContext): Promise<{ content: Array<{ type: 'text'; text: string }> }> {
-        const task_id = typeof args.task_id === 'string' ? args.task_id : String(args.task_id ?? '');
+    protected async execute(args: { task: string }, context: AgentToolContext): Promise<{ content: Array<{ type: 'text'; text: string }> }> {
         const task = typeof args.task === 'string' ? args.task : String(args.task ?? '');
+        
+        // Extract task_id from structured prompt (first line: "Task ID: xxx")
+        const taskIdMatch = task.match(/^Task ID:\s*([a-z0-9\-]+)/im);
+        const task_id = taskIdMatch?.[1]?.trim() || '';
         
         addLog(`[FeatureWriter] Received task_id: ${task_id}`);
         
         if (!task_id || task_id.trim().length === 0) {
-            const message = '❌ 缺少 task_id';
+            const message = '❌ 缺少 task_id。Prompt 必须以 "Task ID: xxx" 开头';
             addLog(`[FeatureWriter] ${message}`);
             return {
                 content: [{ type: 'text', text: message }],

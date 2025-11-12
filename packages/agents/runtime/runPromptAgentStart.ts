@@ -120,10 +120,12 @@ export function buildPromptAgentStart(
                 ts: Date.now(),
               });
               return; // Don't forward the original result event
+            } else {
+              // sinks.onEvent?.(evt as any);
+              addLog(`[RunPromptAgentStart] onNonAssistantEvent: no dispatch router for event this message: ${inspect(evt, { depth: 2 })}`);
             }
-            sinks.onEvent?.(evt as any);
           } catch (err) {
-            addLog(`[RunPromptAgentStart] onNonAssistantEvent error: ${err}`);
+            addLog(`[RunPromptAgentStart] onNonAssistantEvent error: ${err}, ${inspect(evt, { depth: 3 })}`);
           }
         },
       },
