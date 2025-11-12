@@ -20,8 +20,8 @@ export function getDevHubOperatorToolDefinitions(looper: DevLoopBridge): Workflo
 
 function createDevHubTool(looper: DevLoopBridge): WorkflowToolDefinition {
     return {
-        name: DEV_HUB_AGENT_ID,
-        description: '调用 DevHub Agent，协调 Coder / Reviewer 循环直至满足需求',
+        name: 'run_dev_loop',
+        description: '启动开发循环，协调 Coder / Reviewer 迭代直至代码通过审查',
         parameters: {
             task: z.string().min(1).describe('开发任务描述'),
         },

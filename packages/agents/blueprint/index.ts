@@ -1,20 +1,9 @@
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { buildPromptAgentStart } from '../runtime/runPromptAgentStart.js';
 import { loadAgentPipelineConfig } from '../runtime/agentLoader.js';
-import type {
-    AgentContext,
-    AgentStartContext,
-    AgentStartSinks,
-    ExecutionHandle,
-    RunnableAgent,
-} from '../runtime/types.js';
+import type { RunnableAgent } from '../runtime/types.js';
 import type { EventBus } from '@taskagent/core/event-bus';
-import { createWorkflowToolset } from '../runtime/workflowTools.js';
-import { defineBlueprintTool } from './workflows.js';
-
-const BLUEPRINT_AGENT_ID = 'blueprint';
-const BLUEPRINT_DESCRIPTION = 'Blueprint coordinator agent (dialog + workflow orchestration)';
+import { BlueprintAgent } from './BlueprintAgent.js';
 
 export async function createAgent(options?: {
     eventBus?: EventBus;
@@ -32,62 +21,12 @@ export async function createAgent(options?: {
         coordinatorFileName: 'coordinator.agent.md',
     });
 
-    const getPrompt = (userInput: string) => userInput.trim();
-    const getSystemPrompt = () => systemPrompt;
-    const getAgentDefinitions = () => agentDefinitions;
-    const getTools = () => allowedTools ?? [];
-
-    const workflowToolset = createWorkflowToolset({
-        agentId: BLUEPRINT_AGENT_ID,
-        sharedDependencies: {
-            tabExecutor: options?.tabExecutor,
-            agentRegistry: options?.agentRegistry,
-            eventBus: options?.eventBus,
-            defaultParentAgentId: BLUEPRINT_AGENT_ID,
-        },
-        tool: defineBlueprintTool(),
+    return new BlueprintAgent({
+        eventBus: options?.eventBus,
+        tabExecutor: options?.tabExecutor,
+        agentRegistry: options?.agentRegistry,
+        systemPrompt,
+        agentDefinitions,
+        allowedTools,
     });
-
-    const resolveMcpTool = (ctx: { sourceTabId?: string; workspacePath?: string; parentAgentId?: string }) =>
-        workflowToolset.asMcpTool({
-            sourceTabId: ctx.sourceTabId,
-            workspacePath: ctx.workspacePath,
-            parentAgentId: ctx.parentAgentId ?? BLUEPRINT_AGENT_ID,
-        });
-
-    const startPrompt = buildPromptAgentStart({
-        getPrompt: (userInput: string, ctx: { sourceTabId: string; workspacePath?: string }) => getPrompt(userInput),
-        getSystemPrompt,
-        getAgentDefinitions,
-        getMcpTools: (ctx) => {
-            const tool = resolveMcpTool({
-                sourceTabId: ctx.sourceTabId,
-                workspacePath: ctx.workspacePath,
-                parentAgentId: ctx.rawContext?.parentAgentId ?? BLUEPRINT_AGENT_ID,
-            });
-            return tool ? { [BLUEPRINT_AGENT_ID]: tool } : undefined;
-        },
-    });
-
-    return {
-        id: BLUEPRINT_AGENT_ID,
-        description: BLUEPRINT_DESCRIPTION,
-        getPrompt,
-        getAgentDefinitions,
-        getTools,
-        asMcpTool: (ctx) =>
-            resolveMcpTool({
-                sourceTabId: ctx.sourceTabId,
-                workspacePath: ctx.workspacePath,
-                parentAgentId: ctx.parentAgentId ?? BLUEPRINT_AGENT_ID,
-            }),
-        start: (userInput: string, context: AgentStartContext, sinks: AgentStartSinks): ExecutionHandle => {
-            // Minimal start: no event-bus mirroring to avoid duplicate messages
-            const enhancedContext: AgentStartContext = {
-                ...context,
-                tabExecutor: options?.tabExecutor,
-            } as AgentStartContext & AgentContext & { tabExecutor?: any };
-            return startPrompt(userInput, enhancedContext, sinks);
-        },
-    };
 }

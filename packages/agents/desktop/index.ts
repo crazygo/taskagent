@@ -81,6 +81,7 @@ export async function createAgent(options?: {
             }
         }
 
+        addLog(`[Start] Built child tool map: ${JSON.stringify(tools, null, 2)}`);
         return Object.keys(tools).length ? tools : undefined;
     };
 

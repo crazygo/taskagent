@@ -16,6 +16,8 @@ import type { EventBus } from '@taskagent/core/event-bus';
 import { createWorkflowToolset } from '../runtime/workflowTools.js';
 import { getDevHubToolDefinitions, getDevHubOperatorToolDefinitions, type DevLoopBridge } from './workflows.js';
 import { addLog } from '@taskagent/shared/logger';
+import { tool as sdkTool } from '@anthropic-ai/claude-agent-sdk';
+import { z } from 'zod';
 import type { tool as createSdkTool } from '@anthropic-ai/claude-agent-sdk';
 import type { TaskManager } from '@taskagent/shared/task-manager';
 import { createAgent as createLooperAgent } from './looper/index.js';
@@ -23,7 +25,7 @@ import type { LooperCommand } from './looper/command.js';
 import type { WorkflowRuntimeContext } from '../runtime/workflowTools.js';
 
 const DEV_HUB_AGENT_ID = 'devhub';
-const DEV_HUB_DESCRIPTION = '开发枢纽，理解用户需求并协调开发与审查流程';
+const DEV_HUB_DESCRIPTION = 'DevHub Agent - 理解开发需求，协调 Coder 与 Reviewer 循环开发直到代码通过审查';
 
 export async function createAgent(options?: { 
   eventBus?: EventBus;
@@ -86,12 +88,22 @@ export async function createAgent(options?: {
         tool: getDevHubOperatorToolDefinitions(looperBridge),
     });
 
-    const resolvePublicTool = (ctx: { sourceTabId?: string; workspacePath?: string; parentAgentId?: string }) =>
-        publicToolset.asMcpTool({
+    const resolvePublicTool = (ctx: { sourceTabId?: string; workspacePath?: string; parentAgentId?: string }) => {
+        const internalWorkflowTool = publicToolset.asMcpTool({
             sourceTabId: ctx.sourceTabId,
             workspacePath: ctx.workspacePath,
             parentAgentId: ctx.parentAgentId ?? DEV_HUB_AGENT_ID,
         });
+
+        return sdkTool(
+            DEV_HUB_AGENT_ID,
+            DEV_HUB_DESCRIPTION,
+            { task: z.string().min(1).describe('开发任务描述，DevHub 将协调开发与审查流程') },
+            async (args: { task: string }) => {
+                return await internalWorkflowTool.handler(args, {});
+            }
+        );
+    };
 
     const resolveOperatorTool = (ctx: { sourceTabId?: string; workspacePath?: string; parentAgentId?: string }) =>
         operatorToolset.asMcpTool({
@@ -103,9 +115,9 @@ export async function createAgent(options?: {
     const buildDevHubToolMap = (ctx: { sourceTabId?: string; workspacePath?: string; parentAgentId?: string }) => {
         const tools: Record<string, ReturnType<typeof createSdkTool>> = {};
 
-        const publicTool = resolvePublicTool(ctx);
-        if (publicTool) {
-            tools[DEV_HUB_AGENT_ID] = publicTool;
+        const internalTool = publicToolset.asMcpTool(ctx);
+        if (internalTool) {
+            tools['run_dev_loop'] = internalTool;
         }
 
         if ((ctx.sourceTabId ?? '').toLowerCase() === 'devhub') {
@@ -136,12 +148,24 @@ export async function createAgent(options?: {
         getPrompt,
         getAgentDefinitions,
         getTools,
-        asMcpTool: (ctx) =>
-            resolvePublicTool({
+        asMcpTool: (ctx) => {
+            const internalTool = publicToolset.asMcpTool({
                 sourceTabId: ctx.sourceTabId,
                 workspacePath: ctx.workspacePath,
                 parentAgentId: ctx.parentAgentId ?? DEV_HUB_AGENT_ID,
-            }),
+            });
+            
+            if (!internalTool) return undefined;
+            
+            return sdkTool(
+                DEV_HUB_AGENT_ID,
+                DEV_HUB_DESCRIPTION,
+                { task: z.string().min(1).describe('开发任务描述，DevHub 将协调开发与审查流程') },
+                async (args: { task: string }) => {
+                    return await internalTool.handler(args, {});
+                }
+            ) as any;
+        },
         start: (userInput: string, context: AgentStartContext, sinks: AgentStartSinks): ExecutionHandle => {
             // Save context for event handlers
             currentContext = context;

@@ -206,6 +206,7 @@ export const runClaudeStream = async ({
             try {
                 const userMessage: any = message;
                 if (userMessage?.type === 'user' && Array.isArray(userMessage?.message?.content)) {
+                    log(`[Agent] User message received with ${userMessage.message.content.length} blocks`);
                     for (const block of userMessage.message.content) {
                         if (block?.type === 'tool_result') {
                             const rid = String(block?.tool_use_id ?? 'unknown');
@@ -213,7 +214,8 @@ export const runClaudeStream = async ({
                             const started = toolUseStartAt.get(rid);
                             const isError = block?.is_error ?? false;
                             const duration = started ? (Date.now() - started) : undefined;
-                            log(`[ToolResult] id=${rid} name=${name} duration_ms=${duration ?? 'n/a'}`);
+                            const contentPreview = typeof block?.content === 'string' ? block.content.slice(0, 200) : JSON.stringify(block?.content).slice(0, 200);
+                            log(`[ToolResult] id=${rid} name=${name} duration_ms=${duration ?? 'n/a'} content=${contentPreview}`);
                             cb.onToolResult?.({ type: 'tool_result', id: rid, isError, name, content: block?.content ?? '', durationMs: duration, payload: block });
                             toolUseStartAt.delete(rid);
                             toolUseName.delete(rid);
@@ -274,6 +276,9 @@ export const runClaudeStream = async ({
 
     log(`[Agent] Stream summary: events=${eventCount}, assistant_chars=${assistantChars}, reasoning_chars=${reasoningChars}, t=${totalSeconds}s, t_first_evt=${firstEvtSec}s, t_first_asst=${firstAsstSec}s`);
     log(`[Agent] Tool pairing summary: pending_starts=${toolUseStartAt.size}`);
+    if (toolUseStartAt.size > 0) {
+        log(`[Agent] WARNING: Stream ended with ${toolUseStartAt.size} pending tool calls! Tool IDs: ${Array.from(toolUseName.entries()).map(([id, name]) => `${id}(${name})`).join(', ')}`);
+    }
     log('[Agent] Response completed.');
 
     return {
