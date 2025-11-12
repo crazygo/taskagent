@@ -8,7 +8,7 @@
 import { globalAgentRegistry } from './AgentRegistry.js';
 import { createAgent as createStartAgent } from '../desktop/index.js';
 import { createAgent as createBlueprintAgent } from '../blueprint/index.js';
-import { createAgent as createWriterAgent } from '../writer/index.js';
+import { createAgent as createFeatureWriterAgent } from '../feature-writer/index.js';
 import { createAgent as createGlossaryAgent } from '../glossary/index.js';
 import { createAgent as createUiReviewAgent } from '../ui-review/index.js';
 import { createAgent as createCoderAgent } from '../coder/index.js';
@@ -54,13 +54,15 @@ export function registerAllAgents(options?: { eventBus?: any; tabExecutor?: any;
         tags: ['planning', 'documentation'],
     });
 
-    // Writer Agent
+    // Feature Writer Agent
     globalAgentRegistry.register({
-        id: 'writer',
-        factory: () => createWriterAgent({
+        id: 'feature-writer',
+        factory: () => createFeatureWriterAgent({
             tabExecutor: options?.tabExecutor,
+            eventBus: options?.eventBus,
+            agentRegistry: globalAgentRegistry,
         }),
-        description: 'Writer - Write structured feature YAML files',
+        description: 'Feature Writer - Write structured feature YAML files',
         tags: ['atomic', 'writer'],
     });
 
@@ -85,6 +87,8 @@ export function registerAllAgents(options?: { eventBus?: any; tabExecutor?: any;
         id: 'coder',
         factory: () => createCoderAgent({
             tabExecutor: options?.tabExecutor,
+            eventBus: options?.eventBus,
+            agentRegistry: globalAgentRegistry,
         }),
         description: 'Coder Agent - Backend development executor with self-testing',
         tags: ['development', 'coding', 'monitor'],
@@ -95,6 +99,8 @@ export function registerAllAgents(options?: { eventBus?: any; tabExecutor?: any;
         id: 'review',
         factory: () => createReviewAgent({
             tabExecutor: options?.tabExecutor,
+            eventBus: options?.eventBus,
+            agentRegistry: globalAgentRegistry,
         }),
         description: 'Review Agent - Unified code review, progress summary, and quality monitoring',
         tags: ['review', 'quality', 'monitor'],
@@ -108,6 +114,7 @@ export function registerAllAgents(options?: { eventBus?: any; tabExecutor?: any;
             tabExecutor: options?.tabExecutor,
             messageStore: options?.messageStore,
             taskManager: options?.taskManager,
+            agentRegistry: globalAgentRegistry,
         }),
         description: 'DevHub Agent - 开发枢纽，协调开发与审查流程',
         tags: ['coordination', 'development', 'monitor'],

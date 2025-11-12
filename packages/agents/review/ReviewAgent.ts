@@ -7,10 +7,12 @@ import type { AgentDefinition } from '@anthropic-ai/claude-agent-sdk';
 const REVIEW_AGENT_ID = 'review';
 
 interface ReviewAgentDeps {
-    tabExecutor: any;
-    systemPrompt: any;
+    tabExecutor?: any;
+    systemPrompt?: any;
     agentDefinitions?: Record<string, AgentDefinition>;
     allowedTools?: string[];
+    eventBus?: EventBus;
+    agentRegistry?: AgentRegistry;
 }
 
 export class ReviewAgent extends PromptAgent implements RunnableAgent {
@@ -29,6 +31,8 @@ export class ReviewAgent extends PromptAgent implements RunnableAgent {
         return {
             ...this.runtimeContext,
             tabExecutor: this.deps.tabExecutor,
+            eventBus: this.deps.eventBus,
+            agentRegistry: this.deps.agentRegistry,
         };
     }
 

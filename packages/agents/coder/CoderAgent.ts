@@ -1,17 +1,26 @@
 import { z } from 'zod';
-import { addLog } from '@taskagent/shared/logger';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { PromptAgent, type AgentContext, type AgentToolContext, type RunnableAgent, type AgentStartContext, type AgentStartSinks, type ExecutionHandle } from '../runtime/types.js';
 import { buildPromptAgentStart } from '../runtime/runPromptAgentStart.js';
+import { loadAgentPipelineConfig } from '../runtime/agentLoader.js';
+import type { AgentRegistry } from '../registry/AgentRegistry.js';
+import type { EventBus } from '@taskagent/core/event-bus';
 import type { AgentDefinition } from '@anthropic-ai/claude-agent-sdk';
+import { addLog } from '@taskagent/shared/logger';
 
 const CODER_AGENT_ID = 'coder';
+const CODER_DESCRIPTION = 'Coder Agent - Backend development executor with self-testing';
 
 interface CoderAgentDeps {
-    tabExecutor: any;
-    systemPrompt: any;
+    tabExecutor?: any;
+    systemPrompt?: any;
     agentDefinitions?: Record<string, AgentDefinition>;
     allowedTools?: string[];
+    eventBus?: EventBus;
+    agentRegistry?: AgentRegistry;
 }
+
 
 export class CoderAgent extends PromptAgent implements RunnableAgent {
     readonly id = CODER_AGENT_ID;
@@ -29,6 +38,8 @@ export class CoderAgent extends PromptAgent implements RunnableAgent {
         return {
             ...this.runtimeContext,
             tabExecutor: this.deps.tabExecutor,
+            eventBus: this.deps.eventBus,
+            agentRegistry: this.deps.agentRegistry,
         };
     }
 

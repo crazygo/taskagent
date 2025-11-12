@@ -1,27 +1,34 @@
 import { z } from 'zod';
-import { addLog } from '@taskagent/shared/logger';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { PromptAgent, type AgentContext, type AgentToolContext, type RunnableAgent, type AgentStartContext, type AgentStartSinks, type ExecutionHandle } from '../runtime/types.js';
 import { buildPromptAgentStart } from '../runtime/runPromptAgentStart.js';
+import type { AgentRegistry } from '../registry/AgentRegistry.js';
+import type { EventBus } from '@taskagent/core/event-bus';
 import type { AgentDefinition } from '@anthropic-ai/claude-agent-sdk';
+import { addLog } from '@taskagent/shared/logger';
 
-const WRITER_AGENT_ID = 'writer';
+const FEATURE_WRITER_AGENT_ID = 'feature-writer';
+const FEATURE_WRITER_DESCRIPTION = 'Feature Writer - Write structured feature YAML files';
 
-interface WriterAgentDeps {
-    tabExecutor: any;
-    systemPrompt: any;
+interface FeatureWriterAgentDeps {
+    tabExecutor?: any;
+    systemPrompt?: any;
     agentDefinitions?: Record<string, AgentDefinition>;
     allowedTools?: string[];
+    eventBus?: EventBus;
+    agentRegistry?: AgentRegistry;
 }
 
-export class WriterAgent extends PromptAgent implements RunnableAgent {
-    readonly id = WRITER_AGENT_ID;
-    readonly description = 'Writer - Write structured feature YAML files';
+export class FeatureWriterAgent extends PromptAgent implements RunnableAgent {
+    readonly id = FEATURE_WRITER_AGENT_ID;
+    readonly description = FEATURE_WRITER_DESCRIPTION;
     
     protected readonly inputSchema = {
         task: z.string().min(1).describe('写作任务描述，包含目标文件和内容要求'),
     };
 
-    constructor(private deps: WriterAgentDeps) {
+    constructor(private deps: FeatureWriterAgentDeps) {
         super();
     }
 
@@ -29,6 +36,8 @@ export class WriterAgent extends PromptAgent implements RunnableAgent {
         return {
             ...this.runtimeContext,
             tabExecutor: this.deps.tabExecutor,
+            eventBus: this.deps.eventBus,
+            agentRegistry: this.deps.agentRegistry,
         };
     }
 
@@ -48,7 +57,7 @@ export class WriterAgent extends PromptAgent implements RunnableAgent {
         this.setRuntimeContext({
             sourceTabId: context.sourceTabId,
             workspacePath: context.workspacePath,
-            parentAgentId: context.parentAgentId ?? WRITER_AGENT_ID,
+            parentAgentId: context.parentAgentId ?? FEATURE_WRITER_AGENT_ID,
         });
         
         const startFn = buildPromptAgentStart({
@@ -68,36 +77,23 @@ export class WriterAgent extends PromptAgent implements RunnableAgent {
         const task = typeof args.task === 'string' ? args.task : String(args.task ?? '');
 
         if (!context.tabExecutor) {
-            const message = 'TabExecutor 未初始化，无法启动 Writer';
-            addLog(`[Writer] ${message}`);
+            const message = 'TabExecutor 未初始化，无法启动 Feature Writer';
+            addLog(`[FeatureWriter] ${message}`);
             return {
                 content: [{ type: 'text', text: message }],
             };
         }
 
         try {
-            addLog(`[Writer] Starting task: ${task.substring(0, 100)}...`);
-
-            const result = await context.tabExecutor.execute(
-                'Writer',
-                'writer',
-                task,
-                {
-                    sourceTabId: context.sourceTabId ?? 'Start',
-                    workspacePath: context.workspacePath,
-                    parentAgentId: context.parentAgentId ?? WRITER_AGENT_ID,
-                },
-                { async: false }
-            );
-
+            addLog(`[FeatureWriter] Starting task: ${task.substring(0, 100)}...`);
             return {
-                content: [{ type: 'text', text: `✅ Writer 完成\n\n${result}` }],
+                content: [{ type: 'text', text: `Feature Writer received: ${task}` }],
             };
         } catch (error) {
-            const message = `启动 Writer 失败: ${error instanceof Error ? error.message : String(error)}`;
-            addLog(`[Writer] ${message}`);
+            const message = error instanceof Error ? error.message : String(error);
+            addLog(`[FeatureWriter] Error: ${message}`);
             return {
-                content: [{ type: 'text', text: message }],
+                content: [{ type: 'text', text: `Error: ${message}` }],
             };
         }
     }

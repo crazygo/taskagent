@@ -3,9 +3,15 @@ import { fileURLToPath } from 'url';
 import { loadAgentPipelineConfig } from '../runtime/agentLoader.js';
 import type { RunnableAgent } from '../runtime/types.js';
 import type { TabExecutor } from '../../execution/TabExecutor.js';
-import { WriterAgent } from './WriterAgent.js';
+import type { EventBus } from '@taskagent/core/event-bus';
+import type { AgentRegistry } from '../registry/AgentRegistry.js';
+import { FeatureWriterAgent } from './FeatureWriterAgent.js';
 
-export async function createAgent(options?: { tabExecutor?: TabExecutor }): Promise<RunnableAgent> {
+export async function createAgent(options?: { 
+    tabExecutor?: TabExecutor;
+    eventBus?: EventBus;
+    agentRegistry?: AgentRegistry;
+}): Promise<RunnableAgent> {
     const agentDir = path.dirname(fileURLToPath(import.meta.url));
 
     const {
@@ -13,11 +19,13 @@ export async function createAgent(options?: { tabExecutor?: TabExecutor }): Prom
         agents: agentDefinitions,
         allowedTools,
     } = await loadAgentPipelineConfig(agentDir, {
-        coordinatorFileName: 'writer.agent.md',
+        coordinatorFileName: 'feature-writer.agent.md',
     });
 
-    return new WriterAgent({
+    return new FeatureWriterAgent({
         tabExecutor: options?.tabExecutor,
+        eventBus: options?.eventBus,
+        agentRegistry: options?.agentRegistry,
         systemPrompt,
         agentDefinitions,
         allowedTools,
