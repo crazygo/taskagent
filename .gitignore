@@ -94,3 +94,4 @@ unpack/
 # Test artifacts
 artifacts/
 .tmp-test-workspaces/
+.tmp-e2e-workspace/

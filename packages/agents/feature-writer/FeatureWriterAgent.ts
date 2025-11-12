@@ -25,6 +25,7 @@ export class FeatureWriterAgent extends PromptAgent implements RunnableAgent {
     readonly description = FEATURE_WRITER_DESCRIPTION;
     
     protected readonly inputSchema = {
+        task_id: z.string().min(1).describe('任务ID'),
         task: z.string().min(1).describe('写作任务描述，包含目标文件和内容要求'),
     };
 
@@ -73,8 +74,19 @@ export class FeatureWriterAgent extends PromptAgent implements RunnableAgent {
         return startFn(userInput, context, sinks);
     }
 
-    protected async execute(args: { task: string }, context: AgentToolContext): Promise<{ content: Array<{ type: 'text'; text: string }> }> {
+    protected async execute(args: { task_id: string; task: string }, context: AgentToolContext): Promise<{ content: Array<{ type: 'text'; text: string }> }> {
+        const task_id = typeof args.task_id === 'string' ? args.task_id : String(args.task_id ?? '');
         const task = typeof args.task === 'string' ? args.task : String(args.task ?? '');
+        
+        addLog(`[FeatureWriter] Received task_id: ${task_id}`);
+        
+        if (!task_id || task_id.trim().length === 0) {
+            const message = '❌ 缺少 task_id';
+            addLog(`[FeatureWriter] ${message}`);
+            return {
+                content: [{ type: 'text', text: message }],
+            };
+        }
 
         if (!context.tabExecutor) {
             const message = 'TabExecutor 未初始化，无法启动 Feature Writer';
@@ -85,15 +97,30 @@ export class FeatureWriterAgent extends PromptAgent implements RunnableAgent {
         }
 
         try {
-            addLog(`[FeatureWriter] Starting task: ${task.substring(0, 100)}...`);
+            addLog(`[FeatureWriter] Starting task_id: ${task_id}, task: ${task.substring(0, 100)}...`);
+            
+            // Start the agent with the task description
+            // The agent will use its tools (Read, Write, Edit, Glob) to complete the task
+            // This is delegated to the PromptAgent's start() method via tabExecutor
+            
+            const result = await context.tabExecutor.executeAgent(
+                'feature-writer',
+                task,
+                context
+            );
+            
+            addLog(`[FeatureWriter] Completed task_id: ${task_id}`);
             return {
-                content: [{ type: 'text', text: `Feature Writer received: ${task}` }],
+                content: [{ 
+                    type: 'text', 
+                    text: `✅ Feature Writer completed task_id: ${task_id}\n${result || '文件已更新'}` 
+                }],
             };
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
-            addLog(`[FeatureWriter] Error: ${message}`);
+            addLog(`[FeatureWriter] Error for task_id ${task_id}: ${message}`);
             return {
-                content: [{ type: 'text', text: `Error: ${message}` }],
+                content: [{ type: 'text', text: `❌ Error (task_id: ${task_id}): ${message}` }],
             };
         }
     }
