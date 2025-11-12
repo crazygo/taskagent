@@ -134,14 +134,18 @@ export function useAgentEventBridge(eventBus: EventBus, messageStore: MessageSto
       const chunk = typeof event.payload === 'string' ? event.payload : '';
       if (!chunk) return;
 
+      // Route to parent tab if parentAgentId is present
+      const targetTab = event.parentAgentId || event.tabId;
+
       // Emit assistant text as finalized message to interleave with tool logs
-      messageStore.appendMessage(event.tabId, {
+      messageStore.appendMessage(targetTab, {
         id: messageStore.getNextMessageId(),
         role: 'assistant',
         content: chunk,
         reasoning: '',
         isPending: false,
         timestamp: event.timestamp,
+        variant: event.parentAgentId ? 'worker' : undefined,
       });
     };
 

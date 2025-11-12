@@ -197,7 +197,7 @@ export abstract class PromptAgent {
                 return {
                     content: [{ 
                         type: 'text' as const, 
-                        text: result.output || result.result || '完成' 
+                        text: result.output || result.result || (options?.async ? '任务已异步运行，请稍后查看结果' : '完成')
                     }]
                 };
             }
