@@ -86,7 +86,7 @@ export async function createAgent(options?: {
                         task: z.string().min(1).describe('任务描述')
                     },
                     (args: { task_id: string; task: string }) => {
-                        return `Task ID: ${args.task_id}\n\n${args.task}`;
+                        return `Task ID: ${args.task_id}\nTask Folder: tasks/${args.task_id}, Please read/put feature docs in this folder unless the user points to another folder.\n---\n${args.task}`;
                     },
                     {
                         sourceTabId: ctx.sourceTabId,

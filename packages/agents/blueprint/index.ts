@@ -1,6 +1,6 @@
 import type { RunnableAgent } from '../runtime/types.js';
 import type { EventBus } from '@taskagent/core/event-bus';
-import { BlueprintAgent } from './BlueprintAgent.js';
+import { BlueprintLoop } from './BlueprintLoop.js';
 
 export async function createAgent(options?: {
     eventBus?: EventBus;
@@ -8,12 +8,11 @@ export async function createAgent(options?: {
     messageStore?: any;
     agentRegistry?: any;
 }): Promise<RunnableAgent> {
-    const agent = new BlueprintAgent({
-        eventBus: options?.eventBus,
-        tabExecutor: options?.tabExecutor,
-        agentRegistry: options?.agentRegistry,
-    });
-
-    await agent.initialize();
-    return agent;
+    const loop = new BlueprintLoop(
+        options?.agentRegistry,
+        options?.eventBus!,
+        options?.tabExecutor
+    );
+    await loop.initialize();
+    return loop;
 }

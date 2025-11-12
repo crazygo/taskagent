@@ -134,7 +134,7 @@ export class CodingLoop extends LoopAgent {
             this.state.shouldStop = false;
 
             // Launch loop in background
-            this.runLoopAsync(task).catch(error => {
+            this.executeLoopAsync(task).catch(error => {
                 this.emit({ type: 'progress', payload: `[Looper] 循环执行出错: ${error}` });
                 this.state.status = LooperStatus.IDLE;
             });
@@ -174,7 +174,7 @@ export class CodingLoop extends LoopAgent {
         }
     }
 
-    private async runLoopAsync(initialTask: string): Promise<void> {
+    private async executeLoopAsync(initialTask: string): Promise<void> {
         await this.initialize();
 
         // Start summarization callback timer
@@ -194,7 +194,7 @@ export class CodingLoop extends LoopAgent {
             // Execute SinglePass (Coder → Reviewer)
             this.emit({ type: 'progress', payload: '[AUTO] 执行 SinglePass (Coder → Review)...' });
             
-            const iterationResult = await this.runSinglePass(this.state.currentTask);
+            const iterationResult = await this.executePass(this.state.currentTask);
             
             this.emit({ type: 'progress', payload: '[AUTO] SinglePass 完成' });
 
@@ -238,7 +238,7 @@ export class CodingLoop extends LoopAgent {
     /**
      * Execute SinglePass (Coder → Reviewer) workflow
      */
-    private async runSinglePass(task: string): Promise<string> {
+    private async executePass(task: string): Promise<string> {
         if (!this.singlePass) {
             throw new Error('SinglePass not initialized');
         }
@@ -286,6 +286,15 @@ export class CodingLoop extends LoopAgent {
                 sinks
             );
         });
+    }
+
+    /**
+     * Implement LoopAgent abstract method: runSinglePass
+     * Note: CodingLoop uses command-based architecture and doesn't use the Template Method pattern
+     * This is a minimal implementation to satisfy the abstract contract
+     */
+    protected async runSinglePass(context: AgentStartContext, sinks: AgentStartSinks): Promise<string> {
+        return this.executePass(this.state.currentTask);
     }
 
     /**

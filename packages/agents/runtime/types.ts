@@ -72,38 +72,11 @@ export interface AgentToolContext {
 }
 
 /**
- * PromptAgent - Base class for single-purpose, prompt-driven agents
- * Can contain self-managed loop logic within the prompt
- * Can be exposed as MCP tools to other agents
+ * BaseAgent - common base for all agents
  */
-export abstract class PromptAgent {
+export abstract class BaseAgent {
     abstract readonly id: string;
     abstract readonly description: string;
-
-    /**
-     * Generate the prompt for SDK query
-     * @param userInput - Raw user input
-     * @param context - Execution context
-     * @returns Prompt string to send to LLM
-     */
-    abstract getPrompt(userInput: string, context: AgentContext): string;
-
-    /**
-     * Optional: Tools required by this agent
-     */
-    getTools?(): string[];
-
-    /**
-     * Optional: Model override
-     */
-    getModel?(): string;
-
-    /**
-     * Optional: Parse raw output into structured events
-     * @param rawOutput - Accumulated output from agent execution
-     * @returns Array of parsed events
-     */
-    parseOutput?(rawOutput: string): TaskEvent[];
 
     /**
      * Runtime context overrides (sourceTabId, workspacePath, parentAgentId)
@@ -113,7 +86,6 @@ export abstract class PromptAgent {
 
     /**
      * Set runtime context before calling asMcpTool
-     * Should be called by getMcpTools or similar setup methods
      */
     setRuntimeContext(ctx: Partial<AgentToolContext>): void {
         this.runtimeContext = ctx;
@@ -122,7 +94,6 @@ export abstract class PromptAgent {
     /**
      * Convert this agent into an MCP tool callable by other agents (standard version)
      * Uses single 'prompt' parameter by default
-     * @param ctx - Runtime context (sourceTabId, workspacePath, parentAgentId)
      */
     asMcpTool(ctx?: { sourceTabId?: string; workspacePath?: string; parentAgentId?: string }): ReturnType<typeof createSdkTool> | undefined {
         return this.asMcpToolWithSchema(
@@ -134,20 +105,6 @@ export abstract class PromptAgent {
 
     /**
      * Convert this agent into an MCP tool with custom schema
-     * Allows structured parameters to be converted to a single prompt
-     * 
-     * @param schema - Custom input schema (e.g., { task_id: z.string(), task: z.string() })
-     * @param concater - Function to convert structured args to prompt string
-     * @param ctx - Runtime context
-     * @param options - Execution options (async: true for fire-and-forget background execution)
-     * 
-     * @example
-     * agent.asMcpToolWithSchema(
-     *   { task_id: z.string(), task: z.string() },
-     *   (args) => `Task ID: ${args.task_id}\n\n${args.task}`,
-     *   ctx,
-     *   { async: true }  // For background tasks like Blueprint
-     * )
      */
     asMcpToolWithSchema<T extends Record<string, any>>(
         schema: Record<string, any>,
@@ -156,13 +113,10 @@ export abstract class PromptAgent {
         options?: { async?: boolean }
     ): ReturnType<typeof createSdkTool> | undefined {
         // Set runtime context if provided
-        if (ctx) {
-            this.setRuntimeContext(ctx);
-        }
+        if (ctx) this.setRuntimeContext(ctx);
         
         // Merge instance deps with runtime context
         const fullContext = this.buildToolContext();
-        
         if (!fullContext.eventBus || !fullContext.tabExecutor || !fullContext.agentRegistry) {
             return undefined;
         }
@@ -173,12 +127,8 @@ export abstract class PromptAgent {
             schema,
             async (args: Record<string, any>) => {
                 addLog(`[${this.id}] MCP tool handler called with args: ${JSON.stringify(args).slice(0, 200)}`);
-                
-                // 1. Convert structured args to prompt
                 const prompt = concater(args as T);
                 addLog(`[${this.id}] Converted to prompt: ${prompt.slice(0, 100)}...`);
-                
-                // 2. Execute via tabExecutor → start()
                 const result = await fullContext.tabExecutor.execute(
                     this.id,
                     this.id,
@@ -188,17 +138,11 @@ export abstract class PromptAgent {
                         workspacePath: fullContext.workspacePath,
                         parentAgentId: fullContext.parentAgentId,
                     },
-                    { async: options?.async }  // Pass async option to tabExecutor
+                    { async: options?.async }
                 );
-                
                 addLog(`[${this.id}] MCP tool handler completed`);
-                
-                // 3. Return result in CallToolResult format
                 return {
-                    content: [{ 
-                        type: 'text' as const, 
-                        text: result.output || result.result || (options?.async ? '任务已异步运行，请稍后查看结果' : '完成')
-                    }]
+                    content: [{ type: 'text' as const, text: result.output || result.result || (options?.async ? '任务已异步运行，请稍后查看结果' : '完成') }]
                 };
             }
         ) as any;
@@ -214,6 +158,29 @@ export abstract class PromptAgent {
         };
     }
 }
+
+/**
+ * PromptAgent - Base class for single-purpose, prompt-driven agents
+ * Can contain self-managed loop logic within the prompt
+ * Can be exposed as MCP tools to other agents
+ */
+export abstract class PromptAgent extends BaseAgent {
+    abstract readonly id: string;
+    abstract readonly description: string;
+
+    /**
+     * Generate the prompt for SDK query
+     */
+    abstract getPrompt(userInput: string, context: AgentContext): string;
+
+    /** Optional tools */
+    getTools?(): string[];
+    /** Optional model override */
+    getModel?(): string;
+    /** Optional output parser */
+    parseOutput?(rawOutput: string): TaskEvent[];
+}
+
 
 /**
  * RunnableAgent – unified external contract for agents

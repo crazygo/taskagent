@@ -1,4 +1,5 @@
 import type { RunnableAgent, AgentStartContext, AgentStartSinks, ExecutionHandle } from '../runtime/types.js';
+import { BaseAgent } from '../runtime/types.js';
 
 /**
  * SequentialAgent - Execute a group of sub-agents in sequence
@@ -15,7 +16,7 @@ import type { RunnableAgent, AgentStartContext, AgentStartSinks, ExecutionHandle
  * - Support short-circuit: choose to terminate or continue on sub-agent failure
  * - Output aggregation: can be last agent's output or combination of all outputs
  */
-export abstract class SequentialAgent implements RunnableAgent {
+export abstract class SequentialAgent extends BaseAgent implements RunnableAgent {
     abstract readonly id: string;
     abstract readonly description: string;
 
