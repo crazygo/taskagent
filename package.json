@@ -32,6 +32,7 @@
     "@types/react": "^19.2.2",
     "@vitest/coverage-v8": "^4.0.6",
     "concurrently": "^9.2.1",
+    "corepack": "^0.34.3",
     "execa": "^9.6.0",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3",
@@ -65,9 +66,9 @@
     "README.md"
   ],
   "bin": {
-    "taskagent": "dist/packages/cli/main.js",
+    "taskagent": "dist/cli/main.js",
     "taskagent-monitor": "dist/main-monitor.js"
   },
-  "main": "dist/packages/cli/main.js",
-  "types": "dist/packages/cli/main.d.ts"
+  "main": "dist/cli/main.js",
+  "types": "dist/cli/main.d.ts"
 }
