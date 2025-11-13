@@ -80,51 +80,106 @@ export const InputBar: React.FC<InputBarProps> = ({
     }
   }, [onChange, onEscStateChange]);
 
+  // Handle all keypresses with batching for paste detection
+  const pendingCharsRef = useRef('');
+  const batchTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingIsPasteRef = useRef(false);
+  const recentPasteUntilRef = useRef<number>(0); // block submit within window
+  // Store collapsed paste blocks for later expansion on submit
+  const pasteStoreRef = useRef<{ placeholder: string; content: string }[]>([]);
+  
+  // Helper: flush pending characters immediately
+  const flushPending = useCallback(() => {
+    if (pendingCharsRef.current) {
+      const chars = pendingCharsRef.current;
+      const len = chars.length;
+      if (pendingIsPasteRef.current && len >= 100) {
+        // Collapse large paste into summary to avoid UI explosion but APPEND instead of replace
+        const placeholder = `[Pasted ${len} chars]`;
+        // Store mapping so we can expand on submit
+        pasteStoreRef.current.push({ placeholder, content: chars });
+        onChange((prev: string) => prev + placeholder);
+      } else {
+        onChange((prev: string) => prev + chars);
+      }
+      pendingCharsRef.current = '';
+      pendingIsPasteRef.current = false;
+    }
+    if (batchTimerRef.current) {
+      clearTimeout(batchTimerRef.current);
+      batchTimerRef.current = null;
+    }
+  }, [onChange]);
+
+  // Keep latest value in a ref to avoid stale closure on submit
+  const valueRef = useRef(value);
+  useEffect(() => { valueRef.current = value; }, [value]);
+
   // Handle submit command
   const handleSubmitCommand = useCallback(() => {
-    if (process.env.E2E_SENTINEL) {
-      addLog(`[InputBar] SUBMIT command, value="${value}"`);
-    }
-    if (showCommandMenu) {
+    // If paste window active, just flush and ignore submit to avoid accidental sends
+    if (Date.now() < recentPasteUntilRef.current || pendingIsPasteRef.current) {
+      flushPending();
       return;
     }
-    onSubmit(value);
-  }, [value, showCommandMenu, onSubmit]);
+
+    // CRITICAL: Flush pending chars before submit
+    flushPending();
+    
+    // Small delay to ensure state is updated
+    setTimeout(() => {
+      let current = valueRef.current;
+      // Expand any paste placeholders back to original content
+      if (pasteStoreRef.current.length) {
+        for (const { placeholder, content } of pasteStoreRef.current) {
+          // Replace all occurrences (user may paste same size twice)
+          current = current.split(placeholder).join(content);
+        }
+        if (process.env.E2E_SENTINEL) {
+          addLog(`[InputBar] Expanded ${pasteStoreRef.current.length} paste placeholder(s) before submit`);
+        }
+      }
+      if (process.env.E2E_SENTINEL) {
+        addLog(`[InputBar] SUBMIT command, value length=${current.length}`);
+      }
+      if (showCommandMenu) {
+        return;
+      }
+      onSubmit(current);
+      // Clear paste store after successful submit
+      pasteStoreRef.current = [];
+    }, 20);
+  }, [showCommandMenu, onSubmit, flushPending]);
 
   // Subscribe to commands
   useCommand(KeyCommand.SUBMIT, handleSubmitCommand, { isActive: isFocused });
-
-  // Handle all keypresses including paste
+  
   useKeypress(
     useCallback(
       (key: Key) => {
         if (!isFocused) return;
         
-        // 1. Handle paste events
-        if (key.paste) {
-          const length = key.sequence.length;
-          if (process.env.E2E_SENTINEL) {
-            addLog(`[InputBar] Paste detected: ${length} chars`);
-          }
-
-          if (length >= PASTE_THRESHOLD) {
-            onChange(() => `[Pasted ${length} chars]`);
-          } else {
-            onChange((prev: string) => prev + key.sequence);
-          }
+        // CRITICAL: Skip return/enter keys entirely - they should ONLY be handled as SUBMIT command
+        // This prevents paste with newlines from triggering multiple submits
+        if (key.name === 'return' || key.name === 'enter') {
           return;
         }
-
-        // 2. Check if it's a command (handled by useCommand)
+        
+        // 1. Check if it's a command (handled by useCommand)
         const commandValues = Object.values(KeyCommand) as KeyCommand[];
         for (const cmd of commandValues) {
           if (keyMatchers[cmd](key)) {
+            // Flush pending chars before command
+            flushPending();
             return;
           }
         }
 
-        // 3. Handle text editing
+        // 2. Handle text editing
         if (key.name === 'backspace' || key.name === 'delete') {
+          // Flush pending before backspace
+          flushPending();
+          
           onChange((prev: string) => {
             if (prev.length > 0) {
               return prev.slice(0, -1);
@@ -134,15 +189,46 @@ export const InputBar: React.FC<InputBarProps> = ({
           return;
         }
 
-        // 4. Normal printable characters (space, Chinese, etc.)
+        // 3. Normal printable characters - batch them
         if (key.sequence) {
-          onChange((prev: string) => prev + key.sequence);
+          // Filter out any remaining newlines to prevent issues
+          // Convert newlines to spaces
+          const sanitized = key.sequence.replace(/[\r\n]/g, ' ');
+          
+          if (sanitized) {
+            pendingCharsRef.current += sanitized;
+            if (key.paste) pendingIsPasteRef.current = true;
+            // Open a short paste window on any batched input to prevent accidental submit
+            if (key.paste || sanitized.length > 1) {
+              recentPasteUntilRef.current = Date.now() + 600;
+            }
+            
+            // Clear existing timer
+            if (batchTimerRef.current) {
+              clearTimeout(batchTimerRef.current);
+            }
+            
+            // Flush after 50ms of no new input (paste detection)
+            batchTimerRef.current = setTimeout(() => {
+              flushPending();
+              batchTimerRef.current = null;
+            }, 50);
+          }
         }
       },
-      [onChange, isFocused],
+      [onChange, isFocused, flushPending],
     ),
     { isActive: true },
   );
+  
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (batchTimerRef.current) {
+        clearTimeout(batchTimerRef.current);
+      }
+    };
+  }, []);
 
   // 检测是否应该显示命令菜单
   useEffect(() => {
