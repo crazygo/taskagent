@@ -3,7 +3,6 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { PromptAgent, type AgentContext, type AgentToolContext, type RunnableAgent, type AgentStartContext, type AgentStartSinks, type ExecutionHandle } from '../runtime/types.js';
 import { buildPromptAgentStart } from '../runtime/runPromptAgentStart.js';
-import { loadAgentPipelineConfig } from '../runtime/agentLoader.js';
 import type { AgentRegistry } from '../registry/AgentRegistry.js';
 import type { EventBus } from '@taskagent/core/event-bus';
 import type { AgentDefinition } from '@anthropic-ai/claude-agent-sdk';
