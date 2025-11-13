@@ -123,7 +123,7 @@ __metadata:
     vitest: "npm:^4.0.6"
     zod: "npm:^3.22.4"
   bin:
-    taskagent: dist/packages/cli/main.js
+    taskagent: dist/cli/main.js
     taskagent-monitor: dist/main-monitor.js
   languageName: unknown
   linkType: soft
