@@ -24,8 +24,6 @@ interface InputBarProps {
   commands: Command[];
 }
 
-const PASTE_THRESHOLD = 100;
-
 export const InputBar: React.FC<InputBarProps> = ({
   value,
   onChange,

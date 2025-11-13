@@ -1,7 +1,6 @@
 import { Box, Text } from 'ink';
 import React, { useCallback } from 'react';
 import type { Task } from '@taskagent/shared/task-manager';
-import { Driver } from '../drivers/types.js';
 import { addLog } from '@taskagent/shared/logger';
 import { useCommand } from '../src/hooks/useCommand.js';
 import { Command } from '../src/config/keyBindings.js';
@@ -18,8 +17,8 @@ interface TabViewProps {
   isFocused: boolean;
 }
 
-export const TabView: React.FC<TabViewProps> = ({ staticOptions, tasks, selectedTab, onTabChange, isFocused }) => {
-  const taskTabs = tasks.map((task, index) => `Task ${index + 1}`);
+export const TabView: React.FC<TabViewProps> = ({ staticOptions, tasks, selectedTab, onTabChange }) => {
+  const taskTabs = tasks.map((_, index) => `Task ${index + 1}`);
   const allTabs = [...staticOptions, ...taskTabs];
 
   // Handle tab navigation with useCommand

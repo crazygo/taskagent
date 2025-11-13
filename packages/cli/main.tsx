@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { render, Box, Text, useInput } from 'ink';
 import { randomUUID } from 'crypto';
 import { inspect } from 'util';
-import { type AgentDefinition, type PermissionUpdate, type PermissionResult } from '@anthropic-ai/claude-agent-sdk';
+import { type PermissionUpdate, type PermissionResult } from '@anthropic-ai/claude-agent-sdk';
 
 import { addLog } from '@taskagent/shared/logger';
 import { loadCliConfig } from './cli/config.js';
@@ -24,8 +24,6 @@ import {
     Driver,
     type AgentPipelineInvocationOptions,
     type DriverManifestEntry,
-    type ViewDriverEntry,
-    type BackgroundTaskDriverEntry,
     type DriverRuntimeContext,
 } from './drivers/types.js';
 import {
