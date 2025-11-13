@@ -3,7 +3,7 @@ import { runCommand } from '../helpers/run-command';
 
 describe('CLI tab entrypoints', () => {
   const cases = [
-    { slug: 'story', expectation: /\[Story\] view is active/ },
+    { slug: 'story', expectation: /\[Blueprint\] view is active/ },
     { slug: 'glossary', expectation: /\[Glossary\] view is active/ },
   ];
 

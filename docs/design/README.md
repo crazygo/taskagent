@@ -4,11 +4,11 @@ This directory contains architectural design documents for the TaskAgent project
 
 ## Core System Design
 
-### Monitor/Mediator/Looper Architecture
+### Monitor/DevHub/Looper Architecture
 
 - **[monitor_mediator_looper.md](./monitor_mediator_looper.md)** - Technical Implementation Design (Latest)
   - EventBus cross-tab messaging
-  - Mediator Agent: Dialog router and task orchestrator
+  - DevHub Agent: Dialog router and task orchestrator
   - Looper Agent: Loop execution engine (Coder ↔ Review ↔ JUDGE)
   - JUDGE Agent: LLM-based decision node with structured output
   - CLI testing strategy
@@ -19,7 +19,7 @@ This directory contains architectural design documents for the TaskAgent project
 
 ## Related Directories
 
-- `/packages/agents/monitor/` - Current implementation base (to be refactored to mediator/)
+- `/packages/agents/monitor/` - Current implementation base (to be refactored to devhub/)
 - `/packages/agents/monitor/TODO.md` - Implementation checklist and detailed decisions
 - `/docs/features/` - User-facing feature specifications
 - `/packages/agents/coder/` - Coder Agent implementation
@@ -37,7 +37,7 @@ This directory contains architectural design documents for the TaskAgent project
 
 ## For Developers
 
-When implementing the Monitor/Mediator/Looper system:
+When implementing the Monitor/DevHub/Looper system:
 1. Read `monitor_mediator_looper.md` for technical details
 2. Check `packages/agents/monitor/TODO.md` for current status
 3. Run CLI tests from the testing section
@@ -45,9 +45,9 @@ When implementing the Monitor/Mediator/Looper system:
 
 ## Naming Convention
 
-**Why "Monitor/Mediator/Looper"?**
+**Why "Monitor/DevHub/Looper"?**
 - **Monitor Tab**: User-facing tab name (UI concept)
-- **Mediator Agent**: Backend agent handling Monitor Tab (implementation)
+- **DevHub Agent**: Backend agent handling Monitor Tab (implementation)
 - **Looper Agent**: Independent execution engine (architecture component)
 
 The documents use all three terms to maintain clarity at different abstraction levels.

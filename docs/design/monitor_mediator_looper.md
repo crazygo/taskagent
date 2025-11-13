@@ -9,7 +9,7 @@
 ## 文档目标
 
 本文档描述 Monitor Agent 系统的技术实施方案，包括：
-- Mediator Agent（对话路由器）
+- DevHub Agent（开发枢纽）
 - Looper Agent（循环执行引擎）
 - 跨 Tab 消息机制
 - 与现有代码的集成点
@@ -38,7 +38,7 @@
 
 ### 新需求
 
-**用例**：Mediator 需要订阅 Looper Tab 的消息，实时获取进展更新。
+**用例**：DevHub 需要订阅 Looper Tab 的消息，实时获取进展更新。
 
 **技术目标**：
 - MessageStore 推送消息时自动触发 EventBus 事件
@@ -60,7 +60,7 @@
 └─────────────────────────────────────────────────────┘
            ↓
 ┌─────────────────────────────────────────────────────┐
-│  Mediator Agent 订阅                                │
+│  DevHub Agent 订阅                                  │
 │    eventBus.on('message:added', (event) => {        │
 │      if (event.tabId === 'Looper') {                │
 │        // 处理 Looper 消息                          │
@@ -111,10 +111,10 @@ class MessageStore {
 
 ### 使用示例
 
-**Mediator 订阅 Looper 消息**：
+**DevHub 订阅 Looper 消息**：
 ```typescript
-// Mediator Agent 初始化时
-class MediatorAgent {
+// DevHub Agent 初始化时
+class DevHubAgent {
   constructor(private eventBus: EventBus) {
     // 订阅所有消息
     eventBus.on('message:added', (event) => {
@@ -130,7 +130,7 @@ class MediatorAgent {
   }
 
   private handleLooperProgress(message: Message) {
-    // 更新 Mediator 的内部上下文
+    // 更新 DevHub 的内部上下文
     // 用于下次用户询问时提供信息
   }
 }
@@ -253,9 +253,9 @@ Decision:
 
 ### 使用示例
 
-**用户通过 Mediator 启动循环**：
+**用户通过 DevHub 启动循环**：
 ```typescript
-// Mediator 调用 send_to_looper 工具
+// DevHub 调用 send_to_looper 工具
 tabExecutor.execute(
   'Looper',                                // tabId
   'looper',                                // agentId
@@ -277,10 +277,10 @@ Looper.start() 解析为 { type: 'start', task: '优化登录页面' }
 ### 影响范围
 
 **新增文件**：
-- `packages/agents/looper/index.ts` - LooperGraphAgent 类
-- `packages/agents/looper/state.ts` - 状态机定义
-- `packages/agents/looper/command.ts` - 命令解析
-- `packages/agents/looper/judge/` - JUDGE Agent（PromptAgent）
+- `packages/agents/devhub/looper/index.ts` - LooperGraphAgent 类
+- `packages/agents/devhub/looper/state.ts` - 状态机定义
+- `packages/agents/devhub/looper/command.ts` - 命令解析
+- `packages/agents/devhub/looper/judge/` - JUDGE Agent（PromptAgent）
   - `judge.agent.md` - JUDGE System Prompt
   - `index.ts` - JUDGE Agent 实现
   - `schema.ts` - 结构化输出 Schema
@@ -403,7 +403,7 @@ type JudgeDecision =
 
 **在 Looper 中调用 JUDGE**：
 ```typescript
-// packages/agents/looper/index.ts
+// packages/agents/devhub/looper/index.ts
 import { createJudgeAgent } from './judge/index.js';
 
 class LooperGraphAgent {
@@ -446,9 +446,9 @@ class LooperGraphAgent {
 ### 影响范围
 
 **新增文件**：
-- `packages/agents/looper/judge/judge.agent.md` - System Prompt
-- `packages/agents/looper/judge/index.ts` - JUDGE Agent 实现
-- `packages/agents/looper/judge/schema.ts` - JudgeDecision 类型定义
+- `packages/agents/devhub/looper/judge/judge.agent.md` - System Prompt
+- `packages/agents/devhub/looper/judge/index.ts` - JUDGE Agent 实现
+- `packages/agents/devhub/looper/judge/schema.ts` - JudgeDecision 类型定义
 
 **依赖**：
 - 复用 `buildPromptAgentStart` 工厂函数
@@ -456,7 +456,7 @@ class LooperGraphAgent {
 
 ---
 
-## 3. Mediator Agent（PromptAgent）
+## 3. DevHub Agent（PromptAgent）
 
 ### 现状分析
 
@@ -464,13 +464,13 @@ class LooperGraphAgent {
 - `buildPromptAgentStart()` 工厂函数
 - 支持自定义工具注入（通过 `canUseTool` sink）
 
-**Story Agent 示例**（`packages/agents/story/index.ts`）：
+**Story Agent 示例**（`packages/agents/blueprint/index.ts`）：
 - 基于 `loadAgentPipelineConfig` 加载配置
 - 自定义工具通过 SDK 的 tool calling 机制
 
 ### 新需求
 
-**Mediator 职责**：
+**DevHub 职责**：
 - 理解用户自然语言
 - 路由任务（简单问答 vs 发送给 Looper）
 - 订阅 Looper 消息，转述给用户
@@ -479,7 +479,7 @@ class LooperGraphAgent {
 
 ```
 ┌───────────────────────────────────────────────────────┐
-│  MediatorAgent (PromptAgent)                          │
+│  DevHubAgent (PromptAgent)                           │
 │  ┌─────────────────────────────────────────────────┐  │
 │  │  初始化                                         │  │
 │  │    eventBus.on('message:added', ...)           │  │
@@ -529,29 +529,29 @@ tools: {
 ```
 用户: "优化网页代码"
   ↓
-Mediator (LLM 理解意图)
+DevHub (LLM 理解意图)
   ↓
 调用工具: send_to_looper({ command: 'start', task: '优化网页代码' })
   ↓
-Mediator 响应: "好的，已启动优化循环"
+DevHub 响应: "好的，已启动优化循环"
   ↓
 [Looper 后台运行...]
   ↓
 EventBus 推送: message:added { tabId: 'Looper', content: '[AUTO] Coder 完成' }
   ↓
-Mediator 接收事件，更新内部上下文
+DevHub 接收事件，更新内部上下文
   ↓
 用户: "进展如何？"
   ↓
-Mediator (基于上下文): "Coder 已完成，正在审查中"
+DevHub (基于上下文): "Coder 已完成，正在审查中"
 ```
 
 ### 使用示例
 
-**Mediator 工具实现**：
+**DevHub 工具实现**：
 ```typescript
-// packages/agents/mediator/tools.ts
-export const mediatorTools = {
+// packages/agents/devhub/tools.ts
+export const devHubTools = {
   send_to_looper: async (params: {
     command: string;
     task?: string;
@@ -591,13 +591,13 @@ export const mediatorTools = {
 ### 影响范围
 
 **新增文件**：
-- `packages/agents/mediator/index.ts` - Mediator Agent
-- `packages/agents/mediator/mediator.agent.md` - System Prompt
-- `packages/agents/mediator/tools.ts` - 工具实现
+- `packages/agents/devhub/index.ts` - DevHub Agent
+- `packages/agents/devhub/mediator.agent.md` - System Prompt
+- `packages/agents/devhub/tools.ts` - 工具实现
 
 **注册**：
-- `packages/agents/registry/registerAgents.ts` - 注册 mediator
-- Monitor Tab 关联到 Mediator Agent（修改 TabRegistry）
+- `packages/agents/registry/registerAgents.ts` - 注册 devhub
+- Monitor Tab 关联到 DevHub Agent（修改 TabRegistry）
 
 ---
 
@@ -632,7 +632,7 @@ enum Driver {
 TabRegistry
   ├─ Chat Tab → Driver.CHAT → (无 Agent)
   ├─ Agent Tab → Driver.AGENT → DefaultPromptAgent
-  ├─ Monitor Tab → Driver.MONITOR → Mediator Agent
+  ├─ Monitor Tab → Driver.MONITOR → DevHub Agent
   └─ Looper Tab → Driver.LOOPER → Looper Agent (新增)
 ```
 
@@ -682,14 +682,14 @@ export enum Driver {
 
 ### 新需求
 
-**Mediator 调用 Looper 时不等待**：
+**DevHub 调用 Looper 时不等待**：
 - 当前 execute() 会等待 agent.start() 的 completion
-- Mediator 需要 fire-and-forget 模式
+- DevHub 需要 fire-and-forget 模式
 
 ### 接口定义
 
 ```
-Mediator → TabExecutor.execute('Looper', 'looper', ...)
+DevHub → TabExecutor.execute('Looper', 'looper', ...)
               ↓
             不 await（立即返回）
               ↓
@@ -697,7 +697,7 @@ Mediator → TabExecutor.execute('Looper', 'looper', ...)
               ↓
             TabExecutor.execute() Promise resolve
               ↓
-            Mediator 继续执行（不阻塞）
+            DevHub 继续执行（不阻塞）
 ```
 
 ### 技术方案
@@ -713,7 +713,7 @@ Looper 已设计为双支路：
 ### 使用示例
 
 ```typescript
-// Mediator 工具中
+// DevHub 工具中
 tabExecutor.execute('Looper', 'looper', command, context);
 // 不 await，但 execute 会立即返回（因为 Looper completion 立即 resolve）
 ```
@@ -736,13 +736,13 @@ tabExecutor.execute('Looper', 'looper', command, context);
 5. Looper 循环逻辑（Coder → Review → JUDGE）
 6. JUDGE 节点实现
 
-### Phase 3: Mediator Agent
-7. Mediator Agent 实现
-8. Mediator 工具实现（send_to_looper, query_looper_state）
+### Phase 3: DevHub Agent
+7. DevHub Agent 实现
+8. DevHub 工具实现（send_to_looper, query_looper_state）
 9. EventBus 订阅集成
 
 ### Phase 4: 集成测试
-10. 测试 Mediator → Looper 通信
+10. 测试 DevHub → Looper 通信
 11. 测试用户直接操作 Looper
 12. 测试候补队列和停止命令
 
@@ -822,19 +822,19 @@ yarn start -- \
 # - 显示 "状态: IDLE" 或 "状态: RUNNING"
 ```
 
-**Test 3: Mediator 启动 Looper**
+**Test 3: DevHub 启动 Looper**
 ```bash
 yarn start -- \
   --workspace $TEST_WORKSPACE \
   --newsession \
-  --mediator \
+  --devhub \
   --auto-allow \
   -p "优化代码质量，重点检查错误处理"
 
 # 预期：
-# - Mediator 理解意图
+# - DevHub 理解意图
 # - 调用 send_to_looper 工具
-# - Mediator 响应 "已启动优化循环"
+# - DevHub 响应 "已启动优化循环"
 # - 在 Looper Tab 看到循环开始
 ```
 
@@ -879,17 +879,17 @@ yarn start -- \
 
 **Test 7: EventBus 跨 Tab 消息（手动验证）**
 ```bash
-# 启动 Mediator Tab
-yarn start -- --workspace $TEST_WORKSPACE --mediator
+# 启动 DevHub Tab
+yarn start -- --workspace $TEST_WORKSPACE --devhub
 
 # 手动操作：
 # 1. 发送 "优化代码"
 # 2. 切换到 Looper Tab，观察循环执行
 # 3. 切回 Monitor Tab，发送 "进展如何？"
-# 4. 验证 Mediator 能回答当前状态
+# 4. 验证 DevHub 能回答当前状态
 
 # 预期：
-# - Mediator 能看到 Looper 的 [AUTO] 消息
+# - DevHub 能看到 Looper 的 [AUTO] 消息
 # - 基于这些消息回答用户
 ```
 
@@ -901,7 +901,7 @@ yarn start -- --workspace $TEST_WORKSPACE --mediator
 
 #### Looper 状态机测试
 ```bash
-# packages/agents/looper/state.test.ts
+# packages/agents/devhub/looper/state.test.ts
 - 测试 IDLE → RUNNING 转换
 - 测试候补队列 push/pop
 - 测试终止条件判断
@@ -909,13 +909,13 @@ yarn start -- --workspace $TEST_WORKSPACE --mediator
 
 #### 命令解析测试
 ```bash
-# packages/agents/looper/command.test.ts
+# packages/agents/devhub/looper/command.test.ts
 - parseCommand('{"type":"start","task":"xxx"}')
 ```
 
 #### JUDGE 节点测试
 ```bash
-# packages/agents/looper/judge/judge.test.ts
+# packages/agents/devhub/looper/judge/judge.test.ts
 - 输入组装格式验证
 - Prompt 构建验证
 - 结构化输出解析（continue vs terminate）
@@ -941,15 +941,15 @@ yarn start -- --workspace $TEST_WORKSPACE --mediator
 
 参考 TODO.md 中的验证目标，使用 CLI 命令逐一验证：
 
-- [ ] **Test 1**: 用户通过 Mediator 启动循环任务
+- [ ] **Test 1**: 用户通过 DevHub 启动循环任务
 - [ ] **Test 2**: 用户直接在 Looper Tab 启动任务
 - [ ] **Test 3**: Looper 执行 Coder → Review → JUDGE 循环
-- [ ] **Test 4**: 用户查询 Looper 状态（通过 Mediator 或直接）
+- [ ] **Test 4**: 用户查询 Looper 状态（通过 DevHub 或直接）
 - [ ] **Test 5**: 用户添加候补任务
 - [ ] **Test 6**: Looper 在 JUDGE 节点处理候补任务
 - [ ] **Test 7**: 用户停止正在运行的循环
 - [ ] **Test 8**: 看到 [AUTO] 状态消息推送到 Looper Tab
-- [ ] **Test 9**: Mediator 通过 EventBus 接收 Looper 消息
+- [ ] **Test 9**: DevHub 通过 EventBus 接收 Looper 消息
 
 ---
 
@@ -958,13 +958,13 @@ yarn start -- --workspace $TEST_WORKSPACE --mediator
 **查看日志**：
 ```bash
 # 实时查看 debug.log
-tail -f debug.log | grep -E "Looper|Mediator|JUDGE"
+tail -f debug.log | grep -E "Looper|DevHub|JUDGE"
 ```
 
 **手动测试工具调用**：
 ```bash
 # 测试 send_to_looper 工具
-yarn start -- --mediator -p "测试工具：发送任务给 Looper"
+yarn start -- --devhub -p "测试工具：发送任务给 Looper"
 
 # 观察 debug.log 中的工具调用记录
 ```
@@ -989,8 +989,8 @@ eventBus.on('message:added', (event) => {
 | TabRegistry | `packages/tabs/TabRegistry.ts` |
 | TaskManager | `packages/shared/task-manager.ts` |
 | AgentRegistry | `packages/agents/registry/registerAgents.ts` |
-| Mediator Agent | `packages/agents/mediator/` |
-| Looper Agent | `packages/agents/looper/` |
+| DevHub Agent | `packages/agents/devhub/` |
+| Looper Agent | `packages/agents/devhub/looper/` |
 | Coder Agent | `packages/agents/coder/` |
 | Review Agent | `packages/agents/review/` |
 
@@ -1021,7 +1021,7 @@ eventBus.on('message:added', (event) => {
 **目标**: 完成 Looper 状态机、循环逻辑、JUDGE 节点
 
 **任务列表**:
-- [ ] 实现 LooperGraphAgent 类（packages/agents/looper/index.ts）
+- [ ] 实现 LooperGraphAgent 类（packages/agents/devhub/looper/index.ts）
 - [ ] 实现状态机管理（state.ts）
 - [ ] 实现命令解析器（command.ts）
 - [ ] 实现 JUDGE Agent（judge/ 目录）
@@ -1054,12 +1054,12 @@ yarn start -- --looper -p '{"type":"stop"}'
 
 ---
 
-### Milestone 3: Mediator Agent 实现（3-5天）
+### Milestone 3: DevHub Agent 实现（3-5天）
 
-**目标**: 完成 Mediator 对话路由、工具实现、EventBus 订阅
+**目标**: 完成 DevHub 对话路由、工具实现、EventBus 订阅
 
 **任务列表**:
-- [ ] 实现 Mediator Agent（packages/agents/mediator/index.ts）
+- [ ] 实现 DevHub Agent（packages/agents/devhub/index.ts）
 - [ ] 编写 System Prompt（mediator.agent.md）
 - [ ] 实现工具（tools.ts）
   - [ ] send_to_looper: 发送命令到 Looper Tab
@@ -1068,19 +1068,19 @@ yarn start -- --looper -p '{"type":"stop"}'
 - [ ] 实现上下文更新逻辑（基于 Looper 进展）
 - [ ] 单元测试：工具调用、EventBus 订阅
 
-**验收标准**:
-- Mediator 能理解自然语言并路由任务
+- **验收标准**:
+- DevHub 能理解自然语言并路由任务
 - send_to_looper 工具正确调用 TabExecutor
-- Mediator 能订阅并接收 Looper Tab 消息
-- 用户询问进展时，Mediator 基于订阅的消息回复
+- DevHub 能订阅并接收 Looper Tab 消息
+- 用户询问进展时，DevHub 基于订阅的消息回复
 
 **CLI 测试**:
 ```bash
-# Test 4: Mediator 启动 Looper
-yarn start -- --mediator -p "优化代码质量"
+# Test 4: DevHub 启动 Looper
+yarn start -- --devhub -p "优化代码质量"
 
-# Test 5: Mediator 查询进展
-yarn start -- --mediator -p "进展如何？"
+# Test 5: DevHub 查询进展
+yarn start -- --devhub -p "进展如何？"
 ```
 
 ---
@@ -1090,20 +1090,20 @@ yarn start -- --mediator -p "进展如何？"
 **目标**: 验证完整的用户场景，修复集成问题
 
 **测试场景**:
-- [ ] **Test 1**: 用户通过 Mediator 启动循环任务
+- [ ] **Test 1**: 用户通过 DevHub 启动循环任务
 - [ ] **Test 2**: 用户直接在 Looper Tab 启动任务
 - [ ] **Test 3**: Looper 执行 Coder → Review → JUDGE 循环
-- [ ] **Test 4**: 用户查询 Looper 状态（通过 Mediator 或直接）
+- [ ] **Test 4**: 用户查询 Looper 状态（通过 DevHub 或直接）
 - [ ] **Test 5**: 用户添加候补任务
 - [ ] **Test 6**: Looper 在 JUDGE 节点处理候补任务
 - [ ] **Test 7**: 用户停止正在运行的循环
 - [ ] **Test 8**: 看到 [AUTO] 状态消息推送到 Looper Tab
-- [ ] **Test 9**: Mediator 通过 EventBus 接收 Looper 消息
+- [ ] **Test 9**: DevHub 通过 EventBus 接收 Looper 消息
 
 **完整测试流程**:
 ```bash
-# 1. 启动 Mediator，发送任务
-yarn start -- --mediator -p "优化代码，重点检查错误处理"
+# 1. 启动 DevHub，发送任务
+yarn start -- --devhub -p "优化代码，重点检查错误处理"
 
 # 2. 切换到 Looper Tab，观察循环执行
 # 预期：看到 Iteration 1, 2, ... 的进度消息
@@ -1112,17 +1112,17 @@ yarn start -- --mediator -p "优化代码，重点检查错误处理"
 yarn start -- --looper -p '{"type":"add_pending","task":"添加日志功能"}'
 
 # 4. 切回 Monitor Tab，询问进展
-yarn start -- --mediator -p "当前进展如何？"
-# 预期：Mediator 基于订阅的消息回复
+yarn start -- --devhub -p "当前进展如何？"
+# 预期：DevHub 基于订阅的消息回复
 
 # 5. 停止循环
 yarn start -- --looper -p '{"type":"stop"}'
 ```
 
-**验收标准**:
+- **验收标准**:
 - 所有测试场景通过
 - 无崩溃或阻塞问题
-- 消息流顺畅（用户 → Mediator → Looper → EventBus → Mediator）
+- 消息流顺畅（用户 → DevHub → Looper → EventBus → DevHub）
 - 日志清晰可追踪
 
 ---
@@ -1148,7 +1148,7 @@ yarn start -- --looper -p '{"type":"stop"}'
 ## 10. 成功标准
 
 ### 功能完整性
-- ✅ Mediator 能理解自然语言并路由任务
+- ✅ DevHub 能理解自然语言并路由任务
 - ✅ Looper 能执行完整的 Coder → Review → JUDGE 循环
 - ✅ 候补队列正确管理和消费
 - ✅ 用户可随时停止循环

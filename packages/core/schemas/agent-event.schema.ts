@@ -18,9 +18,9 @@ export const AgentEventSchema = z.object({
     timestamp: z.number().positive(),
     payload: z.unknown(),
     version: z.literal('1.0'),
+    taskId: z.string().optional(),
     parentAgentId: z.string().optional()
 });
 
 // Export type from schema
 export type AgentEventSchemaType = z.infer<typeof AgentEventSchema>;
-

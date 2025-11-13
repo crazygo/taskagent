@@ -22,19 +22,24 @@ export const defaultPreset: PresetConfig = {
     // All tabs available
     tabs: [
         'Chat',
-        'Agent', 
-        'Story',
+        'Agent',
+        'Start',
+        'Blueprint',
+        'DevHub',
         'Glossary',
-        'UI-Review',
-        'Mediator'
+        'UI-Review'
     ],
     
     // All agents registered
     agents: [
-        'story',
+        'start',
+        'blueprint',
+        'writer',
         'glossary',
         'ui-review',
-        'mediator'
+        'coder',
+        'review',
+        'devhub'
     ],
     
     // Default to Chat tab
@@ -48,4 +53,3 @@ export const defaultPreset: PresetConfig = {
     
     description: 'Full-featured TaskAgent with all tabs and agents'
 };
-

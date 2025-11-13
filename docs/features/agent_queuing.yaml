@@ -4,19 +4,19 @@ description: "Describes how the system handles concurrent agent execution across
 scenarios:
   - scenario: "Agents on different tabs execute in parallel"
     given:
-      - "The user is on the 'Story' tab and has submitted a long-running prompt."
-      - "The 'Story' agent is currently processing."
+      - "The user is on the 'Blueprint' tab and has submitted a long-running prompt."
+      - "The 'Blueprint' agent is currently processing."
     when:
       - "The user switches to the 'Glossary' tab and submits a new prompt."
     then:
       - "The 'Glossary' agent starts processing the new prompt immediately."
-      - "The 'Story' agent and 'Glossary' agent run concurrently."
+      - "The 'Blueprint' agent and 'Glossary' agent run concurrently."
 
   - scenario: "Prompts for the same tab are queued"
     given:
-      - "The 'Story' agent is currently processing a prompt on the 'Story' tab."
+      - "The 'Blueprint' agent is currently processing a prompt on the 'Blueprint' tab."
     when:
-      - "The user submits another prompt to the 'Story' tab."
+      - "The user submits another prompt to the 'Blueprint' tab."
     then:
-      - "The new prompt is added to the 'Story' tab's independent queue."
-      - "The new prompt starts only after the first 'Story' prompt is complete."
+      - "The new prompt is added to the 'Blueprint' tab's independent queue."
+      - "The new prompt starts only after the first 'Blueprint' prompt is complete."

@@ -19,13 +19,11 @@ export enum Driver {
 export const DRIVER_NAMES = [
     'chat',
     'agent',
-    'plan-review-do',
+    'start',
     'glossary',
-    'story',
-    'ui',
-    'monitor',
-    'looper',
-    'mediator',
+    'blueprint',
+    'ui-review',
+    'devhub',
 ] as const;
 
 export type DriverName = (typeof DRIVER_NAMES)[number];

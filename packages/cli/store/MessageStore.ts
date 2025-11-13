@@ -148,6 +148,7 @@ export class MessageStore {
             isPending: message.isPending,
             queueState: message.queueState,
             isBoxed: message.isBoxed,
+            variant: message.variant,
           },
         },
       });

@@ -6,13 +6,14 @@
  */
 
 import { globalAgentRegistry } from './AgentRegistry.js';
-import { createAgent as createStoryAgent } from '../story/index.js';
+import { createAgent as createStartAgent } from '../desktop/index.js';
+import { createAgent as createBlueprintAgent } from '../blueprint/index.js';
+import { createAgent as createFeatureWriterAgent } from '../feature-writer/index.js';
 import { createAgent as createGlossaryAgent } from '../glossary/index.js';
 import { createAgent as createUiReviewAgent } from '../ui-review/index.js';
 import { createAgent as createCoderAgent } from '../coder/index.js';
 import { createAgent as createReviewAgent } from '../review/index.js';
-import { createAgent as createLooperAgent } from '../looper/index.js';
-import { createAgent as createMediatorAgent } from '../mediator/index.js';
+import { createAgent as createDevHubAgent } from '../devhub/index.js';
 import { DefaultPromptAgent } from '../runtime/types.js';
 
 /**
@@ -27,12 +28,42 @@ export function registerAllAgents(options?: { eventBus?: any; tabExecutor?: any;
         tags: ['default', 'passthrough'],
     });
 
-    // Story Agent
+    // Start Agent
     globalAgentRegistry.register({
-        id: 'story',
-        factory: createStoryAgent,
-        description: 'Story Builder - Creates and manages user stories',
+        id: 'start',
+        factory: () => createStartAgent({
+            eventBus: options?.eventBus,
+            tabExecutor: options?.tabExecutor,
+            messageStore: options?.messageStore,
+            agentRegistry: globalAgentRegistry,
+        }),
+        description: 'Start - Unified interface for dispatching tasks to agents',
+        tags: ['coordination', 'orchestration'],
+    });
+
+    // Blueprint Agent
+    globalAgentRegistry.register({
+        id: 'blueprint',
+        factory: () => createBlueprintAgent({
+            eventBus: options?.eventBus,
+            tabExecutor: options?.tabExecutor,
+            messageStore: options?.messageStore,
+            agentRegistry: globalAgentRegistry,
+        }),
+        description: 'Blueprint Coordinator - Conversational requirements + workflow orchestration',
         tags: ['planning', 'documentation'],
+    });
+
+    // Feature Writer Agent
+    globalAgentRegistry.register({
+        id: 'feature-writer',
+        factory: () => createFeatureWriterAgent({
+            tabExecutor: options?.tabExecutor,
+            eventBus: options?.eventBus,
+            agentRegistry: globalAgentRegistry,
+        }),
+        description: 'Feature Writer - Write structured feature YAML files',
+        tags: ['atomic', 'writer'],
     });
 
     // Glossary Agent
@@ -54,7 +85,11 @@ export function registerAllAgents(options?: { eventBus?: any; tabExecutor?: any;
     // Coder Agent
     globalAgentRegistry.register({
         id: 'coder',
-        factory: createCoderAgent,
+        factory: () => createCoderAgent({
+            tabExecutor: options?.tabExecutor,
+            eventBus: options?.eventBus,
+            agentRegistry: globalAgentRegistry,
+        }),
         description: 'Coder Agent - Backend development executor with self-testing',
         tags: ['development', 'coding', 'monitor'],
     });
@@ -62,30 +97,30 @@ export function registerAllAgents(options?: { eventBus?: any; tabExecutor?: any;
     // Review Agent
     globalAgentRegistry.register({
         id: 'review',
-        factory: createReviewAgent,
+        factory: () => createReviewAgent({
+            tabExecutor: options?.tabExecutor,
+            eventBus: options?.eventBus,
+            agentRegistry: globalAgentRegistry,
+        }),
         description: 'Review Agent - Unified code review, progress summary, and quality monitoring',
         tags: ['review', 'quality', 'monitor'],
     });
 
-    // Looper Agent
+    // DevHub Agent
     globalAgentRegistry.register({
-        id: 'looper',
-        factory: () => createLooperAgent({ taskManager: options?.taskManager }),
-        description: 'Looper Agent - Coder-Review循环执行引擎',
-        tags: ['automation', 'loop', 'monitor'],
-    });
-
-    // Mediator Agent
-    globalAgentRegistry.register({
-        id: 'mediator',
-        factory: () => createMediatorAgent({ 
+        id: 'devhub',
+        factory: () => createDevHubAgent({ 
             eventBus: options?.eventBus, 
             tabExecutor: options?.tabExecutor,
-            messageStore: options?.messageStore
+            messageStore: options?.messageStore,
+            taskManager: options?.taskManager,
+            agentRegistry: globalAgentRegistry,
         }),
-        description: 'Mediator Agent - 对话路由器，协调任务执行',
-        tags: ['coordination', 'routing', 'monitor'],
+        description: 'DevHub Agent - 开发枢纽，协调开发与审查流程',
+        tags: ['coordination', 'development', 'monitor'],
     });
 
-    console.log('[AgentRegistry] Registered 8 agents: default, story, glossary, ui-review, coder, review, looper, mediator');
+    // Log registered agents dynamically
+    const registeredIds = globalAgentRegistry.getAllIds();
+    console.log(`[AgentRegistry] Registered ${registeredIds.length} agents: ${registeredIds.join(', ')}`);
 }

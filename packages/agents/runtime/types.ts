@@ -1,9 +1,11 @@
 import type { AgentDefinition } from '@anthropic-ai/claude-agent-sdk';
+import { tool as createSdkTool } from '@anthropic-ai/claude-agent-sdk';
 import type { Message } from '@taskagent/core/types/Message.js';
 import type { TaskEvent } from '@taskagent/core/types/TaskEvent.js';
 import type { PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
 import type { ToolUseEvent, ToolResultEvent } from './runClaudeStream.js';
-
+import { addLog } from '@taskagent/shared/logger';
+import { z } from 'zod';
 /**
  * Agent execution context
  */
@@ -58,38 +60,127 @@ export interface ExecutionHandle {
 }
 
 /**
+ * Execution context for agent tools
+ */
+export interface AgentToolContext {
+    sourceTabId?: string;
+    workspacePath?: string;
+    parentAgentId?: string;
+    tabExecutor?: any;
+    agentRegistry?: any;
+    eventBus?: any;
+}
+
+/**
+ * BaseAgent - common base for all agents
+ */
+export abstract class BaseAgent {
+    abstract readonly id: string;
+    abstract readonly description: string;
+
+    /**
+     * Runtime context overrides (sourceTabId, workspacePath, parentAgentId)
+     * Merged with agent's own dependencies when creating MCP tool
+     */
+    protected runtimeContext: Partial<AgentToolContext> = {};
+
+    /**
+     * Set runtime context before calling asMcpTool
+     */
+    setRuntimeContext(ctx: Partial<AgentToolContext>): void {
+        this.runtimeContext = ctx;
+    }
+
+    /**
+     * Convert this agent into an MCP tool callable by other agents (standard version)
+     * Uses single 'prompt' parameter by default
+     */
+    asMcpTool(ctx?: { sourceTabId?: string; workspacePath?: string; parentAgentId?: string }): ReturnType<typeof createSdkTool> | undefined {
+        return this.asMcpToolWithSchema(
+            { prompt: z.string().min(1).describe('自然语言输入') },
+            (args: { prompt: string }) => args.prompt,
+            ctx
+        );
+    }
+
+    /**
+     * Convert this agent into an MCP tool with custom schema
+     */
+    asMcpToolWithSchema<T extends Record<string, any>>(
+        schema: Record<string, any>,
+        concater: (args: T) => string,
+        ctx?: { sourceTabId?: string; workspacePath?: string; parentAgentId?: string },
+        options?: { async?: boolean }
+    ): ReturnType<typeof createSdkTool> | undefined {
+        // Set runtime context if provided
+        if (ctx) this.setRuntimeContext(ctx);
+        
+        // Merge instance deps with runtime context
+        const fullContext = this.buildToolContext();
+        if (!fullContext.eventBus || !fullContext.tabExecutor || !fullContext.agentRegistry) {
+            return undefined;
+        }
+
+        return createSdkTool(
+            this.id,
+            this.description,
+            schema,
+            async (args: Record<string, any>) => {
+                addLog(`[${this.id}] MCP tool handler called with args: ${JSON.stringify(args).slice(0, 200)}`);
+                const prompt = concater(args as T);
+                addLog(`[${this.id}] Converted to prompt: ${prompt.slice(0, 100)}...`);
+                const result = await fullContext.tabExecutor.execute(
+                    this.id,
+                    this.id,
+                    prompt,
+                    {
+                        sourceTabId: fullContext.sourceTabId,
+                        workspacePath: fullContext.workspacePath,
+                        parentAgentId: fullContext.parentAgentId,
+                    },
+                    { async: options?.async }
+                );
+                addLog(`[${this.id}] MCP tool handler completed`);
+                return {
+                    content: [{ type: 'text' as const, text: result.output || result.result || (options?.async ? '任务已异步运行，请稍后查看结果' : '完成') }]
+                };
+            }
+        ) as any;
+    }
+
+    /**
+     * Build full tool context from instance dependencies + runtime context
+     * Override in subclass if dependencies are stored differently
+     */
+    protected buildToolContext(): AgentToolContext {
+        return {
+            ...this.runtimeContext,
+        };
+    }
+}
+
+/**
  * PromptAgent - Base class for single-purpose, prompt-driven agents
  * Can contain self-managed loop logic within the prompt
+ * Can be exposed as MCP tools to other agents
  */
-export abstract class PromptAgent {
+export abstract class PromptAgent extends BaseAgent {
     abstract readonly id: string;
     abstract readonly description: string;
 
     /**
      * Generate the prompt for SDK query
-     * @param userInput - Raw user input
-     * @param context - Execution context
-     * @returns Prompt string to send to LLM
      */
     abstract getPrompt(userInput: string, context: AgentContext): string;
 
-    /**
-     * Optional: Tools required by this agent
-     */
+    /** Optional tools */
     getTools?(): string[];
-
-    /**
-     * Optional: Model override
-     */
+    /** Optional model override */
     getModel?(): string;
-
-    /**
-     * Optional: Parse raw output into structured events
-     * @param rawOutput - Accumulated output from agent execution
-     * @returns Array of parsed events
-     */
+    /** Optional output parser */
     parseOutput?(rawOutput: string): TaskEvent[];
 }
+
 
 /**
  * RunnableAgent – unified external contract for agents
@@ -103,6 +194,15 @@ export interface RunnableAgent {
     getModel?: () => string | undefined;
     parseOutput?: (rawChunk: string) => TaskEvent[];
     getAgentDefinitions?: () => Record<string, AgentDefinition> | undefined;
+    asMcpTool?: (ctx: { sourceTabId?: string; workspacePath?: string; parentAgentId?: string }) => ReturnType<
+        typeof createSdkTool
+    > | undefined;
+    asMcpToolWithSchema?: <T extends Record<string, any>>(
+        schema: Record<string, any>,
+        concater: (args: T) => string,
+        ctx?: { sourceTabId?: string; workspacePath?: string; parentAgentId?: string },
+        options?: { async?: boolean }
+    ) => ReturnType<typeof createSdkTool> | undefined;
     start: (userInput: string, context: AgentStartContext, sinks: AgentStartSinks) => ExecutionHandle;
 }
 

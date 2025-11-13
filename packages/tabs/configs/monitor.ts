@@ -1,15 +1,15 @@
 import type { TabConfig } from '../types.js';
 
 export const monitorTabConfig: TabConfig = {
-  id: 'Mediator',
-  label: 'Mediator',
+  id: 'DevHub',
+  label: 'DevHub',
   type: 'agent',
-  agentId: 'mediator',
-  description: 'Mediator · 对话路由器，协调任务执行',
+  agentId: 'devhub',
+  description: 'DevHub · 开发枢纽，协调开发与审查流程',
   requiresSession: true,
   executionMode: 'foreground',
   maxFrozenMessages: 50,
   isPlaceholder: false,
-  cliFlag: '--mediator',
+  cliFlag: '--devhub',
 };
 

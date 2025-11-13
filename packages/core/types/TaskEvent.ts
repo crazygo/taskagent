@@ -4,7 +4,7 @@
  * Represents events emitted by background tasks and agents.
  */
 
-export type TaskEventLevel = 'info' | 'warning' | 'error';
+export type TaskEventLevel = 'debug' | 'info' | 'warning' | 'error';
 
 export interface TaskEvent {
     level: TaskEventLevel;

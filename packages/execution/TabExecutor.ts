@@ -48,13 +48,15 @@ export class TabExecutor {
      * @param agentId - Agent ID (e.g., 'story', 'glossary')
      * @param userInput - User input/prompt
      * @param context - Execution context (workspace path, session, etc.)
-     * @returns Promise that resolves when execution completes
+     * @param options - Execution options (async: fire-and-forget)
+     * @returns Promise that resolves when execution completes (or immediately if async)
      */
     async execute(
         tabId: string,
         agentId: string,
         userInput: string,
-        context: ExecutionContext
+        context: ExecutionContext,
+        options?: { async?: boolean }
     ): Promise<ExecutionResult> {
         // Delegate to TabExecutionManager for concurrent control
         return this.tabExecManager.execute(
@@ -64,7 +66,7 @@ export class TabExecutor {
             context,
             // Executor function that does the actual work
             async (aid, input, ctx) => {
-                return this.executeAgent(tabId, aid, input, ctx);
+                return this.executeAgent(tabId, aid, input, ctx, options?.async);
             }
         );
     }
@@ -77,13 +79,14 @@ export class TabExecutor {
      * 2. Create agent instance from AgentRegistry
      * 3. Create MessageAdapter for event conversion
      * 4. Start agent with sinks
-     * 5. Await completion
+     * 5. Await completion (or return immediately if async)
      */
     private async executeAgent(
         tabId: string,
         agentId: string,
         userInput: string,
-        context: ExecutionContext
+        context: ExecutionContext,
+        isAsync?: boolean
     ): Promise<ExecutionResult> {
         try {
             // Get session from TabExecutionManager if not provided
@@ -113,6 +116,29 @@ export class TabExecutor {
 
             // Start agent
             const handle = await agent.start(userInput, context, sinks);
+            
+            // If async mode, don't wait for completion
+            if (isAsync) {
+                // Fire and forget - handle completion in background
+                handle.completion.catch((error) => {
+                    const errorMessage = error instanceof Error ? error.message : String(error);
+                    this.eventBus.emit({
+                        type: 'agent:failed',
+                        agentId,
+                        tabId,
+                        timestamp: Date.now(),
+                        payload: errorMessage,
+                        version: '1.0',
+                    });
+                });
+                
+                return {
+                    success: true,
+                    sessionId: handle.sessionId ?? context.session?.id,
+                };
+            }
+            
+            // Synchronous mode - wait for completion
             const completed = await handle.completion;
 
             return {

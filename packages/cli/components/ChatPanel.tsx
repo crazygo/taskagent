@@ -45,6 +45,7 @@ const MessageComponent: React.FC<MessageProps> = ({ message }) => {
     ? (message.content ?? '').replace(/^\s+/, '').replace(/\s+$/, '')
     : (message.content ?? '').replace(/\s+$/, '');
   const contentLines = normalizedContent.split(/\r?\n/);
+  const isWorkerMessage = message.variant === 'worker';
 
   // Skip rendering empty assistant placeholders
   if (message.role === 'assistant' && normalizedContent.length === 0 && reasoningLines.length === 0) {
@@ -114,6 +115,9 @@ const MessageComponent: React.FC<MessageProps> = ({ message }) => {
     const looperLike = /^\[(Looper|AUTO)\]/.test(normalizedContent);
     prefix = looperLike ? '∞ ' : '✦ ';
     textColor = looperLike ? 'cyan' : undefined;
+    if (isWorkerMessage) {
+      textColor = 'gray';
+    }
   } else if (message.role === 'system') {
     prefix = 'i ';
     textColor = 'yellow';
@@ -140,14 +144,14 @@ const MessageComponent: React.FC<MessageProps> = ({ message }) => {
           <Box key={`${message.id}-content-${index}`} flexDirection="row">
             {isFirstLine ? (
               <>
-                <Text color={textColor}>{prefix.replace(/\s*$/, ' ')}</Text>
-                <Text color={textColor}>{line || ' '}</Text>
-                {pendingSuffix ? <Text color={textColor}>{pendingSuffix}</Text> : null}
+                <Text color={textColor} dimColor={isWorkerMessage}>{prefix.replace(/\s*$/, ' ')}</Text>
+                <Text color={textColor} dimColor={isWorkerMessage}>{line || ' '}</Text>
+                {pendingSuffix ? <Text color={textColor} dimColor={isWorkerMessage}>{pendingSuffix}</Text> : null}
               </>
             ) : (
               <>
                 <Text>{prefix.replace(/./g, ' ')}</Text>
-                <Text color={textColor}>{line || ' '}</Text>
+                <Text color={textColor} dimColor={isWorkerMessage}>{line || ' '}</Text>
               </>
             )}
           </Box>

@@ -20,7 +20,8 @@ export interface AgentEvent {
     timestamp: number;
     payload: unknown;       // Event-specific payload
     version: '1.0';         // Protocol version (fixed, no wildcards)
-    parentAgentId?: string; // Parent agent in call chain (e.g., 'mediator' calls 'looper')
+    taskId?: string;        // Optional task identifier for async workflows
+    parentAgentId?: string; // Parent agent in call chain (e.g., 'devhub' calls 'looper')
 }
 
 // Event-specific payload types
@@ -58,4 +59,3 @@ export interface MessageAddedPayload {
         isBoxed?: boolean;
     };
 }
-

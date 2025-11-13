@@ -1,4 +1,4 @@
-# Monitor/Mediator/Looper 实现与测试总结
+# Monitor/DevHub/Looper 实现与测试总结
 
 ## 📅 完成时间
 2025-11-07 00:42 UTC+8
@@ -9,12 +9,12 @@
 - **新增文件**: 15个
 - **修改文件**: 13个
 - **代码总行数**: ~1500行
-- **新增 Agents**: 3个 (Looper, Mediator, JUDGE)
+- **新增 Agents**: 3个 (Looper, DevHub, JUDGE)
 - **新增 Tabs**: 1个 (Looper)
 
 ### 文件清单
 ```
-packages/agents/looper/
+packages/agents/devhub/looper/
 ├── index.ts (326行) - Looper GraphAgent 主逻辑
 ├── state.ts (48行) - 状态机定义
 ├── command.ts (46行) - 命令解析器
@@ -23,8 +23,8 @@ packages/agents/looper/
     ├── schema.ts (22行) - 决策 Schema
     └── judge.agent.md (201行) - JUDGE System Prompt
 
-packages/agents/mediator/
-├── index.ts (73行) - Mediator Agent
+packages/agents/devhub/
+├── index.ts (73行) - DevHub Agent
 ├── tools.ts (88行) - send_to_looper 工具
 ├── mediator.agent.md (167行) - 原 System Prompt
 ├── coordinator.agent.md (54行) - 新 Coordinator Prompt
@@ -44,7 +44,7 @@ packages/cli/
 └── main.tsx - 集成 Looper Tab 和 Agent 重注册逻辑
 
 packages/presets/
-└── default.ts - 添加 Mediator 和 Looper tabs
+└── default.ts - 添加 DevHub 和 Looper tabs
 ```
 
 ## ✅ 测试结果
@@ -54,7 +54,7 @@ packages/presets/
 - [x] MessageStore 集成 EventBus
 - [x] Driver.LOOPER 注册
 - [x] Looper Tab 配置和注册
-- [x] Monitor Tab 改名为 Mediator
+- [x] Monitor Tab 改名为 DevHub
 
 ### Phase 2: Looper Agent ✅
 - [x] 状态机（IDLE/RUNNING）
@@ -66,7 +66,7 @@ packages/presets/
 - [x] start() 方法正确调用
 - [x] [AUTO] 消息推送
 
-### Phase 3: Mediator Agent ⚠️
+### Phase 3: DevHub Agent ⚠️
 - [x] Coordinator System Prompt
 - [x] 子 Agent 定义（send_to_looper）
 - [x] loadAgentPipelineConfig 集成
@@ -145,14 +145,14 @@ yarn start -- --looper -p 'status' --newsession
 - 依赖: Coder/Review 完成后才能测试
 - 下一步: 完整循环测试
 
-#### 3. Mediator 工具调用
+#### 3. DevHub 工具调用
 - 状态: 使用 loadAgentPipelineConfig 重构
 - 未测试: 子 Agent 调用机制
-- 下一步: 测试 Mediator → Looper 通信
+- 下一步: 测试 DevHub → Looper 通信
 
 #### 4. EventBus 跨 Tab 消息
 - 状态: 代码已实现
-- 未测试: Mediator 订阅 Looper 消息
+- 未测试: DevHub 订阅 Looper 消息
 - 下一步: 端到端集成测试
 
 ## 🐛 发现的问题
@@ -220,14 +220,14 @@ useEffect(() => {
    - 验证 continue/terminate 决策
    - 测试候补队列整合
 
-5. **Mediator 完整测试**
-   - 测试 Mediator → Looper 命令发送
+5. **DevHub 完整测试**
+   - 测试 DevHub → Looper 命令发送
    - 验证 EventBus 消息订阅
    - 测试自然语言路由
 
-6. **端到端场景测试**
+- 6. **端到端场景测试**
    ```
-   用户 → Mediator → Looper → Coder → Review → JUDGE → 循环
+   用户 → DevHub → Looper → Coder → Review → JUDGE → 循环
    ```
 
 ### 长期（1-2周）
@@ -251,17 +251,17 @@ useEffect(() => {
 
 ### Commit Message
 ```
-feat: implement Monitor/Mediator/Looper agent system
+feat: implement Monitor/DevHub/Looper agent system
 
 - Add Looper GraphAgent with dual-branch architecture (response + execution)
 - Add JUDGE Agent for loop decision making
-- Refactor Monitor tab to Mediator with coordinator pattern
+- Refactor Monitor tab to DevHub with coordinator pattern
 - Integrate EventBus for cross-tab communication
 - Add message:added event type to EventBus
 - Integrate MessageStore with EventBus
 - Register Looper tab and agents to default preset
 
-BREAKING CHANGE: Monitor tab renamed to Mediator
+BREAKING CHANGE: Monitor tab renamed to DevHub
 
 Test: Basic Looper commands (start/stop/status) working
 Test: GraphAgent properly called and executes as expected
@@ -270,7 +270,7 @@ Test: [AUTO] messages displayed correctly
 Known Issues:
 - Agent registry re-registration on every render (performance impact)
 - Full Coder-Review loop not yet verified (needs longer test)
-- Mediator tool calling mechanism not fully tested
+- DevHub tool calling mechanism not fully tested
 ```
 
 ### Story AC Format
@@ -329,7 +329,7 @@ And 输出固定格式响应
 2. ✅ 验证了双支路架构
 3. ✅ 实现了 EventBus 跨 Tab 通信
 4. ✅ 完成了 JUDGE 决策节点
-5. ✅ 重构了 Mediator Agent
+5. ✅ 重构了 DevHub Agent
 
 ### 里程碑
 - **第一个自定义 GraphAgent 成功运行**

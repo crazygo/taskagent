@@ -40,11 +40,11 @@ import { loadWorkspaceSettings, writeWorkspaceSettings, type WorkspaceSettings }
 import { getGlobalTabRegistry, type TabConfig } from '@taskagent/tabs';
 import { chatTabConfig } from '@taskagent/tabs/configs/chat';
 import { agentTabConfig } from '@taskagent/tabs/configs/agent';
-import { storyTabConfig } from '@taskagent/tabs/configs/story';
+import { startTabConfig } from '@taskagent/tabs/configs/start';
+import { blueprintTabConfig } from '@taskagent/tabs/configs/blueprint';
 import { glossaryTabConfig } from '@taskagent/tabs/configs/glossary';
 import { uiReviewTabConfig } from '@taskagent/tabs/configs/ui-review';
 import { monitorTabConfig } from '@taskagent/tabs/configs/monitor';
-import { looperTabConfig } from '@taskagent/tabs/configs/looper';
 import { getPresetOrDefault } from '@taskagent/presets';
 import { globalAgentRegistry, registerAllAgents } from '@taskagent/agents/registry';
 import type { AgentStartContext, AgentStartSinks } from '@taskagent/agents/runtime/types.js';
@@ -61,8 +61,7 @@ let __nonInteractiveSubmittedOnce = false;
 // Initialize TabRegistry - tabs will be registered based on preset in App component
 const tabRegistry = getGlobalTabRegistry();
 
-// Initialize Agent Registry - register all built-in agents
-registerAllAgents();
+// Early agent registration removed - now done in App component with proper options
 
 // STATIC_TABS will be populated dynamically after tabs are registered
 function getStaticTabs(): string[] {
@@ -90,8 +89,7 @@ const BASE_COMMANDS: readonly { name: string; description: string }[] = [
  * @returns Tab config with requiresSession and description
  */
 function getTabInfoByLabel(label: string): { requiresSession: boolean; description: string; label: string } | null {
-    // Try new TabRegistry first
-    const tabConfig = tabRegistry.get(label);
+    const tabConfig = tabRegistry.get(label) ?? tabRegistry.getByLabel(label);
     if (tabConfig) {
         return {
             requiresSession: tabConfig.requiresSession,
@@ -119,24 +117,31 @@ function getTabInfoByLabel(label: string): { requiresSession: boolean; descripti
  * @returns Tab info with label
  */
 function getTabByCliName(cliName: string): { label: string } | null {
-    const normalizedCliName = cliName.toLowerCase();
-    
-    // Try new TabRegistry first
-    const tabs = tabRegistry.getAll();
-    for (const tab of tabs) {
-        if (tab.id.toLowerCase() === normalizedCliName || 
-            tab.label.toLowerCase().replace(/\s/g, '-') === normalizedCliName ||
-            tab.cliFlag === `--${normalizedCliName}`) {
-            return { label: tab.label };
-        }
+    const normalizedCliName = cliName.replace(/^--/, '').trim().toLowerCase();
+
+    // Try matching CLI flag (e.g., '--blueprint')
+    const flagMatch = tabRegistry.getByCliFlag(`--${normalizedCliName}`);
+    if (flagMatch) {
+        return { label: flagMatch.label };
     }
-    
+
+    // Try direct ID or label (case-insensitive, slug-aware)
+    const idMatch = tabRegistry.get(cliName) ?? tabRegistry.get(normalizedCliName);
+    if (idMatch) {
+        return { label: idMatch.label };
+    }
+
+    const labelMatch = tabRegistry.getByLabel(cliName) ?? tabRegistry.getByLabel(normalizedCliName);
+    if (labelMatch) {
+        return { label: labelMatch.label };
+    }
+
     // Fallback to old Driver system
     const driverEntry = getDriverByCliName(normalizedCliName);
     if (driverEntry) {
         return { label: driverEntry.label };
     }
-    
+
     return null;
 }
 
@@ -316,11 +321,11 @@ const App = () => {
             const tabConfigMap: Record<string, TabConfig> = {
                 'Chat': chatTabConfig,
                 'Agent': agentTabConfig,
-                'Story': storyTabConfig,
+                'Start': startTabConfig,
+                'Blueprint': blueprintTabConfig,
                 'Glossary': glossaryTabConfig,
                 'UI-Review': uiReviewTabConfig,
-                'Mediator': monitorTabConfig,
-                'Looper': looperTabConfig,
+                'DevHub': monitorTabConfig,
             };
 
             // Register tabs based on preset
@@ -334,11 +339,11 @@ const App = () => {
                 tabRegistry.registerMany([
                     chatTabConfig,
                     agentTabConfig,
-                    storyTabConfig,
-                    glossaryTabConfig,
-                    uiReviewTabConfig,
+                    startTabConfig,
+                    blueprintTabConfig,
                     monitorTabConfig,
-                    looperTabConfig
+                    glossaryTabConfig,
+                    uiReviewTabConfig
                 ]);
             } else {
                 tabRegistry.registerMany(tabsToRegister);
@@ -906,7 +911,7 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
         const tabId = tabOverride ?? selectedTabRef.current;
         let targetAgentId = agentIdOverride;
         if (!targetAgentId) {
-            const tabConfig = tabRegistry.get(tabId);
+            const tabConfig = tabRegistry.get(tabId) ?? tabRegistry.getByLabel(tabId);
             targetAgentId = tabConfig?.agentId ?? 'default';
         }
 
@@ -1172,7 +1177,7 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
         setInputValue('');
         
         // Check TabRegistry first for agent tabs
-        const tabConfig = tabRegistry.get(selectedTab);
+        const tabConfig = tabRegistry.get(selectedTab) ?? tabRegistry.getByLabel(selectedTab);
         if (tabConfig && tabConfig.type === 'agent' && !tabConfig.isPlaceholder) {
             // Agent tab - use agent pipeline
             addLog(`[Tab] Routing to agent tab: ${tabConfig.label} (agentId: ${tabConfig.agentId})`);

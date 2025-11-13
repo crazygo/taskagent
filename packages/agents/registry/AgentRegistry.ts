@@ -6,7 +6,7 @@
  */
 
 import type { EventBus } from '@taskagent/core/event-bus';
-import type { AgentStartContext, AgentStartSinks, ExecutionHandle } from '../runtime/types.js';
+import type { AgentStartContext, AgentStartSinks, ExecutionHandle, RunnableAgent } from '../runtime/types.js';
 import { MessageAdapter } from '@taskagent/execution/MessageAdapter.js';
 
 /**
@@ -17,15 +17,7 @@ export type AgentFactory = () => Promise<Agent>;
 /**
  * Agent interface - all agents must implement this
  */
-export interface Agent {
-    id: string;
-    description: string;
-    start(
-        userInput: string,
-        context: AgentStartContext,
-        sinks: AgentStartSinks
-    ): ExecutionHandle | Promise<ExecutionHandle>;
-}
+export type Agent = RunnableAgent;
 
 /**
  * Agent Registration Entry
@@ -150,4 +142,3 @@ export class AgentRegistry {
  * Global agent registry instance
  */
 export const globalAgentRegistry = new AgentRegistry();
-

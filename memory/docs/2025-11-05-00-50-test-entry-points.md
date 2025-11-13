@@ -51,7 +51,7 @@ tests/
 **Story 测试**:
 ```bash
 yarn test:story
-# 等价于: yarn start -- --story -p "Hi"
+# 等价于: yarn start -- --blueprint -p "Hi"
 ```
 
 **功能**: 

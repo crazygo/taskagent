@@ -1,0 +1,86 @@
+# MOVED: This spec has been copied to packages/agents/devhub/features/core_behaviors.yaml on 2025-11-07T06:25:33.741Z
+feature: "Monitor Agent Core Behaviors"
+description: "Describes the fundamental quality supervision and orchestration behaviors of the Monitor Agent with dual-channel architecture."
+
+scenarios:
+  - scenario: "Basic Agent operations: file listing"
+    given:
+      - "Monitor Agent (DevHub) is active and ready for user input."
+    when: "User types 'list my files'"
+    then:
+      - "DevHub calls appropriate file listing tool (e.g., bash, view)."
+      - "User sees the tool call in the response stream."
+      - "User sees the tool output showing file names."
+
+  - scenario: "Basic Agent operations: file creation"
+    given:
+      - "Monitor Agent (DevHub) is active and ready for user input."
+    when: "User types '写一个 markdown 文件，描述贪吃蛇的玩法，文件名是 task.md'"
+    then:
+      - "DevHub understands the request to create a file."
+      - "DevHub calls create tool with path='task.md' and content describing snake game rules."
+      - "User sees the tool call and confirmation that 'task.md' was created."
+
+  - scenario: "Natural language triggers background Coder Agent"
+    given:
+      - "Monitor Agent (DevHub) is active."
+      - "A file 'plan.md' exists with development requirements."
+    when: "User says '请根据 plan.md 文件开始开发'"
+    then:
+      - "DevHub infers the user wants to start a background development task."
+      - "DevHub automatically generates task description from conversation context (e.g., 'Please implement a python game, requirements at plan.md')."
+      - "DevHub invokes '/bg:coder <generated_task_description>' in background mode."
+      - "User sees confirmation like 'Coder Agent started in background. You can continue chatting.'"
+      - "User can continue conversing with DevHub while Coder works."
+
+  - scenario: "User checks progress of background Coder task"
+    given:
+      - "Coder Agent is running in background with log file 'coder.log'."
+      - "User is in conversation with DevHub."
+    when: "User says '看看进展'"
+    then:
+      - "DevHub generates natural language task for ReviewAgent: 'Summarize progress from coder.log, focusing on completed tasks and current work.'"
+      - "DevHub invokes '/bg:review <generated_task>' in background mode."
+      - "ReviewAgent reads coder.log based on prompt instructions."
+      - "User sees a summary report from ReviewAgent, e.g., 'Coder has completed 3/5 tasks. Current: implementing game loop.'"
+
+  - scenario: "Automatic completion notification and review initiation"
+    given:
+      - "Coder Agent is running in background."
+      - "User has not sent any messages recently."
+      - "Coder Agent finishes its task."
+    when: "Coder Agent completes execution"
+    then:
+      - "DevHub receives completion signal from Coder."
+      - "User sees a system message '[AUTO] Coder 已完成，准备审查'."
+      - "DevHub generates natural language task for ReviewAgent: 'Review completed development task. Analyze coder.log, check git diff against plan.md specs, identify quality issues.'"
+      - "DevHub automatically invokes '/bg:review <generated_task>'."
+      - "ReviewAgent uses its 3 sub-agents (specs_breakdown, task_log, git_diff) as needed based on the prompt."
+      - "Shortly after, user sees ReviewAgent's comprehensive report with code review and quality assessment."
+      - "The alert and report are inserted into the dialog flow without user action."
+
+  - scenario: "Loop Manager detects critical health issue and pushes alert to dialog"
+    given:
+      - "Coder Agent is executing a development task."
+      - "Loop Manager is running with periodic ReviewAgent checks."
+      - "Loop Manager triggers ReviewAgent with prompt: 'Perform periodic quality check. Analyze recent logs, git changes, and spec compliance. Report health status.'"
+      - "ReviewAgent has executed and returned an Audit Report."
+    when: "Loop Manager parses the report and finds health.severity === 'critical'"
+    then:
+      - "Loop Manager structures the health metrics from the report."
+      - "Loop Manager invokes DevHub's pushToDialogChannel with an [AUTO] alert."
+      - "User sees an asynchronous message like '[AUTO] ⚠️ Critical: 3 spec deviations detected by specs_breakdown'."
+      - "The alert is inserted into the dialog flow without blocking ongoing conversation."
+      - "User can respond to the alert or ignore it and continue other tasks."
+
+  - scenario: "User terminates Loop Manager while monitoring is active"
+    given:
+      - "Loop Manager is running and periodically triggering ReviewAgent."
+      - "User is in conversation with DevHub."
+    when: "User sends any message or clicks a UI button or calls loop_terminate"
+    then:
+      - "Loop Manager receives termination signal."
+      - "Loop Manager stops the periodic interval timer."
+      - "No further ReviewAgent checks are triggered."
+      - "DevHub confirms 'Loop monitoring stopped' to the user."
+      - "User can restart monitoring with start_loop if needed."

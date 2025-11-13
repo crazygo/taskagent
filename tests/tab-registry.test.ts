@@ -84,10 +84,10 @@ describe('TabRegistry', () => {
   });
 
   it('should find tab by CLI flag', () => {
-    registry.register(createTestTab('Story', { cliFlag: '--story' }));
+    registry.register(createTestTab('Story', { cliFlag: '--blueprint' }));
     registry.register(createTestTab('Glossary', { cliFlag: '--glossary' }));
 
-    const tab = registry.getByCliFlag('--story');
+    const tab = registry.getByCliFlag('--blueprint');
     expect(tab?.id).toBe('Story');
   });
 
