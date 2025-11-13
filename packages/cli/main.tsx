@@ -54,6 +54,7 @@ import { useMessageStoreTab } from './hooks/useMessageStoreTab.js';
 import { useAgentEventBridge } from './hooks/useAgentEventBridge.js';
 import { TabExecutionManager, TabExecutor } from '@taskagent/execution';
 import type { ExecutionContext, ExecutionResult } from '@taskagent/execution';
+import { KeypressProvider } from './src/contexts/KeypressProvider.js';
 
 // Guard to prevent double submission in dev double-mount scenarios
 let __nonInteractiveSubmittedOnce = false;
@@ -1390,15 +1391,16 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
     }
 
     return (
-        <Box flexDirection="column" height="100%">
-            <ChatPanel
-                frozenMessages={frozenMessages}
-                activeMessages={activeMessages}
-                modelName={modelName}
-                workspacePath={bootstrapConfig.workspacePath}
-                positionalPromptWarning={positionalPromptWarning}
-                sessionLabel={agentSessionId ? formatSessionId(agentSessionId) : null}
-            />
+        <KeypressProvider>
+            <Box flexDirection="column" height="100%">
+                <ChatPanel
+                    frozenMessages={frozenMessages}
+                    activeMessages={activeMessages}
+                    modelName={modelName}
+                    workspacePath={bootstrapConfig.workspacePath}
+                    positionalPromptWarning={positionalPromptWarning}
+                    sessionLabel={agentSessionId ? formatSessionId(agentSessionId) : null}
+                />
 
             {/* Render input UI and TabView only when raw mode/input is supported */}
             {(() => {
@@ -1451,7 +1453,8 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
                     </>
                 );
             })()}
-        </Box>
+            </Box>
+        </KeypressProvider>
     );
 };
 

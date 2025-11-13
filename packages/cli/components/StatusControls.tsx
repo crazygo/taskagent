@@ -1,8 +1,10 @@
-import { Box, Text, useInput } from 'ink';
-import React from 'react';
+import { Box, Text } from 'ink';
+import React, { useCallback } from 'react';
 import type { Task } from '@taskagent/shared/task-manager';
 import { Driver } from '../drivers/types.js';
 import { addLog } from '@taskagent/shared/logger';
+import { useCommand } from '../src/hooks/useCommand.js';
+import { Command } from '../src/config/keyBindings.js';
 
 
 
@@ -19,41 +21,30 @@ export const TabView: React.FC<TabViewProps> = ({ staticOptions, tasks, selected
   const taskTabs = tasks.map((task, index) => `Task ${index + 1}`);
   const allTabs = [...staticOptions, ...taskTabs];
 
-  useInput((input, key) => {
-    // Debug logging (only when E2E sentinel is active)
-    if (process.env.E2E_SENTINEL && (input || key.ctrl || key.shift || key.meta)) {
-      const inputCode = input ? input.charCodeAt(0) : null;
-      addLog(`[TabView] input="${input}" charCode=${inputCode} ctrl=${key.ctrl} shift=${key.shift} meta=${key.meta}`);
-    }
-
+  // Handle tab navigation with useCommand
+  const handleNextTab = useCallback(() => {
     if (allTabs.length === 0) return;
-
     const currentIndex = allTabs.indexOf(selectedTab);
-
-    const handleSelect = (newIndex: number) => {
-      onTabChange(allTabs[newIndex]!);
-    };
-
-    // Handle both user Ctrl+N and programmatic \x0e (for E2E testing)
-    if ((key.ctrl && input === 'n') || input === '\x0e') {
-      if (process.env.E2E_SENTINEL) {
-        addLog(`[TabView] Ctrl+N detected, switching from ${selectedTab} (index ${currentIndex}) to next tab`);
-      }
-      const newIndex = (currentIndex + 1) % allTabs.length;
-      handleSelect(newIndex);
-      return;
+    if (process.env.E2E_SENTINEL) {
+      addLog(`[TabView] SWITCH_TAB_NEXT, switching from ${selectedTab} (index ${currentIndex}) to next tab`);
     }
+    const newIndex = (currentIndex + 1) % allTabs.length;
+    onTabChange(allTabs[newIndex]!);
+  }, [allTabs, selectedTab, onTabChange]);
 
-    if (!isFocused) return;
-
-    if (key.leftArrow) {
-      const newIndex = currentIndex > 0 ? currentIndex - 1 : allTabs.length - 1;
-      handleSelect(newIndex);
-    } else if (key.rightArrow) {
-      const newIndex = currentIndex < allTabs.length - 1 ? currentIndex + 1 : 0;
-      handleSelect(newIndex);
+  const handlePrevTab = useCallback(() => {
+    if (allTabs.length === 0) return;
+    const currentIndex = allTabs.indexOf(selectedTab);
+    if (process.env.E2E_SENTINEL) {
+      addLog(`[TabView] SWITCH_TAB_PREV, switching from ${selectedTab} (index ${currentIndex}) to prev tab`);
     }
-  }, { isActive: true });
+    const newIndex = (currentIndex - 1 + allTabs.length) % allTabs.length;
+    onTabChange(allTabs[newIndex]!);
+  }, [allTabs, selectedTab, onTabChange]);
+
+  // Subscribe to commands (always active for global shortcuts)
+  useCommand(Command.SWITCH_TAB_NEXT, handleNextTab, { isActive: true });
+  useCommand(Command.SWITCH_TAB_PREV, handlePrevTab, { isActive: true });
 
   return (
     <Box flexDirection="row" width="100%">
