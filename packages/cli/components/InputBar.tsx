@@ -175,13 +175,13 @@ export const InputBar: React.FC<InputBarProps> = ({
         
         if (key.name === 'escape') {
           flushPending();
-
-          const menuWasOpen = showCommandMenu;
-          if (menuWasOpen) {
+          
+          if (showCommandMenu) {
             setShowCommandMenu(false);
             onCommandMenuChange?.(false);
+            return;
           }
-
+          
           if (isEscActive) {
             handleSecondEsc();
           } else {
@@ -341,8 +341,13 @@ export const InputBar: React.FC<InputBarProps> = ({
 
   return (
     <Box flexDirection="column" backgroundColor={SURFACE_BACKGROUND_COLOR}>
-      <Box paddingX={1} width="100%" flexDirection="row" backgroundColor={SURFACE_BACKGROUND_COLOR}>
-        <Text color={isFocused ? 'blue' : 'white'}>&gt; </Text>
+      <Box
+        paddingX={1}
+        width="100%"
+        flexDirection="row"
+        backgroundColor={SURFACE_BACKGROUND_COLOR}
+      >
+        <Text color={isFocused ? 'blue' : 'black'}>&gt; </Text>
         <Box flexGrow={1} minWidth={0}>
           <SimpleTextDisplay
             key={`display-${inputVersion}`}

@@ -1373,7 +1373,7 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
     if (!tabsInitialized) {
         return (
             <Box padding={1}>
-                <Text color="gray">Loading...</Text>
+                <Text color="gray">::</Text>
             </Box>
         );
     }
