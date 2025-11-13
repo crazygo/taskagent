@@ -11,9 +11,18 @@ export const useTaskStore = ({ pollIntervalMs = 1000 }: UseTaskStoreOptions = {}
   const [tasks, setTasks] = useState<Task[]>([]);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setTasks(taskManager.getAllTasks());
-    }, pollIntervalMs);
+    const updateTasks = () => {
+      const nextTasks = taskManager.getAllTasks();
+      setTasks(prev => {
+        if (prev.length === nextTasks.length && prev.every((task, index) => task === nextTasks[index])) {
+          return prev;
+        }
+        return nextTasks;
+      });
+    };
+
+    updateTasks();
+    const interval = setInterval(updateTasks, pollIntervalMs);
     return () => clearInterval(interval);
   }, [pollIntervalMs, taskManager]);
 

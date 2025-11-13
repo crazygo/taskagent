@@ -99,8 +99,10 @@ export function KeypressProvider({
   const pasteBufferRef = useRef('');
   // Global submit guard: suppress Enter during and shortly after paste
   const submitGuardUntilRef = useRef(0);
-  // Suppress exactly one trailing Enter after paste end
-  const suppressReturnOnceRef = useRef(false);
+  // Suppress exactly one trailing Enter after paste end (with time window)
+  const suppressReturnUntilRef = useRef(0);
+  // Track last bracketed paste time to suppress spurious keypress events
+  const lastBracketPasteTimeRef = useRef(0);
 
   /**
    * Broadcast key event to all subscribers
@@ -137,11 +139,12 @@ export function KeypressProvider({
     const wasRaw = stdin.isRaw;
     if (!wasRaw) {
       setRawMode(true);
-      // Enable bracketed paste mode by sending escape sequence on stdout
-      // This makes the terminal wrap pasted content in \x1B[200~ ... \x1B[201~
-      process.stdout.write('\x1B[?2004h');
-      addLog('[KeypressProvider] Enabled bracketed paste mode');
     }
+    
+    // Always enable bracketed paste mode (independent of raw mode state)
+    // This makes the terminal wrap pasted content in \x1B[200~ ... \x1B[201~
+    process.stdout.write('\x1B[?2004h');
+    addLog(`[KeypressProvider] Enabled bracketed paste mode (wasRaw=${wasRaw})`);
 
 
     /**
@@ -149,10 +152,51 @@ export function KeypressProvider({
      */
     const handleRawData = (chunk: Buffer) => {
       const str = chunk.toString();
+      
+      // Log all raw data for debugging
+      const preview = str.length > 100 ? str.slice(0, 100) + '...' : str;
+      const hasNewline = str.includes('\n');
+      const hasPasteStart = str.includes(PASTE_MODE_PREFIX);
+      const hasPasteEnd = str.includes(PASTE_MODE_SUFFIX);
+      addLog(`[KeypressProvider] RAW DATA: len=${str.length}, hasNL=${hasNewline}, start=${hasPasteStart}, end=${hasPasteEnd}, preview="${preview.replace(/\n/g, '\\n').replace(/\r/g, '\\r')}"`);
 
-      // Detect paste start
-      if (str.includes(PASTE_MODE_PREFIX)) {
-        addLog('[KeypressProvider] PASTE START detected');
+      // Handle complete paste in single chunk (start + content + end)
+      if (str.includes(PASTE_MODE_PREFIX) && str.includes(PASTE_MODE_SUFFIX)) {
+        addLog('[KeypressProvider] PASTE START+END in single chunk');
+        const startIdx = str.indexOf(PASTE_MODE_PREFIX);
+        const endIdx = str.indexOf(PASTE_MODE_SUFFIX);
+        
+        if (startIdx < endIdx) {
+          // Extract content between markers
+          const content = str.slice(startIdx + PASTE_MODE_PREFIX.length, endIdx);
+          const contentPreview = content.length > 100 
+            ? content.slice(0, 100) + '...' 
+            : content;
+          addLog(`[KeypressProvider] Complete paste detected, length: ${content.length}, content="${contentPreview.replace(/\n/g, '\\n').replace(/\r/g, '\\r')}"`);
+          
+          // Mark paste time to suppress spurious keypress events
+          lastBracketPasteTimeRef.current = Date.now();
+          
+          // Broadcast paste content
+          broadcast({
+            name: '',
+            ctrl: false,
+            meta: false,
+            shift: false,
+            paste: true,
+            sequence: content,
+          });
+          
+          // Set guard to swallow trailing Enter (only within 100ms window)
+          submitGuardUntilRef.current = Date.now() + 600;
+          suppressReturnUntilRef.current = Date.now() + 100;
+          return;
+        }
+      }
+
+      // Detect paste start (multi-chunk paste)
+      if (str.includes(PASTE_MODE_PREFIX) && !isPastingRef.current) {
+        addLog('[KeypressProvider] PASTE START detected (multi-chunk)');
         isPastingRef.current = true;
         isBracketPasteRef.current = true;
         pasteBufferRef.current = '';
@@ -166,12 +210,15 @@ export function KeypressProvider({
         return;
       }
 
-      // Detect paste end
-      if (str.includes(PASTE_MODE_SUFFIX)) {
+      // Detect paste end (multi-chunk paste)
+      if (str.includes(PASTE_MODE_SUFFIX) && isPastingRef.current) {
         // append content before suffix
         const idx = str.indexOf(PASTE_MODE_SUFFIX);
         if (idx > 0) pasteBufferRef.current += str.slice(0, idx);
-        addLog(`[KeypressProvider] PASTE END detected, length: ${pasteBufferRef.current.length}`);
+        const contentPreview = pasteBufferRef.current.length > 100 
+          ? pasteBufferRef.current.slice(0, 100) + '...' 
+          : pasteBufferRef.current;
+        addLog(`[KeypressProvider] PASTE END detected (multi-chunk), length: ${pasteBufferRef.current.length}, content="${contentPreview.replace(/\n/g, '\\n').replace(/\r/g, '\\r')}"`);
         isPastingRef.current = false;
         isBracketPasteRef.current = false;
         // keep guard briefly after end to swallow trailing Enter
@@ -187,8 +234,8 @@ export function KeypressProvider({
           sequence: pasteBufferRef.current,
         });
 
-        // Swallow the very next Enter that terminals often emit after paste
-        suppressReturnOnceRef.current = true;
+        // Swallow Enter only within 100ms window after paste
+        suppressReturnUntilRef.current = Date.now() + 100;
 
         pasteBufferRef.current = '';
         return;
@@ -223,10 +270,17 @@ export function KeypressProvider({
         lastLogTime = now;
       }
 
-      // Suppress one Enter immediately following a paste end
-      if ((key?.name === 'return' || key?.name === 'enter') && suppressReturnOnceRef.current) {
-        suppressReturnOnceRef.current = false;
-        addLog('[KeypressProvider] Suppressed trailing Enter (post-paste)');
+      // CRITICAL: Ignore all keypress events during or immediately after bracketed paste
+      // The real content is handled by handleRawData → broadcast
+      // 200ms window to catch spurious readline events after paste
+      if (isBracketPasteRef.current || (Date.now() - lastBracketPasteTimeRef.current < 200)) {
+        addLog('[KeypressProvider] Ignored keypress during/after bracketed paste');
+        return;
+      }
+
+      // Suppress Enter only within time window after paste end
+      if ((key?.name === 'return' || key?.name === 'enter') && Date.now() < suppressReturnUntilRef.current) {
+        addLog('[KeypressProvider] Suppressed trailing Enter (post-paste, within time window)');
         return;
       }
 
@@ -272,8 +326,8 @@ export function KeypressProvider({
           if (Date.now() >= pasteWindowUntil) {
             isPastingRef.current = false;
             burstCount = 0;
-            // After heuristic paste ends, suppress a trailing Enter just in case
-            suppressReturnOnceRef.current = true;
+            // After heuristic paste ends, suppress Enter within 100ms window
+            suppressReturnUntilRef.current = Date.now() + 100;
             addLog('[KeypressProvider] Fallback paste end (idle)');
           }
         }, 1200);

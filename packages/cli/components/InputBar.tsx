@@ -51,6 +51,9 @@ export const InputBar: React.FC<InputBarProps> = ({
   const escTimerRef = useRef<NodeJS.Timeout | null>(null);
   
   useEffect(() => {
+    if (prevValueRef.current !== value) {
+      setInputVersion(v => v + 1);
+    }
     prevValueRef.current = value;
   }, [value]);
 
@@ -311,9 +314,10 @@ export const InputBar: React.FC<InputBarProps> = ({
 
   return (
     <Box flexDirection="column">
-      <Box paddingX={1} width="100%">
+      <Box paddingX={1} width="100%" flexDirection="row">
         <Text color={isFocused ? 'blue' : 'white'}>&gt; </Text>
         <SimpleTextDisplay
+          key={`display-${inputVersion}`}
           value={value}
           placeholder="Type your message... or use /<command> <prompt>"
           isFocused={isFocused}
