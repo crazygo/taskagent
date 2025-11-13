@@ -7,7 +7,6 @@ import { loadAgentPipelineConfig } from '../runtime/agentLoader.js';
 import type { AgentRegistry } from '../registry/AgentRegistry.js';
 import type { EventBus } from '@taskagent/core/event-bus';
 import type { AgentDefinition } from '@anthropic-ai/claude-agent-sdk';
-import { addLog } from '@taskagent/shared/logger';
 
 const CODER_AGENT_ID = 'coder';
 const CODER_DESCRIPTION = 'Coder Agent - Backend development executor with self-testing';
