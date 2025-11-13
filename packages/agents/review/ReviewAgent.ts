@@ -1,4 +1,3 @@
-import { z } from 'zod';
 import { addLog } from '@taskagent/shared/logger';
 import { PromptAgent, type AgentContext, type AgentToolContext, type RunnableAgent, type AgentStartContext, type AgentStartSinks, type ExecutionHandle } from '../runtime/types.js';
 import { buildPromptAgentStart } from '../runtime/runPromptAgentStart.js';
