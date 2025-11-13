@@ -157,6 +157,13 @@ export const InputBar: React.FC<InputBarProps> = ({
   // Subscribe to commands
   useCommand(KeyCommand.SUBMIT, handleSubmitCommand, { isActive: isFocused });
   
+  // Reset caret to end after submit clears input
+  useEffect(() => {
+    if (value.length === 0 && caretRef.current !== 0) {
+      setCaretIndex(0);
+    }
+  }, [value]);
+  
   useKeypress(
     useCallback(
       (key: Key) => {

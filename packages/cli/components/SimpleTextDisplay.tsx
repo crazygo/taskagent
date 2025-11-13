@@ -9,32 +9,35 @@ interface SimpleTextDisplayProps {
 }
 
 export function SimpleTextDisplay({ value, placeholder, isFocused, caretIndex }: SimpleTextDisplayProps) {
-  const { before, caretChar, after, showPlaceholder } = useMemo(() => {
+  // Use inline styling for inverse caret to avoid nested <Text> ghost frames
+  const parts = useMemo(() => {
     if (!value && placeholder && !isFocused) {
-      return { before: '', caretChar: '', after: placeholder, showPlaceholder: true };
+      return { text: placeholder, isPlaceholder: true };
     }
     const text = value ?? '';
-    const ciRaw = typeof caretIndex === 'number' ? caretIndex : text.length;
-    const ci = Math.max(0, Math.min(ciRaw, text.length));
+    const ci = Math.max(0, Math.min(caretIndex ?? text.length, text.length));
+    if (!isFocused) {
+      return { text, isPlaceholder: false };
+    }
+    // Insert inverse caret at position
     const before = text.slice(0, ci);
     const caretChar = text[ci] ?? ' ';
-    const after = ci < text.length ? text.slice(ci + 1) : '';
-    return { before, caretChar, after, showPlaceholder: false };
+    const after = text.slice(ci + 1);
+    return { before, caretChar, after, isPlaceholder: false };
   }, [value, placeholder, isFocused, caretIndex]);
-  
-  if (!isFocused && !value && placeholder) {
-    return <Text color="gray" dimColor>{after}</Text>;
-  }
 
-  return (
-    <Text>
-      <Text>{before}</Text>
-      {isFocused ? (
-        <Text inverse>{caretChar}</Text>
-      ) : (
-        <Text>{caretChar}</Text>
-      )}
-      <Text>{after}</Text>
-    </Text>
-  );
+  if (parts.isPlaceholder) {
+    return <Text color="gray" dimColor>{parts.text}</Text>;
+  }
+  
+  if ('before' in parts) {
+    // Focused with caret
+    return (
+      <Text>
+        {parts.before}<Text inverse>{parts.caretChar}</Text>{parts.after}
+      </Text>
+    );
+  }
+  
+  return <Text>{parts.text}</Text>;
 }
