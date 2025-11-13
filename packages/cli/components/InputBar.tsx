@@ -40,6 +40,13 @@ export const InputBar: React.FC<InputBarProps> = ({
   const [inputVersion, setInputVersion] = useState(0);
   const [isEscActive, setIsEscActive] = useState(false);
   
+  // Caret index for insert mode
+  const [caretIndex, setCaretIndex] = useState<number>(value.length);
+  const caretRef = useRef<number>(caretIndex);
+  useEffect(() => { caretRef.current = caretIndex; }, [caretIndex]);
+  // Keep caret within bounds on external value changes
+  useEffect(() => { if (caretRef.current > value.length) setCaretIndex(value.length); }, [value]);
+
   const prevValueRef = useRef(value);
   const escTimerRef = useRef<NodeJS.Timeout | null>(null);
   
@@ -92,16 +99,12 @@ export const InputBar: React.FC<InputBarProps> = ({
   const flushPending = useCallback(() => {
     if (pendingCharsRef.current) {
       const chars = pendingCharsRef.current;
-      const len = chars.length;
-      if (pendingIsPasteRef.current && len >= 100) {
-        // Collapse large paste into summary to avoid UI explosion but APPEND instead of replace
-        const placeholder = `[Pasted ${len} chars]`;
-        // Store mapping so we can expand on submit
-        pasteStoreRef.current.push({ placeholder, content: chars });
-        onChange((prev: string) => prev + placeholder);
-      } else {
-        onChange((prev: string) => prev + chars);
-      }
+      onChange((prev: string) => {
+        const ci = caretRef.current;
+        const next = prev.slice(0, ci) + chars + prev.slice(ci);
+        setCaretIndex(ci + chars.length);
+        return next;
+      });
       pendingCharsRef.current = '';
       pendingIsPasteRef.current = false;
     }
@@ -176,13 +179,40 @@ export const InputBar: React.FC<InputBarProps> = ({
         }
 
         // 2. Handle text editing
-        if (key.name === 'backspace' || key.name === 'delete') {
-          // Flush pending before backspace
+        // 2a. Arrow/home/end navigation
+        if (key.name === 'left') {
+          flushPending(); setCaretIndex(ci => Math.max(0, ci - 1)); return;
+        }
+        if (key.name === 'right') {
+          flushPending(); setCaretIndex(ci => Math.min(valueRef.current.length, ci + 1)); return;
+        }
+        if (key.name === 'home') {
+          flushPending(); setCaretIndex(0); return;
+        }
+        if (key.name === 'end') {
+          flushPending(); setCaretIndex(valueRef.current.length); return;
+        }
+
+        if (key.name === 'backspace') {
           flushPending();
-          
           onChange((prev: string) => {
-            if (prev.length > 0) {
-              return prev.slice(0, -1);
+            const ci = caretRef.current;
+            if (ci > 0) {
+              const next = prev.slice(0, ci - 1) + prev.slice(ci);
+              setCaretIndex(ci - 1);
+              return next;
+            }
+            return prev;
+          });
+          return;
+        }
+        if (key.name === 'delete') {
+          flushPending();
+          onChange((prev: string) => {
+            const ci = caretRef.current;
+            if (ci < prev.length) {
+              const next = prev.slice(0, ci) + prev.slice(ci + 1);
+              return next;
             }
             return prev;
           });
@@ -280,6 +310,7 @@ export const InputBar: React.FC<InputBarProps> = ({
           value={value}
           placeholder="Type your message... or use /<command> <prompt>"
           isFocused={isFocused}
+          caretIndex={caretIndex}
         />
       </Box>
       {showCommandMenu && (

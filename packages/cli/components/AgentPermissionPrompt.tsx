@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Text, useInput } from 'ink';
+import { Box, Text } from 'ink';
 
 import type { AgentPermissionOption, AgentPermissionPromptProps } from './AgentPermissionPrompt.types.js';
+import { useKeypress, type Key } from '../src/hooks/useKeypress.js';
 
 export const AgentPermissionPromptComponent: React.FC<AgentPermissionPromptProps> = ({ prompt, onSubmit, isFocused }) => {
     const options: Array<{ key: AgentPermissionOption; label: string }> = prompt.hasSuggestions
@@ -21,20 +22,17 @@ export const AgentPermissionPromptComponent: React.FC<AgentPermissionPromptProps
         setSelectedIndex(0);
     }, [prompt.requestId, prompt.hasSuggestions]);
 
-    useInput(
-        (_input, key) => {
-            if (!isFocused) {
-                return;
-            }
-            if (key.leftArrow || key.upArrow) {
+    useKeypress(
+        (key: Key) => {
+            if (!isFocused) return;
+            const name = key.name;
+            if (name === 'left' || name === 'up') {
                 setSelectedIndex(prev => (prev + options.length - 1) % options.length);
-            } else if (key.rightArrow || key.downArrow || key.tab) {
+            } else if (name === 'right' || name === 'down' || name === 'tab') {
                 setSelectedIndex(prev => (prev + 1) % options.length);
-            } else if (key.return) {
+            } else if (name === 'return' || name === 'enter') {
                 const option = options[selectedIndex];
-                if (option) {
-                    onSubmit(option.key);
-                }
+                if (option) onSubmit(option.key);
             }
         },
         { isActive: isFocused }
