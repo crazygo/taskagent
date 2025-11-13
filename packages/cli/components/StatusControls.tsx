@@ -5,6 +5,7 @@ import { Driver } from '../drivers/types.js';
 import { addLog } from '@taskagent/shared/logger';
 import { useCommand } from '../src/hooks/useCommand.js';
 import { Command } from '../src/config/keyBindings.js';
+import { ACTIVE_TAB_BACKGROUND_COLOR } from './theme.js';
 
 
 
@@ -50,7 +51,7 @@ export const TabView: React.FC<TabViewProps> = ({ staticOptions, tasks, selected
     <Box flexDirection="row" width="100%">
       {allTabs.map(tab => {
         const selected = selectedTab === tab;
-        const backgroundColor = selected ? 'white' : 'gray';
+        const backgroundColor = selected ? ACTIVE_TAB_BACKGROUND_COLOR : 'gray';
         const color = selected ? 'black' : 'white';
         const indicator = selected ? '› ' : '  ';
         return (

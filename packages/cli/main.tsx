@@ -15,6 +15,7 @@ import { ChatPanel } from './components/ChatPanel.js';
 import { TabView } from './components/StatusControls.js';
 import { TaskSpecificView } from './components/TaskSpecificView.js';
 import { InputBar } from './components/InputBar.js';
+import { SURFACE_BACKGROUND_COLOR } from './components/theme.js';
 import type { AgentPermissionPromptState, AgentPermissionOption } from './components/AgentPermissionPrompt.types.js';
 import { AgentPermissionPromptComponent } from './components/AgentPermissionPrompt.js';
 import { useTaskStore } from './domain/taskStore.js';
@@ -1408,7 +1409,7 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
                 return (
                     <>
                         {inputSupported && <InputHandlers />}
-                        <Box paddingY={1}>
+                        <Box paddingY={1} backgroundColor={SURFACE_BACKGROUND_COLOR}>
                             {inputSupported && (agentPermissionPrompt ? (
                                 <AgentPermissionPromptComponent
                                     prompt={agentPermissionPrompt}
@@ -1447,7 +1448,7 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
                         )}
                         <Box paddingX={1} backgroundColor="gray">
                             <Text>
-                                {(isEscActive ? "[Press ESC again to clear input]" : "Switch Driver: Ctrl+N") + ((bootstrapConfig.autoExit || bootstrapConfig.autoAllowPermissions) ? ` | Params: ${[bootstrapConfig.autoExit && '--auto-exit', bootstrapConfig.autoAllowPermissions && '--auto-allow'].filter(Boolean).join(' ')}` : '')}
+                                {(isEscActive ? "[Press ESC again to clear input]" : "Switch Driver: Ctrl+P/N") + ((bootstrapConfig.autoExit || bootstrapConfig.autoAllowPermissions) ? ` | Params: ${[bootstrapConfig.autoExit && '--auto-exit', bootstrapConfig.autoAllowPermissions && '--auto-allow'].filter(Boolean).join(' ')}` : '')}
                             </Text>
                         </Box>
                     </>

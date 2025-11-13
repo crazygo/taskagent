@@ -6,6 +6,7 @@ const loadEnvFile = (filePath: string, options?: { override?: boolean }) => {
   dotenv.config({
     path: filePath,
     override: options?.override ?? false,
+    debug: false,
   });
 };
 

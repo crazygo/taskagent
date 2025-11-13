@@ -7,6 +7,7 @@ import { useCommand } from '../src/hooks/useCommand.js';
 import { useKeypress, type Key } from '../src/hooks/useKeypress.js';
 import { Command as KeyCommand } from '../src/config/keyBindings.js';
 import { keyMatchers } from '../src/utils/keyMatchers.js';
+import { SURFACE_BACKGROUND_COLOR } from './theme.js';
 
 export interface Command {
   name: string;
@@ -172,6 +173,23 @@ export const InputBar: React.FC<InputBarProps> = ({
       (key: Key) => {
         if (!isFocused) return;
         
+        if (key.name === 'escape') {
+          flushPending();
+
+          const menuWasOpen = showCommandMenu;
+          if (menuWasOpen) {
+            setShowCommandMenu(false);
+            onCommandMenuChange?.(false);
+          }
+
+          if (isEscActive) {
+            handleSecondEsc();
+          } else {
+            handleFirstEsc();
+          }
+          return;
+        }
+        
         // CRITICAL: Skip return/enter keys entirely - they should ONLY be handled as SUBMIT command
         // This prevents paste with newlines from triggering multiple submits
         if (key.name === 'return' || key.name === 'enter') {
@@ -256,7 +274,16 @@ export const InputBar: React.FC<InputBarProps> = ({
           }
         }
       },
-      [onChange, isFocused, flushPending],
+      [
+        onChange,
+        isFocused,
+        flushPending,
+        showCommandMenu,
+        onCommandMenuChange,
+        handleFirstEsc,
+        handleSecondEsc,
+        isEscActive,
+      ],
     ),
     { isActive: true },
   );
@@ -313,16 +340,18 @@ export const InputBar: React.FC<InputBarProps> = ({
   }, []);
 
   return (
-    <Box flexDirection="column">
-      <Box paddingX={1} width="100%" flexDirection="row">
+    <Box flexDirection="column" backgroundColor={SURFACE_BACKGROUND_COLOR}>
+      <Box paddingX={1} width="100%" flexDirection="row" backgroundColor={SURFACE_BACKGROUND_COLOR}>
         <Text color={isFocused ? 'blue' : 'white'}>&gt; </Text>
-        <SimpleTextDisplay
-          key={`display-${inputVersion}`}
-          value={value}
-          placeholder="Type your message... or use /<command> <prompt>"
-          isFocused={isFocused}
-          caretIndex={caretIndex}
-        />
+        <Box flexGrow={1} minWidth={0}>
+          <SimpleTextDisplay
+            key={`display-${inputVersion}`}
+            value={value}
+            placeholder="Type your message... or use /<command> <prompt>"
+            isFocused={isFocused}
+            caretIndex={caretIndex}
+          />
+        </Box>
       </Box>
       {showCommandMenu && (
         <CommandMenu commands={filteredCommands} selectedIndex={selectedIndex} />
