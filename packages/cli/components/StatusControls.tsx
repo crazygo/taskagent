@@ -49,13 +49,13 @@ export const TabView: React.FC<TabViewProps> = ({ staticOptions, tasks, selected
 
   return (
     <Box flexDirection="row" width="100%">
-      {allTabs.map(tab => {
+      {allTabs.map((tab, idx) => {
         const selected = selectedTab === tab;
         const backgroundColor = selected ? ACTIVE_TAB_BACKGROUND_COLOR : 'gray';
         const color = selected ? 'black' : 'white';
         const indicator = selected ? '› ' : '  ';
         return (
-          <Box key={tab} backgroundColor={backgroundColor as any} paddingX={1}>
+          <Box key={`${tab}-${idx}`} backgroundColor={backgroundColor as any} paddingX={1}>
             <Text color={color as any}>{`${indicator}${tab} `}</Text>
           </Box>
         );

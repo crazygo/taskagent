@@ -135,16 +135,27 @@ export function KeypressProvider({
   );
 
   useEffect(() => {
+    // Check if raw mode is supported before enabling
+    // Raw mode may not be supported in:
+    // - CI environments (non-TTY stdin, e.g., GitHub Actions, GitLab CI)
+    // - Piped input scenarios (e.g., echo "input" | yarn start)
+    // - Automated testing environments without actual terminal
+    const supportsRawMode = stdin.isTTY && typeof (stdin as any).setRawMode === 'function';
+    
     // Enable raw mode and bracketed paste mode
     const wasRaw = stdin.isRaw;
-    if (!wasRaw) {
+    if (!wasRaw && supportsRawMode) {
       setRawMode(true);
     }
     
     // Always enable bracketed paste mode (independent of raw mode state)
     // This makes the terminal wrap pasted content in \x1B[200~ ... \x1B[201~
-    process.stdout.write('\x1B[?2004h');
-    addLog(`[KeypressProvider] Enabled bracketed paste mode (wasRaw=${wasRaw})`);
+    if (supportsRawMode) {
+      process.stdout.write('\x1B[?2004h');
+      addLog(`[KeypressProvider] Enabled bracketed paste mode (wasRaw=${wasRaw})`);
+    } else {
+      addLog(`[KeypressProvider] Raw mode not supported, skipping bracketed paste`);
+    }
 
 
     /**
@@ -368,7 +379,7 @@ export function KeypressProvider({
       isBracketPasteRef.current = false;
       pasteBufferRef.current = '';
       
-      if (!wasRaw) {
+      if (!wasRaw && supportsRawMode) {
         // Disable bracketed paste mode
         process.stdout.write('\x1B[?2004l');
         setRawMode(false);
