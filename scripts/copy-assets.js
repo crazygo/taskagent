@@ -6,7 +6,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const repoRoot = join(__dirname, '..');
 const sourceRoot = join(repoRoot, 'packages');
-const targetRoot = join(repoRoot, 'dist');
+// With --splitting, tsup outputs to dist/packages/, so .agent.md should go to dist/packages/ too
+const targetRoot = join(repoRoot, 'dist/packages');
 const EXT = '.agent.md';
 
 function copyAgents(fromDir) {
