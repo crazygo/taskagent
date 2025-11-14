@@ -19,6 +19,20 @@ export const parseCliArgs = (): CliArgs => {
   const raw = process.argv.slice(2);
   try { addLog(`[CLI] process.argv: ${JSON.stringify(process.argv)}`); } catch {}
   const firstFlagIdx = raw.findIndex(arg => typeof arg === 'string' && arg.startsWith('-'));
+  const positionalBeforeFlags = (firstFlagIdx === -1 ? raw : raw.slice(0, firstFlagIdx)).filter(
+    (value): value is string => typeof value === 'string',
+  );
+
+  const normalizedPositional = positionalBeforeFlags
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+
+  const commandTokenIdx = normalizedPositional.findIndex((value) =>
+    ['monitor', 'mon'].includes(value.toLowerCase()),
+  );
+  const presetFromCommand = commandTokenIdx >= 0 ? 'monitor' : undefined;
+  const positionalRemainder = normalizedPositional.filter((_, idx) => idx !== commandTokenIdx);
+
   let toParse = firstFlagIdx >= 0 ? raw.slice(firstFlagIdx) : [];
   while (toParse.length > 0 && toParse[0] === '--') {
     toParse = toParse.slice(1);
@@ -105,13 +119,16 @@ export const parseCliArgs = (): CliArgs => {
   };
   
   let ignoredPositionalPrompt: string | undefined;
+  if (!rawPrompt && positionalRemainder.length > 0) {
+    ignoredPositionalPrompt = positionalRemainder[0];
+  }
   // Detect if a driver was specified, but no -p/--prompt, and there's a single positional arg
-  if (detectedDriver && !rawPrompt && argv._ && argv._.length === 1 && typeof argv._[0] === 'string') {
+  if (!ignoredPositionalPrompt && detectedDriver && !rawPrompt && argv._ && argv._.length === 1 && typeof argv._[0] === 'string') {
     ignoredPositionalPrompt = argv._[0];
   }
 
   const coercePreset = (): string | undefined => {
-    const rawPreset = argv.preset;
+    const rawPreset = argv.preset ?? presetFromCommand;
     if (typeof rawPreset === 'string' && rawPreset.trim().length > 0) {
       return rawPreset.trim().toLowerCase();
     }
