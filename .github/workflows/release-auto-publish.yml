@@ -124,33 +124,33 @@ jobs:
             --title "v${VERSION}" \
             --notes "## 📦 Release v${VERSION}
 
-**To publish to npm manually:**
+          **To publish to npm manually:**
 
-\`\`\`bash
-# Download the artifact
-gh release download v${VERSION} -p taskagent.tgz
+          \\\`\\\`\\\`bash
+          # Download the artifact
+          gh release download v${VERSION} -p taskagent.tgz
 
-# Extract and publish
-mkdir -p /tmp/publish-v${VERSION}
-tar -xzf taskagent.tgz -C /tmp/publish-v${VERSION}
-cd /tmp/publish-v${VERSION}/package
+          # Extract and publish
+          mkdir -p /tmp/publish-v${VERSION}
+          tar -xzf taskagent.tgz -C /tmp/publish-v${VERSION}
+          cd /tmp/publish-v${VERSION}/package
 
-# Login to npm (if needed)
-npm login
+          # Login to npm (if needed)
+          npm login
 
-# Publish
-npm publish --access public
-\`\`\`
+          # Publish
+          npm publish --access public
+          \\\`\\\`\\\`
 
-**Or use yarn:**
+          **Or use yarn:**
 
-\`\`\`bash
-# From repo root after pulling the tag
-git checkout v${VERSION}
-yarn install
-YARN_NPM_PUBLISH_REGISTRY=https://registry.npmjs.org yarn npm publish --access public
-\`\`\`
-"
+          \\\`\\\`\\\`bash
+          # From repo root after pulling the tag
+          git checkout v${VERSION}
+          yarn install
+          YARN_NPM_PUBLISH_REGISTRY=https://registry.npmjs.org yarn npm publish --access public
+          \\\`\\\`\\\`
+          "
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
