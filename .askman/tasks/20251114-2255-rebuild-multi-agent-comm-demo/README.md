@@ -1,5 +1,9 @@
 # Rebuild Multi-Agent Communication (Quick Dev Flow Demo)
 
+## Requirement (2025-11-14T16:13:10.912Z)
+- The Feature-Plan stage MUST support interrupt/abort when it detects conflicts with existing requirements.
+- On interrupt, the sequential pipeline MUST short-circuit and emit a structured failure payload (e.g., { ok: false, code: 'CONFLICT', message, details }) or a controlled abort that the orchestrator maps to a failure, preventing downstream stages (feature-edit, YAML validator, report).
+
 - Task ID: 20251114-2255-rebuild-multi-agent-comm-demo
 - Goal: Rebuild/streamline multi-agent communication (DevHub ↔ LoopAgent/SequentialAgent) for a quick development flow demo.
 - Notes:
@@ -33,3 +37,15 @@
   - rationale (what change introduces the potential break)
 - Architecture Choice: Programming Agent (multi-node) for deterministic traversal: nodes = [collect_diff, enumerate_features, map_dependencies, detect_cross, score_risk, generate_report].
 - Benefit: Early surfacing of silent regressions without full test suite expansion.
+
+## Planned Upgrade: Feature-Updater Sequential Agent (2025-11-14T15:59:12.767Z)
+- Goal: Upgrade to feature-updater with a sequential architecture; rename feature-writer to feature-edit.
+- Composition:
+  - Feature-Plan (Prompt Agent; new agent)
+  - Loop (LoopAgent; current: blueprint loop)
+    - Stage: feature-edit (Prompt Agent; renamed from feature-writer; supports add/delete/change) → YAML validator
+  - Feature-Changes Review (Prompt Agent) to check and produce a report
+- Pipeline: feature-plan → loop(feature-edit → yaml validator) → feature-changes report.
+- Rationale: Combine prompt-driven ideation with programmatic validation to reduce LLM-induced structural errors while producing a final human-readable risk/change report.
+
+> 2025-11-14T16:00:41.950Z: Note — feature-edit is a Prompt Agent.
