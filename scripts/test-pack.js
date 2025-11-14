@@ -42,7 +42,7 @@ run(`npm install --ignore-scripts`, {
 });
 
 // Run the extracted package binary (what users will actually run)
-run(`node dist/cli/main.js --workspace /tmp --start -p 'list files'`, {
+run(`node dist/cli/main.js --workspace /tmp --start -p 'list files' --auto-exit`, {
   cwd: `${testDir}/package`,
   env: cleanEnv,
 });
