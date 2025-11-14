@@ -49,3 +49,11 @@
 - Rationale: Combine prompt-driven ideation with programmatic validation to reduce LLM-induced structural errors while producing a final human-readable risk/change report.
 
 > 2025-11-14T16:00:41.950Z: Note — feature-edit is a Prompt Agent.
+
+## Additional Agent Evolution (2025-11-14T16:21:31.043Z)
+- Blueprint will become a Prompt Agent (was LoopAgent) focused on direct user dialogue and selectively invoking other agents when needed (not a full orchestrator/central workflow controller).
+- Selection logic: interpret user intent → choose Feature-Updater, UI Review, Notes Agent, or others; skip calls when no added value.
+- UI Review (ui-review) remains a Prompt Agent for UI/UX; legacy structure requires audit/refactor.
+- Notes Agent (new Prompt Agent): writes fragments to notes-<timestamp>.md in task workspace; appends decisions, conflicts, risks chronologically.
+- Example interaction path: user intent → blueprint (dialog) → conditional calls: (feature-updater loop) and/or (ui-review) → notes-agent summary.
+- Abort policy: On conflict detected in feature-plan or validation failure, blueprint stops further calls and invokes notes-agent to persist the issue.
