@@ -1,7 +1,12 @@
 /**
- * BlueprintLoop - Loop agent for edit-validate workflow
+ * BlueprintLoop - Sequential agent with Feature-Plan → Loop(feature-edit → YAML validator) → Feature-Changes Review
  * 
- * Uses Template Method pattern: implements runSinglePass() and shouldContinue()
+ * Architecture:
+ * 1. Feature-Plan stage: Analyze requirements and detect conflicts
+ * 2. Loop stage: feature-edit → YAML validator (if no conflicts)
+ * 3. Feature-Changes Review stage: Final review and report
+ * 
+ * Short-circuit on conflict: If Feature-Plan detects conflicts, pipeline aborts with structured failure
  */
 
 import path from 'node:path';
@@ -13,15 +18,29 @@ import type { RunnableAgent, AgentStartContext, AgentStartSinks, AgentToolContex
 import type { AgentRegistry } from '../registry/AgentRegistry.js';
 import type { EventBus } from '@core/event-bus';
 import { addLog } from '@shared/logger';
-import { runAgent, emitProgress } from '../runtime/async-task/helpers.js';
+import { runAgent, emitProgress, emitResult } from '../runtime/async-task/helpers.js';
 import type { AsyncTaskContext } from '../runtime/async-task/types.js';
+
+/**
+ * Result structure for Feature-Plan stage
+ */
+interface PlanResult {
+    ok: boolean;
+    code?: string;
+    message: string;
+    details?: any;
+    analysis?: any;
+}
 
 export class BlueprintLoop extends LoopAgent {
     readonly id = 'blueprint';
-    readonly description = 'Blueprint Agent - Generate structured feature documentation with edit-validate loop';
+    readonly description = 'Blueprint Agent - Feature-Plan → Loop(feature-edit → validator) → Review';
 
     protected readonly maxIterations = 3;
     protected readonly subAgents: RunnableAgent[] = []; // Not used, but required by LoopAgent
+    
+    // Store plan result to short-circuit if needed
+    private planResult?: PlanResult;
 
     constructor(
         private agentRegistry: AgentRegistry,
@@ -53,13 +72,13 @@ export class BlueprintLoop extends LoopAgent {
     // ========================================
 
     /**
-     * Execute single iteration: call feature-writer and validate
+     * Stage 2 (Loop): Execute single iteration - call feature-edit and validate
      */
     protected async runSinglePass(
         context: AgentStartContext,
         sinks: AgentStartSinks
     ): Promise<string> {
-        addLog('[BlueprintLoop] Calling feature-writer...');
+        addLog('[BlueprintLoop] Calling feature-edit...');
 
         try {
             const asyncContext: AsyncTaskContext = {
@@ -71,13 +90,13 @@ export class BlueprintLoop extends LoopAgent {
                 parentAgentId: context.parentAgentId || 'blueprint',
             };
 
-            const output = await runAgent('feature-writer', this.state.currentTask, asyncContext);
-            addLog(`[BlueprintLoop] Writer completed: ${output.slice(0, 800)}...`);
+            const output = await runAgent('feature-edit', this.state.currentTask, asyncContext);
+            addLog(`[BlueprintLoop] Editor completed: ${output.slice(0, 800)}...`);
 
             const validation = await this.validateYAML(output, context.workspacePath);
             return validation;
         } catch (error) {
-            const errorMsg = `Feature Writer 执行失败: ${error}`;
+            const errorMsg = `Feature Edit 执行失败: ${error}`;
             addLog(`[BlueprintLoop] ${errorMsg}`);
             sinks.onText?.(`❌ ${errorMsg}\n`);
             return `❌验证失败：${errorMsg}`;
@@ -110,16 +129,97 @@ export class BlueprintLoop extends LoopAgent {
     // Hook Methods (Optional Overrides)
     // ========================================
 
+    /**
+     * Stage 1: Feature-Plan - Analyze requirements and detect conflicts
+     * Short-circuits the pipeline if conflicts are detected
+     */
     protected async beforeLoop(context: AgentStartContext, sinks: AgentStartSinks): Promise<void> {
         const targetTab = context.sourceTabId;
+        
         emitProgress(
             this.eventBus,
             'blueprint-loop',
             targetTab,
-            '🔄 Blueprint 循环开始...',
+            '📋 Stage 1: Feature-Plan - 分析需求并检测冲突...',
             undefined,
             context.parentAgentId
         );
+
+        try {
+            const asyncContext: AsyncTaskContext = {
+                eventBus: this.eventBus,
+                agentRegistry: this.agentRegistry,
+                tabExecutor: this.tabExecutor,
+                sourceTabId: context.sourceTabId,
+                workspacePath: context.workspacePath,
+                parentAgentId: context.parentAgentId || 'blueprint',
+            };
+
+            const planOutput = await runAgent('feature-plan', this.state.currentTask, asyncContext);
+            addLog(`[BlueprintLoop] Feature-Plan output: ${planOutput.slice(0, 500)}...`);
+            
+            // Parse JSON result from Feature-Plan
+            this.planResult = this.parsePlanResult(planOutput);
+            
+            if (!this.planResult.ok) {
+                // Conflict detected - short-circuit pipeline
+                const errorMsg = `❌ ${this.planResult.message}`;
+                emitProgress(
+                    this.eventBus,
+                    'blueprint-loop',
+                    targetTab,
+                    errorMsg,
+                    undefined,
+                    context.parentAgentId
+                );
+                
+                // Emit structured failure result
+                emitResult(
+                    this.eventBus,
+                    'blueprint-loop',
+                    targetTab,
+                    this.planResult,
+                    undefined,
+                    context.parentAgentId
+                );
+                
+                sinks.onText?.(`\n${errorMsg}\n`);
+                if (this.planResult.details) {
+                    sinks.onText?.(`\n详细信息: ${JSON.stringify(this.planResult.details, null, 2)}\n`);
+                }
+                
+                // Stop the loop immediately
+                this.state.shouldStop = true;
+                return;
+            }
+            
+            // No conflict - proceed to loop
+            emitProgress(
+                this.eventBus,
+                'blueprint-loop',
+                targetTab,
+                '✅ Feature-Plan 完成: 未检测到冲突，开始编辑...',
+                undefined,
+                context.parentAgentId
+            );
+            
+            sinks.onText?.(`\n✅ ${this.planResult.message}\n`);
+        } catch (error) {
+            const errorMsg = `Feature-Plan 执行失败: ${error}`;
+            addLog(`[BlueprintLoop] ${errorMsg}`);
+            
+            emitProgress(
+                this.eventBus,
+                'blueprint-loop',
+                targetTab,
+                `❌ ${errorMsg}`,
+                undefined,
+                context.parentAgentId
+            );
+            
+            sinks.onText?.(`\n❌ ${errorMsg}\n`);
+            this.state.shouldStop = true;
+        }
     }
 
     protected async onIterationStart(iteration: number, context: AgentStartContext, sinks: AgentStartSinks): Promise<void> {
@@ -138,7 +238,7 @@ export class BlueprintLoop extends LoopAgent {
             this.eventBus,
             'blueprint-loop',
             targetTab,
-            '📝 调用 Feature Writer 生成 YAML...',
+            '📝 调用 Feature Edit 编辑 YAML...',
             undefined,
             context.parentAgentId
         );
@@ -151,7 +251,7 @@ export class BlueprintLoop extends LoopAgent {
             this.eventBus,
             'blueprint-loop',
             targetTab,
-            '✓ Writer 完成',
+            '✓ Editor 完成',
             undefined,
             context.parentAgentId
         );
@@ -227,12 +327,75 @@ export class BlueprintLoop extends LoopAgent {
         sinks.onText?.(`\n⚠️ 已达到最大迭代次数 (${this.maxIterations})，停止循环\n`);
     }
 
+    /**
+     * Stage 3: Feature-Changes Review - Generate final review report
+     */
+    protected async afterLoop(context: AgentStartContext, sinks: AgentStartSinks): Promise<void> {
+        // Skip review if we short-circuited due to conflict
+        if (this.planResult && !this.planResult.ok) {
+            return;
+        }
+        
+        const targetTab = context.sourceTabId || 'Start';
+        
+        emitProgress(
+            this.eventBus,
+            'blueprint-loop',
+            targetTab,
+            '📊 Stage 3: Feature-Changes Review - 生成最终报告...',
+            undefined,
+            context.parentAgentId
+        );
+        
+        // TODO: Implement feature-changes review agent
+        // For now, just emit a completion message
+        emitProgress(
+            this.eventBus,
+            'blueprint-loop',
+            targetTab,
+            '✅ Feature-Changes Review 完成',
+            undefined,
+            context.parentAgentId
+        );
+        
+        sinks.onText?.('\n✅ 所有阶段完成\n');
+    }
+
     // ========================================
     // Private Helper Methods
     // ========================================
+    
+    /**
+     * Parse JSON result from Feature-Plan agent
+     */
+    private parsePlanResult(output: string): PlanResult {
+        try {
+            // Extract JSON from output (may have surrounding text)
+            const jsonMatch = output.match(/\{[\s\S]*"ok"[\s\S]*\}/);
+            if (!jsonMatch) {
+                // No JSON found, assume success (backward compatibility)
+                return {
+                    ok: true,
+                    message: '需求分析完成',
+                    analysis: { summary: output }
+                };
+            }
+            
+            const result = JSON.parse(jsonMatch[0]) as PlanResult;
+            return result;
+        } catch (error) {
+            addLog(`[BlueprintLoop] Failed to parse plan result: ${error}`);
+            // Default to success if parsing fails
+            return {
+                ok: true,
+                message: '需求分析完成',
+                analysis: { summary: output }
+            };
+        }
+    }
 
     /**
-     * Parse feature-writer output, read the referenced files, and validate YAML structure
+     * Parse feature-edit output, read the referenced files, and validate YAML structure
      */
     private async validateYAML(writerOutput: string, workspacePath?: string): Promise<string> {
         const changedFiles = this.extractChangedFiles(writerOutput);

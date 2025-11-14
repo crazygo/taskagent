@@ -48,7 +48,7 @@ export async function createAgent(options?: {
     const getAgentDefinitions = () => agentDefinitions;
     const getTools = () => allowedTools ?? [];
 
-    const childAgentIds = ['blueprint', 'devhub', 'feature-writer', 'coder', 'review'] as const;
+    const childAgentIds = ['blueprint', 'devhub', 'feature-edit', 'coder', 'review'] as const;
     const childAgents = new Map<string, RunnableAgent>();
 
     if (options?.agentRegistry) {
