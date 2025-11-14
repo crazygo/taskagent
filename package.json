@@ -1,7 +1,6 @@
 {
   "name": "@askman-dev/task",
   "version": "1.0.9",
-  "private": true,
   "workspaces": [
     "packages/*"
   ],
