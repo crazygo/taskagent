@@ -11,8 +11,8 @@ import yaml from 'js-yaml';
 import { LoopAgent } from '../workflow-agents/LoopAgent.js';
 import type { RunnableAgent, AgentStartContext, AgentStartSinks, AgentToolContext } from '../runtime/types.js';
 import type { AgentRegistry } from '../registry/AgentRegistry.js';
-import type { EventBus } from '@taskagent/core/event-bus';
-import { addLog } from '@taskagent/shared/logger';
+import type { EventBus } from '@core/event-bus';
+import { addLog } from '@shared/logger';
 import { runAgent, emitProgress } from '../runtime/async-task/helpers.js';
 import type { AsyncTaskContext } from '../runtime/async-task/types.js';
 

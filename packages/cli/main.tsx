@@ -6,9 +6,9 @@ import { randomUUID } from 'crypto';
 import { inspect } from 'util';
 import { type PermissionUpdate, type PermissionResult } from '@anthropic-ai/claude-agent-sdk';
 
-import { addLog } from '@taskagent/shared/logger';
+import { addLog } from '@shared/logger';
 import { loadCliConfig } from './cli/config.js';
-import type { Task } from '@taskagent/shared/task-manager';
+import type { Task } from '@shared/task-manager';
 import { ensureAiProvider, type AiChatProvider } from './config/ai-provider.js';
 import * as Types from './types.js';
 import { ChatPanel } from './components/ChatPanel.js';
@@ -34,25 +34,24 @@ import {
     getDriverCommandEntries,
 } from './drivers/registry.js';
 import type { AgentPipelineOverrides } from './drivers/pipeline.js';
-import { closeTaskLogger } from '@taskagent/shared/task-logger';
+import { closeTaskLogger } from '@shared/task-logger';
 import { loadWorkspaceSettings, writeWorkspaceSettings, type WorkspaceSettings } from './workspace/settings.js';
-import { getGlobalTabRegistry, type TabConfig } from '@taskagent/tabs';
-import { chatTabConfig } from '@taskagent/tabs/configs/chat';
-import { agentTabConfig } from '@taskagent/tabs/configs/agent';
-import { startTabConfig } from '@taskagent/tabs/configs/start';
-import { blueprintTabConfig } from '@taskagent/tabs/configs/blueprint';
-import { glossaryTabConfig } from '@taskagent/tabs/configs/glossary';
-import { uiReviewTabConfig } from '@taskagent/tabs/configs/ui-review';
-import { monitorTabConfig } from '@taskagent/tabs/configs/monitor';
-import { getPresetOrDefault } from '@taskagent/presets';
-import { globalAgentRegistry, registerAllAgents } from '@taskagent/agents/registry';
-import type { AgentStartContext, AgentStartSinks } from '@taskagent/agents/runtime/types.js';
-import { EventBus } from '@taskagent/core/event-bus';
+import { getGlobalTabRegistry, type TabConfig } from '@tabs';
+import { chatTabConfig } from '@tabs/configs/chat';
+import { agentTabConfig } from '@tabs/configs/agent';
+import { startTabConfig } from '@tabs/configs/start';
+import { blueprintTabConfig } from '@tabs/configs/blueprint';
+import { glossaryTabConfig } from '@tabs/configs/glossary';
+import { uiReviewTabConfig } from '@tabs/configs/ui-review';
+import { monitorTabConfig } from '@tabs/configs/monitor';
+import { getPresetOrDefault } from '@presets';
+import { globalAgentRegistry, registerAllAgents } from '@agents/registry';
+import { EventBus } from '@core/event-bus';
 import { MessageStore } from './store/MessageStore.js';
 import { useMessageStoreTab } from './hooks/useMessageStoreTab.js';
 import { useAgentEventBridge } from './hooks/useAgentEventBridge.js';
-import { TabExecutionManager, TabExecutor } from '@taskagent/execution';
-import type { ExecutionContext, ExecutionResult } from '@taskagent/execution';
+import { TabExecutionManager, TabExecutor } from '@execution';
+import type { ExecutionContext, ExecutionResult } from '@execution';
 import { KeypressProvider } from './src/contexts/KeypressProvider.js';
 
 // Guard to prevent double submission in dev double-mount scenarios
@@ -1446,7 +1445,7 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
                         )}
                         <Box paddingX={1} backgroundColor="gray">
                             <Text>
-                                {(isEscActive ? "[Press ESC again to clear input]" : "Switch Driver: Ctrl+P/N") + ((bootstrapConfig.autoExit || bootstrapConfig.autoAllowPermissions) ? ` | Params: ${[bootstrapConfig.autoExit && '--auto-exit', bootstrapConfig.autoAllowPermissions && '--auto-allow'].filter(Boolean).join(' ')}` : '')}
+                                {(isEscActive ? "[Press ESC again to clear input]" : "Switch Agent: Ctrl+P/N") + ((bootstrapConfig.autoExit || bootstrapConfig.autoAllowPermissions) ? ` | Params: ${[bootstrapConfig.autoExit && '--auto-exit', bootstrapConfig.autoAllowPermissions && '--auto-allow'].filter(Boolean).join(' ')}` : '')}
                             </Text>
                         </Box>
                     </>

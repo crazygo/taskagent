@@ -1,8 +1,8 @@
 import type { AgentDefinition, PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
 
-import { EventBus } from '@taskagent/core/event-bus';
-import type { AgentEvent, AgentTextPayload, AgentReasoningPayload, AgentEventPayload } from '@taskagent/core/types/AgentEvent.js';
-import type { Message } from '@taskagent/core/types/Message.js';
+import { EventBus } from '@core/event-bus';
+import type { AgentEvent, AgentTextPayload, AgentReasoningPayload, AgentEventPayload } from '@core/types/AgentEvent.js';
+import type { Message } from '@core/types/Message.js';
 
 import { runClaudeStream, type ToolResultEvent, type ToolUseEvent } from '../runClaudeStream.js';
 

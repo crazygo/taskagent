@@ -1,6 +1,6 @@
-import { promises as fs } from 'node:fs';
-import { join } from 'node:path';
-import { addLog } from '@taskagent/shared/logger';
+import { promises as fs } from 'fs';
+import { join } from 'path';
+import { addLog } from '@shared/logger';
 
 const SETTINGS_DIR = '.askman';
 const SETTINGS_FILE = 'settings.json';

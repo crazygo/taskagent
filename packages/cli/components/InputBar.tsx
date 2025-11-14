@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Box, Text } from 'ink';
 import { CommandMenu } from './CommandMenu.js';
 import { SimpleTextDisplay } from './SimpleTextDisplay.js';
-import { addLog } from '@taskagent/shared/logger';
+import { addLog } from '@shared/logger';
 import { useCommand } from '../src/hooks/useCommand.js';
 import { useKeypress, type Key } from '../src/hooks/useKeypress.js';
 import { Command as KeyCommand } from '../src/config/keyBindings.js';

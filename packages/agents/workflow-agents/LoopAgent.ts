@@ -1,7 +1,7 @@
 import type { RunnableAgent, AgentStartContext, AgentStartSinks, ExecutionHandle } from '../runtime/types.js';
 import { BaseAgent } from '../runtime/types.js';
 import type { AgentCallback } from './AgentCallback.js';
-import { addLog } from '@taskagent/shared/logger';
+import { addLog } from '@shared/logger';
 
 /**
  * LoopAgent - Execute sub-agents in a loop until termination condition is met

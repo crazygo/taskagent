@@ -1,10 +1,10 @@
 import type { AgentDefinition } from '@anthropic-ai/claude-agent-sdk';
 import { tool as createSdkTool } from '@anthropic-ai/claude-agent-sdk';
-import type { Message } from '@taskagent/core/types/Message.js';
-import type { TaskEvent } from '@taskagent/core/types/TaskEvent.js';
+import type { Message } from '@core/types/Message.js';
+import type { TaskEvent } from '@core/types/TaskEvent.js';
 import type { PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
 import type { ToolUseEvent, ToolResultEvent } from './runClaudeStream.js';
-import { addLog } from '@taskagent/shared/logger';
+import { addLog } from '@shared/logger';
 import { z } from 'zod';
 /**
  * Agent execution context

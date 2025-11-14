@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { addLog } from '@taskagent/shared/logger';
-import type { EventBus } from '@taskagent/core/event-bus';
-import type { AgentEvent } from '@taskagent/core/types/AgentEvent.js';
+import { addLog } from '@shared/logger';
+import type { EventBus } from '@core/event-bus';
+import type { AgentEvent } from '@core/types/AgentEvent.js';
 import type { MessageStore } from '../store/MessageStore.js';
 import type { Message } from '../types.js';
-import type { ToolUseEvent, ToolResultEvent } from '@taskagent/agents/runtime/runClaudeStream.js';
+import type { ToolUseEvent, ToolResultEvent } from '@agents/runtime/runClaudeStream.js';
 
 type ConversationStatus = 'queued' | 'active';
 
