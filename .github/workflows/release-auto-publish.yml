@@ -55,11 +55,19 @@ jobs:
       - name: Enable Corepack
         run: corepack enable
 
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes expect
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: yarn
+
+      - name: Install Claude Code CLI
+        run: npm install -g @anthropic-ai/claude-code
 
       - name: Install dependencies
         run: yarn install --immutable
@@ -80,23 +88,21 @@ jobs:
       - name: Build package
         run: yarn build
 
+      - name: Run pack test
+        run: yarn test:pack
+        env:
+          AI_REASONING_ENABLED: ${{ secrets.AI_REASONING_ENABLED }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL_NAME: ${{ secrets.OPENAI_MODEL_NAME }}
+          OPENAI_API_BASE_URL: ${{ secrets.OPENAI_API_BASE_URL }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_BASE_URL: ${{ secrets.ANTHROPIC_BASE_URL }}
+          ANTHROPIC_MODEL: ${{ secrets.ANTHROPIC_MODEL }}
+
       - name: Create npm package tarball
         run: |
           mkdir -p artifacts
           yarn pack --out ./artifacts/taskagent.tgz
-
-      - name: Configure npm auth
-        run: |
-          echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Publish package to npm
-        run: yarn npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          YARN_NPM_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Commit version bump
         run: |
@@ -125,6 +131,44 @@ jobs:
         with:
           name: taskagent-package
           path: ./artifacts/taskagent.tgz
+
+      - name: Create GitHub Release with publish instructions
+        run: |
+          VERSION=$(cat package.json | jq -r .version)
+          gh release create "v${VERSION}" \
+            ./artifacts/taskagent.tgz \
+            --title "v${VERSION}" \
+            --notes "## 📦 Release v${VERSION}
+
+          **To publish to npm manually:**
+
+          \\\`\\\`\\\`bash
+          # Download the artifact
+          gh release download v${VERSION} -p taskagent.tgz
+
+          # Extract and publish
+          mkdir -p /tmp/publish-v${VERSION}
+          tar -xzf taskagent.tgz -C /tmp/publish-v${VERSION}
+          cd /tmp/publish-v${VERSION}/package
+
+          # Login to npm (if needed)
+          npm login
+
+          # Publish
+          npm publish --access public
+          \\\`\\\`\\\`
+
+          **Or use yarn:**
+
+          \\\`\\\`\\\`bash
+          # From repo root after pulling the tag
+          git checkout v${VERSION}
+          yarn install
+          YARN_NPM_PUBLISH_REGISTRY=https://registry.npmjs.org yarn npm publish --access public
+          \\\`\\\`\\\`
+          "
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   backmerge-pr:
     if: github.event_name == 'push' && success()
