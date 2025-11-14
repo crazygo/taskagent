@@ -3,7 +3,7 @@
  */
 
 import type { AgentRegistry } from '../../registry/AgentRegistry.js';
-import type { EventBus } from '@taskagent/core/event-bus';
+import type { EventBus } from '@core/event-bus';
 
 /**
  * Context passed to async tasks

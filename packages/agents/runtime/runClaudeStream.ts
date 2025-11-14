@@ -1,7 +1,7 @@
 import { inspect } from 'util';
 import { query, type SDKAssistantMessage, type PermissionUpdate, type McpServerConfig } from '@anthropic-ai/claude-agent-sdk';
 
-import { addLog } from '@taskagent/shared/logger';
+import { addLog } from '@shared/logger';
 
 const truncate = (s: string, n = 200) => (s.length <= n ? s : `${s.slice(0, n)}…`);
 

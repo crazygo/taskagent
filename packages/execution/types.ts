@@ -1,11 +1,10 @@
 /**
- * Execution Layer Types
+ * Execution module types
  * 
- * Types for the execution coordination layer that decouples
- * Agent execution from UI rendering.
+ * Provides types for tab execution and agent coordination
  */
 
-import type { ExecutionHandle, AgentStartSinks } from '@taskagent/agents/runtime/types.js';
+import type { ExecutionHandle, AgentStartSinks } from '@agents/runtime/types.js';
 
 /**
  * Execution context passed to agents

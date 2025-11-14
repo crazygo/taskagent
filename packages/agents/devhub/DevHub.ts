@@ -14,12 +14,12 @@ import { PromptAgent, type AgentContext, type AgentToolContext, type RunnableAge
 import { buildPromptAgentStart } from '../runtime/runPromptAgentStart.js';
 import { loadAgentPipelineConfig } from '../runtime/agentLoader.js';
 import type { AgentDefinition } from '@anthropic-ai/claude-agent-sdk';
-import type { EventBus } from '@taskagent/core/event-bus';
-import type { TaskManager } from '@taskagent/shared/task-manager';
+import type { EventBus } from '@core/event-bus';
+import type { TaskManager } from '@shared/task-manager';
 import type { AgentRegistry } from '../registry/AgentRegistry.js';
 import { CodingLoop } from './coding-loop/index.js';
 import type { LooperCommand } from './coding-loop/command.js';
-import { addLog } from '@taskagent/shared/logger';
+import { addLog } from '@shared/logger';
 
 const DEV_HUB_AGENT_ID = 'devhub';
 const DEV_HUB_DESCRIPTION = 'DevHub Agent - 理解开发需求，协调 Coder 与 Reviewer 循环开发直到代码通过审查';

@@ -17,7 +17,7 @@ import { createJudgeAgent, parseJudgeOutput } from '../judge/index.js';
 import { createSummarizerAgent } from '../summarizer/index.js';
 import { SummarizationCallback } from './SummarizationCallback.js';
 import { SinglePass } from './SinglePass.js';
-import { addLog } from '@taskagent/shared/logger';
+import { addLog } from '@shared/logger';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 

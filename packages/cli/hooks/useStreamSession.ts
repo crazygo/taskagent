@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { streamText } from 'ai';
-import { addLog } from '@taskagent/shared/logger';
+import { addLog } from '@shared/logger';
 import type { AiChatProvider } from '../config/ai-provider.js';
 import type { Message, LogMessage } from '../types.js';
 import type { MessageStore } from '../store/MessageStore.js';

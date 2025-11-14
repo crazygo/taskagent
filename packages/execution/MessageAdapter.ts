@@ -13,8 +13,8 @@
  * - Errors → agent:failed event
  */
 
-import type { EventBus } from '@taskagent/core/event-bus';
-import type { AgentStartSinks } from '@taskagent/agents/runtime/types.js';
+import type { EventBus } from '@core/event-bus';
+import type { AgentStartSinks } from '@agents/runtime/types.js';
 import { addLog } from '../shared/logger.js';
 
 export interface MessageAdapterOptions {

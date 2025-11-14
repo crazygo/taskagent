@@ -1,5 +1,6 @@
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
-import { addLog } from '@taskagent/shared/logger';
+
+import { addLog } from '@shared/logger';
 
 type ChatModelFactory = ReturnType<typeof createOpenRouter>['chat'];
 

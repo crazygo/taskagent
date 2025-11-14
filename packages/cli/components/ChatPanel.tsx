@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, Newline, Static, Text, useStdout } from 'ink';
 import * as Types from '../types.js';
-import { addLog } from '@taskagent/shared/logger';
+import { addLog } from '@shared/logger';
 
 /**
  * Thinking animation component - displays walking dots

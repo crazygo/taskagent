@@ -8,7 +8,7 @@
 import type { AgentCallback } from '../../workflow-agents/AgentCallback.js';
 import type { RunnableAgent } from '../../runtime/types.js';
 import { EventCollector } from './event-collector.js';
-import { addLog } from '@taskagent/shared/logger';
+import { addLog } from '@shared/logger';
 
 export class SummarizationCallback implements AgentCallback {
     private eventCollector = new EventCollector();

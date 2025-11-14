@@ -12,7 +12,7 @@
 import { EventEmitter } from 'node:events';
 import type { Message } from '../types.js';
 import type { EventBus } from '../../core/event-bus/EventBus.js';
-import { addLog } from '@taskagent/shared/logger';
+import { addLog } from '@shared/logger';
 
 export interface MessageStoreConfig {
   /**

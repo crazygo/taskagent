@@ -6,7 +6,7 @@
 
 import type { Message } from '../../types.js';
 import type { MessageStore } from '../../store/MessageStore.js';
-import { addLog } from '@taskagent/shared/logger';
+import { addLog } from '@shared/logger';
 import { runTask, type TaskRunState } from './flow.js';
 
 /**

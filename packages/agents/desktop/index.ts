@@ -15,8 +15,8 @@ import { buildPromptAgentStart } from '../runtime/runPromptAgentStart.js';
 import { loadAgentPipelineConfig } from '../runtime/agentLoader.js';
 import type { tool as createSdkTool } from '@anthropic-ai/claude-agent-sdk';
 import type { AgentContext, AgentStartContext, AgentStartSinks, ExecutionHandle, RunnableAgent } from '../runtime/types.js';
-import type { EventBus } from '@taskagent/core/event-bus';
-import { addLog } from '@taskagent/shared/logger';
+import type { EventBus } from '@core/event-bus';
+import { addLog } from '@shared/logger';
 import type { AgentRegistry } from '../registry/AgentRegistry.js';
 
 const START_AGENT_ID = 'start';

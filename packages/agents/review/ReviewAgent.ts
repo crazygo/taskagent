@@ -1,4 +1,4 @@
-import { addLog } from '@taskagent/shared/logger';
+import { addLog } from '@shared/logger';
 import { PromptAgent, type AgentContext, type AgentToolContext, type RunnableAgent, type AgentStartContext, type AgentStartSinks, type ExecutionHandle } from '../runtime/types.js';
 import { buildPromptAgentStart } from '../runtime/runPromptAgentStart.js';
 import type { AgentDefinition } from '@anthropic-ai/claude-agent-sdk';

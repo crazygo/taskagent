@@ -1,5 +1,5 @@
 import { useCallback, useRef } from 'react';
-import { addLog } from '@taskagent/shared/logger';
+import { addLog } from '@shared/logger';
 import type { Message } from '../types.js';
 
 export interface QueuedUserInput {

@@ -1,10 +1,12 @@
 /**
- * AsyncTask - Shared helper functions
+ * Async Task Helpers
+ * 
+ * Progress reporting and task coordination utilities
  */
 
+import { addLog } from '@shared/logger';
 import type { AsyncTaskContext } from './types.js';
-import type { AgentStartContext, AgentStartSinks } from '../types.js';
-import { addLog } from '@taskagent/shared/logger';
+import type { AgentStartSinks, AgentStartContext } from '../types.js';
 
 /**
  * Run an agent and collect its output
