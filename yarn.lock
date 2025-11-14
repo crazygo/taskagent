@@ -125,7 +125,6 @@ __metadata:
     zod: "npm:^3.22.4"
   bin:
     taskagent: dist/cli/main.js
-    taskagent-monitor: dist/main-monitor.js
   languageName: unknown
   linkType: soft
 
