@@ -1,11 +1,8 @@
-import { z } from 'zod';
-import path from 'path';
 import { PromptAgent, type AgentContext, type AgentToolContext, type RunnableAgent, type AgentStartContext, type AgentStartSinks, type ExecutionHandle } from '../runtime/types.js';
 import { buildPromptAgentStart } from '../runtime/runPromptAgentStart.js';
 import type { AgentRegistry } from '../registry/AgentRegistry.js';
 import type { EventBus } from '@core/event-bus';
 import type { AgentDefinition } from '@anthropic-ai/claude-agent-sdk';
-import { addLog } from '@shared/logger';
 
 const FEATURE_WRITER_AGENT_ID = 'feature-writer';
 const FEATURE_WRITER_DESCRIPTION = 'Feature Writer - Write structured feature YAML files';
