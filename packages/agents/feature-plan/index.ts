@@ -5,7 +5,7 @@ import type { RunnableAgent } from '../runtime/types.js';
 import type { TabExecutor } from '../../execution/TabExecutor.js';
 import type { EventBus } from '@core/event-bus';
 import type { AgentRegistry } from '../registry/AgentRegistry.js';
-import { FeatureWriterAgent } from './FeatureWriterAgent.js';
+import { FeaturePlanAgent } from './FeaturePlanAgent.js';
 
 export async function createAgent(options?: { 
     tabExecutor?: TabExecutor;
@@ -19,10 +19,10 @@ export async function createAgent(options?: {
         agents: agentDefinitions,
         allowedTools,
     } = await loadAgentPipelineConfig(agentDir, {
-        coordinatorFileName: 'feature-writer.agent.md',
+        coordinatorFileName: 'feature-plan.agent.md',
     });
 
-    return new FeatureWriterAgent({
+    return new FeaturePlanAgent({
         tabExecutor: options?.tabExecutor,
         eventBus: options?.eventBus,
         agentRegistry: options?.agentRegistry,
@@ -31,3 +31,6 @@ export async function createAgent(options?: {
         allowedTools,
     });
 }
+
+export { FeaturePlanAgent } from './FeaturePlanAgent.js';
+

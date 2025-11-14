@@ -4,10 +4,10 @@ import type { AgentRegistry } from '../registry/AgentRegistry.js';
 import type { EventBus } from '@core/event-bus';
 import type { AgentDefinition } from '@anthropic-ai/claude-agent-sdk';
 
-const FEATURE_WRITER_AGENT_ID = 'feature-writer';
-const FEATURE_WRITER_DESCRIPTION = 'Feature Writer - Write structured feature YAML files';
+const FEATURE_EDIT_AGENT_ID = 'feature-edit';
+const FEATURE_EDIT_DESCRIPTION = 'Feature Edit - Add, delete, or change structured feature YAML files';
 
-interface FeatureWriterAgentDeps {
+interface FeatureEditAgentDeps {
     tabExecutor?: any;
     systemPrompt?: any;
     agentDefinitions?: Record<string, AgentDefinition>;
@@ -16,11 +16,11 @@ interface FeatureWriterAgentDeps {
     agentRegistry?: AgentRegistry;
 }
 
-export class FeatureWriterAgent extends PromptAgent implements RunnableAgent {
-    readonly id = FEATURE_WRITER_AGENT_ID;
-    readonly description = FEATURE_WRITER_DESCRIPTION;
+export class FeatureEditAgent extends PromptAgent implements RunnableAgent {
+    readonly id = FEATURE_EDIT_AGENT_ID;
+    readonly description = FEATURE_EDIT_DESCRIPTION;
 
-    constructor(private deps: FeatureWriterAgentDeps) {
+    constructor(private deps: FeatureEditAgentDeps) {
         super();
     }
 
@@ -49,7 +49,7 @@ export class FeatureWriterAgent extends PromptAgent implements RunnableAgent {
         this.setRuntimeContext({
             sourceTabId: context.sourceTabId,
             workspacePath: context.workspacePath,
-            parentAgentId: context.parentAgentId ?? FEATURE_WRITER_AGENT_ID,
+            parentAgentId: context.parentAgentId ?? FEATURE_EDIT_AGENT_ID,
         });
         
         const startFn = buildPromptAgentStart({

@@ -6,7 +6,8 @@
 
 // Blueprint Agent (formerly Story)
 export { createAgent as createBlueprintAgent } from './blueprint/index.js';
-export { createAgent as createFeatureWriterAgent } from './feature-writer/index.js';
+export { createAgent as createFeatureEditAgent } from './feature-edit/index.js';
+export { createAgent as createFeaturePlanAgent } from './feature-plan/index.js';
 export { createAgent as createCoderAgent } from './coder/index.js';
 export { createAgent as createReviewAgent } from './review/index.js';
 export { createAgent as createGlossaryAgent } from './glossary/index.js';

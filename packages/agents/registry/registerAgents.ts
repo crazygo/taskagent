@@ -8,7 +8,8 @@
 import { globalAgentRegistry } from './AgentRegistry.js';
 import { createAgent as createStartAgent } from '../desktop/index.js';
 import { createAgent as createBlueprintAgent } from '../blueprint/index.js';
-import { createAgent as createFeatureWriterAgent } from '../feature-writer/index.js';
+import { createAgent as createFeatureEditAgent } from '../feature-edit/index.js';
+import { createAgent as createFeaturePlanAgent } from '../feature-plan/index.js';
 import { createAgent as createGlossaryAgent } from '../glossary/index.js';
 import { createAgent as createUiReviewAgent } from '../ui-review/index.js';
 import { createAgent as createCoderAgent } from '../coder/index.js';
@@ -54,16 +55,28 @@ export function registerAllAgents(options?: { eventBus?: any; tabExecutor?: any;
         tags: ['planning', 'documentation'],
     });
 
-    // Feature Writer Agent
+    // Feature Plan Agent
     globalAgentRegistry.register({
-        id: 'feature-writer',
-        factory: () => createFeatureWriterAgent({
+        id: 'feature-plan',
+        factory: () => createFeaturePlanAgent({
             tabExecutor: options?.tabExecutor,
             eventBus: options?.eventBus,
             agentRegistry: globalAgentRegistry,
         }),
-        description: 'Feature Writer - Write structured feature YAML files',
-        tags: ['atomic', 'writer'],
+        description: 'Feature Plan - Analyze requirements and detect conflicts',
+        tags: ['atomic', 'planning', 'analysis'],
+    });
+
+    // Feature Edit Agent
+    globalAgentRegistry.register({
+        id: 'feature-edit',
+        factory: () => createFeatureEditAgent({
+            tabExecutor: options?.tabExecutor,
+            eventBus: options?.eventBus,
+            agentRegistry: globalAgentRegistry,
+        }),
+        description: 'Feature Edit - Add, delete, or change structured feature YAML files',
+        tags: ['atomic', 'editor'],
     });
 
     // Glossary Agent
