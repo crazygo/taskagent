@@ -28,7 +28,7 @@ const monitorWrapper = `#!/usr/bin/env node
 process.argv.push('--preset', 'monitor');
 
 // Load main CLI
-import('../dist/packages/cli/main.js');
+import('../dist/cli/main.js');
 `;
 
 // Output paths

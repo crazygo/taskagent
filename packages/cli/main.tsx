@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { render, Box, Text, useInput } from 'ink';
 import { randomUUID } from 'crypto';
 import { inspect } from 'util';
-import { type AgentDefinition, type PermissionUpdate, type PermissionResult } from '@anthropic-ai/claude-agent-sdk';
+import { type PermissionUpdate, type PermissionResult } from '@anthropic-ai/claude-agent-sdk';
 
 import { addLog } from '@taskagent/shared/logger';
 import { loadCliConfig } from './cli/config.js';
@@ -15,6 +15,7 @@ import { ChatPanel } from './components/ChatPanel.js';
 import { TabView } from './components/StatusControls.js';
 import { TaskSpecificView } from './components/TaskSpecificView.js';
 import { InputBar } from './components/InputBar.js';
+import { SURFACE_BACKGROUND_COLOR } from './components/theme.js';
 import type { AgentPermissionPromptState, AgentPermissionOption } from './components/AgentPermissionPrompt.types.js';
 import { AgentPermissionPromptComponent } from './components/AgentPermissionPrompt.js';
 import { useTaskStore } from './domain/taskStore.js';
@@ -23,8 +24,6 @@ import {
     Driver,
     type AgentPipelineInvocationOptions,
     type DriverManifestEntry,
-    type ViewDriverEntry,
-    type BackgroundTaskDriverEntry,
     type DriverRuntimeContext,
 } from './drivers/types.js';
 import {
@@ -54,6 +53,7 @@ import { useMessageStoreTab } from './hooks/useMessageStoreTab.js';
 import { useAgentEventBridge } from './hooks/useAgentEventBridge.js';
 import { TabExecutionManager, TabExecutor } from '@taskagent/execution';
 import type { ExecutionContext, ExecutionResult } from '@taskagent/execution';
+import { KeypressProvider } from './src/contexts/KeypressProvider.js';
 
 // Guard to prevent double submission in dev double-mount scenarios
 let __nonInteractiveSubmittedOnce = false;
@@ -1371,7 +1371,7 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
     if (!tabsInitialized) {
         return (
             <Box padding={1}>
-                <Text color="gray">Loading...</Text>
+                <Text color="gray">::</Text>
             </Box>
         );
     }
@@ -1390,15 +1390,16 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
     }
 
     return (
-        <Box flexDirection="column" height="100%">
-            <ChatPanel
-                frozenMessages={frozenMessages}
-                activeMessages={activeMessages}
-                modelName={modelName}
-                workspacePath={bootstrapConfig.workspacePath}
-                positionalPromptWarning={positionalPromptWarning}
-                sessionLabel={agentSessionId ? formatSessionId(agentSessionId) : null}
-            />
+        <KeypressProvider>
+            <Box flexDirection="column" height="100%">
+                <ChatPanel
+                    frozenMessages={frozenMessages}
+                    activeMessages={activeMessages}
+                    modelName={modelName}
+                    workspacePath={bootstrapConfig.workspacePath}
+                    positionalPromptWarning={positionalPromptWarning}
+                    sessionLabel={agentSessionId ? formatSessionId(agentSessionId) : null}
+                />
 
             {/* Render input UI and TabView only when raw mode/input is supported */}
             {(() => {
@@ -1406,7 +1407,7 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
                 return (
                     <>
                         {inputSupported && <InputHandlers />}
-                        <Box paddingY={1}>
+                        <Box paddingY={1} backgroundColor={SURFACE_BACKGROUND_COLOR}>
                             {inputSupported && (agentPermissionPrompt ? (
                                 <AgentPermissionPromptComponent
                                     prompt={agentPermissionPrompt}
@@ -1445,13 +1446,14 @@ const lastAnnouncedDriverRef = useRef<string | null>(null);
                         )}
                         <Box paddingX={1} backgroundColor="gray">
                             <Text>
-                                {(isEscActive ? "[Press ESC again to clear input]" : "Switch Driver: Ctrl+N") + ((bootstrapConfig.autoExit || bootstrapConfig.autoAllowPermissions) ? ` | Params: ${[bootstrapConfig.autoExit && '--auto-exit', bootstrapConfig.autoAllowPermissions && '--auto-allow'].filter(Boolean).join(' ')}` : '')}
+                                {(isEscActive ? "[Press ESC again to clear input]" : "Switch Driver: Ctrl+P/N") + ((bootstrapConfig.autoExit || bootstrapConfig.autoAllowPermissions) ? ` | Params: ${[bootstrapConfig.autoExit && '--auto-exit', bootstrapConfig.autoAllowPermissions && '--auto-allow'].filter(Boolean).join(' ')}` : '')}
                             </Text>
                         </Box>
                     </>
                 );
             })()}
-        </Box>
+            </Box>
+        </KeypressProvider>
     );
 };
 

@@ -14,7 +14,7 @@ describe('CLI tab entrypoints', () => {
   });
 
   test('application bootstraps with a prompt via -p flag', async () => {
-    const prompt = 'Hello, world!';
+    const prompt = 'Hello, world! Don\'t say anything else.';
     const { exitCode, stdout } = await runCommand('yarn', ['start', '--', '-p', prompt, '--newsession', '--auto-exit'], { testName: 'p-flag' });
     expect(exitCode).toBe(0);
     expect(stdout).toContain(prompt);

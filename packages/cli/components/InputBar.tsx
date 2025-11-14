@@ -1,8 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Box, Text, useInput } from 'ink';
-import TextInput from 'ink-text-input';
+import { Box, Text } from 'ink';
 import { CommandMenu } from './CommandMenu.js';
+import { SimpleTextDisplay } from './SimpleTextDisplay.js';
 import { addLog } from '@taskagent/shared/logger';
+import { useCommand } from '../src/hooks/useCommand.js';
+import { useKeypress, type Key } from '../src/hooks/useKeypress.js';
+import { Command as KeyCommand } from '../src/config/keyBindings.js';
+import { keyMatchers } from '../src/utils/keyMatchers.js';
+import { SURFACE_BACKGROUND_COLOR } from './theme.js';
 
 export interface Command {
   name: string;
@@ -11,7 +16,7 @@ export interface Command {
 
 interface InputBarProps {
   value: string;
-  onChange: (value: string) => void;
+  onChange: (value: string | ((prev: string) => string)) => void;
   onSubmit: (value: string) => void | Promise<unknown>;
   isFocused: boolean;
   onCommandMenuChange?: (isShown: boolean) => void;
@@ -31,12 +36,23 @@ export const InputBar: React.FC<InputBarProps> = ({
   const [showCommandMenu, setShowCommandMenu] = useState(false);
   const [filteredCommands, setFilteredCommands] = useState<Command[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [inputVersion, setInputVersion] = useState(0); // bump to remount input and move cursor to end
+  const [inputVersion, setInputVersion] = useState(0);
   const [isEscActive, setIsEscActive] = useState(false);
-  // 撤回 Ctrl+N 对输入框的干预，仅做日志观测
+  
+  // Caret index for insert mode
+  const [caretIndex, setCaretIndex] = useState<number>(value.length);
+  const caretRef = useRef<number>(caretIndex);
+  useEffect(() => { caretRef.current = caretIndex; }, [caretIndex]);
+  // Keep caret within bounds on external value changes
+  useEffect(() => { if (caretRef.current > value.length) setCaretIndex(value.length); }, [value]);
+
   const prevValueRef = useRef(value);
   const escTimerRef = useRef<NodeJS.Timeout | null>(null);
+  
   useEffect(() => {
+    if (prevValueRef.current !== value) {
+      setInputVersion(v => v + 1);
+    }
     prevValueRef.current = value;
   }, [value]);
 
@@ -73,17 +89,211 @@ export const InputBar: React.FC<InputBarProps> = ({
     }
   }, [onChange, onEscStateChange]);
 
-  // 当下拉命令菜单显示时，阻止 TextInput 的回车提交
-  const handleTextInputSubmit = (text: string) => {
-    if (process.env.E2E_SENTINEL) {
-      addLog(`[InputBar] TextInput onSubmit triggered with text="${text}" (showCommandMenu=${showCommandMenu})`);
+  // Handle all keypresses with batching for paste detection
+  const pendingCharsRef = useRef('');
+  const batchTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingIsPasteRef = useRef(false);
+  const recentPasteUntilRef = useRef<number>(0); // block submit within window
+  // Store collapsed paste blocks for later expansion on submit
+  const pasteStoreRef = useRef<{ placeholder: string; content: string }[]>([]);
+  
+  // Helper: flush pending characters immediately
+  const flushPending = useCallback(() => {
+    if (pendingCharsRef.current) {
+      const chars = pendingCharsRef.current;
+      onChange((prev: string) => {
+        const ci = caretRef.current;
+        const next = prev.slice(0, ci) + chars + prev.slice(ci);
+        setCaretIndex(ci + chars.length);
+        return next;
+      });
+      pendingCharsRef.current = '';
+      pendingIsPasteRef.current = false;
     }
-    if (showCommandMenu) {
-      // 命令菜单场景下，Enter 只用于上屏（在 useInput 中处理），此处不提交
+    if (batchTimerRef.current) {
+      clearTimeout(batchTimerRef.current);
+      batchTimerRef.current = null;
+    }
+  }, [onChange]);
+
+  // Keep latest value in a ref to avoid stale closure on submit
+  const valueRef = useRef(value);
+  useEffect(() => { valueRef.current = value; }, [value]);
+
+  // Handle submit command
+  const handleSubmitCommand = useCallback(() => {
+    // If paste window active, just flush and ignore submit to avoid accidental sends
+    if (Date.now() < recentPasteUntilRef.current || pendingIsPasteRef.current) {
+      flushPending();
       return;
     }
-    onSubmit(text);
-  };
+
+    // CRITICAL: Flush pending chars before submit
+    flushPending();
+    
+    // Small delay to ensure state is updated
+    setTimeout(() => {
+      let current = valueRef.current;
+      // Expand any paste placeholders back to original content
+      if (pasteStoreRef.current.length) {
+        for (const { placeholder, content } of pasteStoreRef.current) {
+          // Replace all occurrences (user may paste same size twice)
+          current = current.split(placeholder).join(content);
+        }
+        if (process.env.E2E_SENTINEL) {
+          addLog(`[InputBar] Expanded ${pasteStoreRef.current.length} paste placeholder(s) before submit`);
+        }
+      }
+      if (process.env.E2E_SENTINEL) {
+        addLog(`[InputBar] SUBMIT command, value length=${current.length}`);
+      }
+      if (showCommandMenu) {
+        return;
+      }
+      onSubmit(current);
+      // Clear paste store after successful submit
+      pasteStoreRef.current = [];
+    }, 20);
+  }, [showCommandMenu, onSubmit, flushPending]);
+
+  // Subscribe to commands
+  useCommand(KeyCommand.SUBMIT, handleSubmitCommand, { isActive: isFocused });
+  
+  // Reset caret to end after submit clears input
+  useEffect(() => {
+    if (value.length === 0 && caretRef.current !== 0) {
+      setCaretIndex(0);
+    }
+  }, [value]);
+  
+  useKeypress(
+    useCallback(
+      (key: Key) => {
+        if (!isFocused) return;
+        
+        if (key.name === 'escape') {
+          flushPending();
+          
+          if (showCommandMenu) {
+            setShowCommandMenu(false);
+            onCommandMenuChange?.(false);
+            return;
+          }
+          
+          if (isEscActive) {
+            handleSecondEsc();
+          } else {
+            handleFirstEsc();
+          }
+          return;
+        }
+        
+        // CRITICAL: Skip return/enter keys entirely - they should ONLY be handled as SUBMIT command
+        // This prevents paste with newlines from triggering multiple submits
+        if (key.name === 'return' || key.name === 'enter') {
+          return;
+        }
+        
+        // 1. Check if it's a command (handled by useCommand)
+        const commandValues = Object.values(KeyCommand) as KeyCommand[];
+        for (const cmd of commandValues) {
+          if (keyMatchers[cmd](key)) {
+            // Flush pending chars before command
+            flushPending();
+            return;
+          }
+        }
+
+        // 2. Handle text editing
+        // 2a. Arrow/home/end navigation
+        if (key.name === 'left') {
+          flushPending(); setCaretIndex(ci => Math.max(0, ci - 1)); return;
+        }
+        if (key.name === 'right') {
+          flushPending(); setCaretIndex(ci => Math.min(valueRef.current.length, ci + 1)); return;
+        }
+        if (key.name === 'home') {
+          flushPending(); setCaretIndex(0); return;
+        }
+        if (key.name === 'end') {
+          flushPending(); setCaretIndex(valueRef.current.length); return;
+        }
+
+        if (key.name === 'backspace') {
+          flushPending();
+          onChange((prev: string) => {
+            const ci = caretRef.current;
+            if (ci > 0) {
+              const next = prev.slice(0, ci - 1) + prev.slice(ci);
+              setCaretIndex(ci - 1);
+              return next;
+            }
+            return prev;
+          });
+          return;
+        }
+        if (key.name === 'delete') {
+          flushPending();
+          onChange((prev: string) => {
+            const ci = caretRef.current;
+            if (ci < prev.length) {
+              const next = prev.slice(0, ci) + prev.slice(ci + 1);
+              return next;
+            }
+            return prev;
+          });
+          return;
+        }
+
+        // 3. Normal printable characters - batch them
+        if (key.sequence) {
+          // Filter out any remaining newlines to prevent issues
+          // Convert newlines to spaces
+          const sanitized = key.sequence.replace(/[\r\n]/g, ' ');
+          
+          if (sanitized) {
+            pendingCharsRef.current += sanitized;
+            if (key.paste) pendingIsPasteRef.current = true;
+            // Open a short paste window on any batched input to prevent accidental submit
+            if (key.paste || sanitized.length > 1) {
+              recentPasteUntilRef.current = Date.now() + 600;
+            }
+            
+            // Clear existing timer
+            if (batchTimerRef.current) {
+              clearTimeout(batchTimerRef.current);
+            }
+            
+            // Flush after 50ms of no new input (paste detection)
+            batchTimerRef.current = setTimeout(() => {
+              flushPending();
+              batchTimerRef.current = null;
+            }, 50);
+          }
+        }
+      },
+      [
+        onChange,
+        isFocused,
+        flushPending,
+        showCommandMenu,
+        onCommandMenuChange,
+        handleFirstEsc,
+        handleSecondEsc,
+        isEscActive,
+      ],
+    ),
+    { isActive: true },
+  );
+  
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (batchTimerRef.current) {
+        clearTimeout(batchTimerRef.current);
+      }
+    };
+  }, []);
 
   // 检测是否应该显示命令菜单
   useEffect(() => {
@@ -127,70 +337,24 @@ export const InputBar: React.FC<InputBarProps> = ({
     };
   }, []);
 
-  // 仅记录：输入框层面捕获到 Ctrl+N，不做任何拦截
-  useInput((input, key) => {
-    if (key.ctrl && (input === 'n' || input === 'N')) {
-      addLog(`[InputBar] Ctrl+N detected (isFocused=${isFocused})`);
-    }
-  }, { isActive: isFocused });
-
-  // 处理下拉菜单中的按键事件
-  useInput((input, key) => {
-    if (!isFocused || !showCommandMenu) return;
-
-    if (key.upArrow) {
-      setSelectedIndex(prev => (prev > 0 ? prev - 1 : filteredCommands.length - 1));
-    } else if (key.downArrow) {
-      setSelectedIndex(prev => (prev < filteredCommands.length - 1 ? prev + 1 : 0));
-    } else if (key.tab) {
-      // Tab 键：自动补全并添加空格，不提交
-      const selected = filteredCommands[selectedIndex];
-      if (selected) {
-        onChange(`/${selected.name} `);
-        setShowCommandMenu(false);
-        setInputVersion(v => v + 1); // 重新挂载以将光标放到末尾
-      }
-    } else if (key.return && filteredCommands.length > 0) {
-      // Enter 键：自动补全并添加空格，不提交
-      const selected = filteredCommands[selectedIndex];
-      if (selected) {
-        onChange(`/${selected.name} `);
-        setShowCommandMenu(false);
-        setInputVersion(v => v + 1); // 重新挂载以将光标放到末尾
-      }
-    } else if (key.escape) {
-      setShowCommandMenu(false);
-    }
-  }, { isActive: isFocused && showCommandMenu });
-
-  // Handle double-ESC clearing mechanism
-  useInput((input, key) => {
-    if (!key.escape) return;
-    
-    if (isEscActive) {
-      handleSecondEsc();
-    } else {
-      handleFirstEsc();
-    }
-  }, { isActive: isFocused && !showCommandMenu });
-
-  // 仅记录变化轨迹，不做抑制
-  const handleChange = (next: string) => {
-    onChange(next);
-  };
-
   return (
-    <Box flexDirection="column">
-      <Box paddingX={1} width="100%">
-        <Text color={isFocused ? 'blue' : 'white'}>&gt; </Text>
-        <TextInput
-          key={inputVersion}
-          value={value}
-          onChange={handleChange}
-          onSubmit={handleTextInputSubmit}
-          placeholder="Type your message... or use /<command> <prompt>"
-          focus={isFocused}
-        />
+    <Box flexDirection="column" backgroundColor={SURFACE_BACKGROUND_COLOR}>
+      <Box
+        paddingX={1}
+        width="100%"
+        flexDirection="row"
+        backgroundColor={SURFACE_BACKGROUND_COLOR}
+      >
+        <Text color={isFocused ? 'blue' : 'black'}>&gt; </Text>
+        <Box flexGrow={1} minWidth={0}>
+          <SimpleTextDisplay
+            key={`display-${inputVersion}`}
+            value={value}
+            placeholder="Type your message... or use /<command> <prompt>"
+            isFocused={isFocused}
+            caretIndex={caretIndex}
+          />
+        </Box>
       </Box>
       {showCommandMenu && (
         <CommandMenu commands={filteredCommands} selectedIndex={selectedIndex} />

@@ -34,6 +34,7 @@
     "concurrently": "^9.2.1",
     "corepack": "^0.34.3",
     "execa": "^9.6.0",
+    "tsup": "^8.5.1",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3",
     "vitest": "^4.0.6"
@@ -44,7 +45,7 @@
   "type": "module",
   "scripts": {
     "start": "tsx packages/cli/main.tsx --",
-    "build": "tsc",
+    "build": "tsup packages/cli/main.tsx --format esm --target node20 --sourcemap --dts --out-dir dist/cli && node scripts/create-aliases.js",
     "postbuild": "node scripts/create-aliases.js",
     "prepublishOnly": "yarn build",
     "start:test": "concurrently --raw --kill-others --success first \"yarn start\" \"sleep 10\"",
@@ -66,9 +67,9 @@
     "README.md"
   ],
   "bin": {
-    "taskagent": "dist/packages/cli/main.js",
+    "taskagent": "dist/cli/main.js",
     "taskagent-monitor": "dist/main-monitor.js"
   },
-  "main": "dist/packages/cli/main.js",
-  "types": "dist/packages/cli/main.d.ts"
+  "main": "dist/cli/main.js",
+  "types": "dist/cli/main.d.ts"
 }
