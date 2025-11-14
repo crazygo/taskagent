@@ -67,8 +67,7 @@
     "README.md"
   ],
   "bin": {
-    "taskagent": "dist/packages/cli/main.js",
-    "task": "dist/packages/cli/main.js"
+    "taskagent": "dist/packages/cli/main.js"
   },
   "main": "dist/packages/cli/main.js"
 }
