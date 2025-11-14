@@ -14,13 +14,27 @@
     "moduleResolution": "NodeNext",
     "module": "NodeNext",
     "outDir": "./dist",
+    "rootDir": ".",
     "jsx": "react-jsx",
-    "types": ["node"]
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@taskagent/agents": ["packages/agents/index.ts"],
+      "@taskagent/agents/*": ["packages/agents/*"],
+      "@taskagent/shared": ["packages/shared/index.ts"],
+      "@taskagent/shared/*": ["packages/shared/*"],
+      "@taskagent/core": ["packages/core/index.ts"],
+      "@taskagent/core/*": ["packages/core/*"],
+      "@taskagent/execution": ["packages/execution/index.ts"],
+      "@taskagent/execution/*": ["packages/execution/*"],
+      "@taskagent/presets": ["packages/presets/index.ts"],
+      "@taskagent/presets/*": ["packages/presets/*"],
+      "@taskagent/tabs": ["packages/tabs/index.ts"],
+      "@taskagent/tabs/*": ["packages/tabs/*"]
+    }
   },
   "include": [
-    "ui.tsx",
-    "task-manager.ts",
-    "src/**/*.ts",
-    "src/**/*.tsx"
+    "packages/**/*.ts",
+    "packages/**/*.tsx"
   ]
 }

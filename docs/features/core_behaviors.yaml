@@ -1,0 +1,32 @@
+feature: "Core Application Behaviors"
+description: "Describes the fundamental interactive behaviors of the application based on verified acceptance criteria."
+
+scenarios:
+  - scenario: "Application starts and displays the correct default tabs"
+    given: "The application environment is set up."
+    when: "The user runs the application."
+    then:
+      - "The UI displays the 'Chat', 'Agent', 'Blueprint', and 'Glossary' tabs."
+      - "The 'Plan-Review-DO' tab is not visible."
+
+  - scenario: "The slash command menu shows commands for background and foreground tasks"
+    given: "The application is running."
+    when: "The user types '/' in the input bar."
+    then:
+      - "The command menu appears and contains 'newsession' and 'plan-review-do'."
+      - "The menu also contains commands for foreground and background execution, like '/fg:story', '/bg:story', and '/bg:log-monitor'."
+
+  - scenario: "A driver can be invoked directly via a CLI flag with a prompt"
+    given: "The application is not running."
+    when: 'The user runs `yarn start -- --blueprint -p "Draft a story for login"`'
+    then:
+      - "The application launches with the 'Blueprint' tab active."
+      - "The Blueprint agent's workflow is immediately triggered with the provided prompt."
+
+  - scenario: "Launching the application with the 'monitor' preset"
+    given: "A 'monitor' preset exists that is configured to only show the 'Monitor' tab."
+    when: "The user runs `yarn start -- --preset monitor`"
+    then:
+      - "The application starts."
+      - "The only tab visible in the UI is the 'Monitor' tab."
+      - "The 'Monitor' tab is active by default."

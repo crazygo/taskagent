@@ -1,0 +1,30 @@
+feature: "Slash Command Execution"
+description: "Describes how the system handles special commands prefixed with a '/'."
+
+scenarios:
+  - scenario: "User invokes a feature via a slash command"
+    given:
+      - "The user is on any tab."
+    when:
+      - "The user types a valid slash command, like '/story Write a short story', and submits."
+    then:
+      - "The agent or driver associated with the '/story' command is executed with the prompt 'Write a short story'."
+      - "The main input bar is cleared."
+
+  - scenario: "User manually starts a new agent session"
+    given:
+      - "The user is in a workspace with an active agent session."
+    when:
+      - "The user types '/newsession' and submits."
+    then:
+      - "A new, unique session ID is generated and becomes active."
+      - "A system message is displayed confirming the new session has started."
+
+  - scenario: "User starts a background task from the Agent tab"
+    given:
+      - "The user is on the 'Agent' tab with an active session."
+    when:
+      - "The user runs the command '/bg:log-monitor Monitor for errors'."
+    then:
+      - "A new background task is started by forking the 'Agent' tab's current session."
+      - "A new 'Task 1' tab is created to show the status of the background task."

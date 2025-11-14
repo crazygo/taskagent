@@ -1,18 +1,27 @@
 {
+  "name": "@askman-dev/task",
+  "version": "1.0.9",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
   "author": "",
   "dependencies": {
     "@ai-sdk/openai": "^2.0.48",
-    "@anthropic-ai/claude-agent-sdk": "^0.1.25",
+    "@anthropic-ai/claude-agent-sdk": "^0.1.30",
     "@langchain/core": "^1.0.1",
     "@langchain/langgraph": "^1.0.1",
     "@openrouter/ai-sdk-provider": "https://github.com/crazygo/ai-sdk-provider/releases/download/1.2.1/openrouter-ai-sdk-provider-1.2.1.tgz",
+    "@types/js-yaml": "^4.0.9",
     "ai": "^5.0.78",
     "dotenv": "^17.2.3",
+    "glob": "^11.0.3",
     "ink": "^6.3.1",
     "ink-text-input": "^6.0.0",
+    "js-yaml": "^4.1.0",
     "minimist": "^1.2.8",
     "react": "^19.2.0",
-    "zod": "^3.25.76"
+    "zod": "^3.22.4"
   },
   "description": "",
   "devDependencies": {
@@ -21,31 +30,46 @@
     "@types/minimist": "^1.2.0",
     "@types/node": "^24.7.1",
     "@types/react": "^19.2.2",
+    "@vitest/coverage-v8": "^4.0.6",
     "concurrently": "^9.2.1",
+    "corepack": "^0.34.3",
+    "execa": "^9.6.0",
+    "tsup": "^8.5.1",
     "tsx": "^4.20.6",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.6"
   },
   "keywords": [],
   "license": "ISC",
-  "name": "@askman-dev/task",
   "packageManager": "yarn@4.9.1",
-  "version": "1.0.9",
   "type": "module",
   "scripts": {
-    "start": "tsx ui.tsx --",
-    "build": "tsc",
+    "start": "tsx packages/cli/main.tsx --",
+    "build": "tsup packages/cli/main.tsx --format esm --target node20 --sourcemap --dts --out-dir dist/cli && node scripts/copy-assets.js",
     "prepublishOnly": "yarn build",
-    "start:test": "concurrently --raw --kill-others --success first \"yarn start\" \"sleep 5\"",
+    "start:test": "concurrently --raw --kill-others --success first \"yarn start\" \"sleep 10\"",
+    "test:story": "yarn start -- --blueprint -p \"Say [Hi]. Don't say anything else.\" --auto-allow --auto-exit",
+    "test:glossary": "yarn start -- --glossary -p \"Say [Hi]. Don't say anything else.\" --auto-allow --auto-exit",
     "e2e:experiment": "expect scripts/e2e-experiment.expect --",
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "publish": "echo \"Use yarn npm publish --access public\""
+    "test": "vitest",
+    "test:ci": "vitest run",
+    "test:devhub:status": "concurrently --raw --kill-others --success first \"yarn start -- --workspace $(mktemp -d)/taskagent-tmp --newsession --devhub --auto-allow --auto-exit -p 'Hello, please use send_to_looper tool with command status'\" \"sleep 20\"",
+    "test:devhub:start": "concurrently --raw --kill-others --success first \"yarn start -- --workspace $(mktemp -d)/taskagent-tmp --newsession --devhub --auto-allow --auto-exit -p 'Hello, please use send_to_looper tool with command start and task Optimize code structure'\" \"sleep 20\"",
+    "test:devhub:add_pending": "concurrently --raw --kill-others --success first \"yarn start -- --workspace $(mktemp -d)/taskagent-tmp --newsession --devhub --auto-allow --auto-exit -p 'Hello, please use send_to_looper tool with command add_pending and task Refactor logging system'\" \"sleep 20\"",
+    "test:devhub:stop": "concurrently --raw --kill-others --success first \"yarn start -- --workspace $(mktemp -d)/taskagent-tmp --newsession --devhub --auto-allow --auto-exit -p 'Hello, please use send_to_looper tool with command stop'\" \"sleep 20\"",
+    "test:watch": "vitest watch",
+    "publish": "echo \"Use yarn npm publish --access public\"",
+    "test:pack": "node scripts/test-pack.js"
   },
+  "_note_postbuild": "Yarn 4 hardened mode skips postbuild hooks, so asset copy runs inline in the build script.",
   "files": [
     "dist",
     "package.json",
     "README.md"
   ],
-  "bin": "dist/ui.js",
-  "main": "dist/ui.js",
-  "types": "dist/ui.d.ts"
+  "bin": {
+    "taskagent": "dist/cli/main.js"
+  },
+  "main": "dist/cli/main.js",
+  "types": "dist/cli/main.d.ts"
 }

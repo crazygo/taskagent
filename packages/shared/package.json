@@ -1,0 +1,19 @@
+{
+  "name": "@taskagent/shared",
+  "version": "0.0.1",
+  "type": "module",
+  "exports": {
+    "./logger": "./logger.ts",
+    "./task-logger": "./task-logger.ts",
+    "./env": "./env.ts",
+    "./types": "./types.ts",
+    "./task-manager": "./task-manager.ts"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.7.1",
+    "typescript": "^5.9.3"
+  }
+}

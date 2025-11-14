@@ -1,0 +1,19 @@
+{
+  "name": "@taskagent/core",
+  "version": "0.0.1",
+  "type": "module",
+  "exports": {
+    "./types/*": "./types/*.ts",
+    "./types/*.js": "./types/*.ts",
+    "./schemas/*": "./schemas/*.ts",
+    "./event-bus": "./event-bus/index.ts",
+    "./logger.js": "./logger.ts"
+  },
+  "dependencies": {
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^24.7.1",
+    "typescript": "^5.9.3"
+  }
+}

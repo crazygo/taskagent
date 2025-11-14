@@ -50,6 +50,7 @@ storybook-static/
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+!.yarn/constraints.pro
 # If not using Zero-Installs, ensure cache stays untracked
 .yarn/cache/
 
@@ -78,7 +79,8 @@ opencodetmp/
 .fileHistory/
 .kiro/
 .worktree/
-.askman/
+/.askman/*
+!/.askman/tasks
 
 # Qoder configuration
 .qoder/
@@ -88,3 +90,8 @@ opencodetmp/
 *.tgz
 package/
 unpack/
+
+# Test artifacts
+artifacts/
+.tmp-test-workspaces/
+.tmp-e2e-workspace/

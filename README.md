@@ -2,7 +2,7 @@
 
 ## What's This
 
-TaskAgent is a terminal-first workflow assistant built on top of React Ink, Anthropic’s Claude Agent SDK, and the Vercel AI tooling. It orchestrates multiple “aspect” agents (Story, UI Review, Plan-Review-Do, etc.) and provides a TUI for rapid iteration, streaming responses, and workspace-aware automation.
+TaskAgent is a terminal-first workflow assistant built on top of React Ink, Anthropic’s Claude Agent SDK, and the Vercel AI tooling. It orchestrates multiple “aspect” agents (Blueprint, UI Review, Plan-Review-Do, etc.) and provides a TUI for rapid iteration, streaming responses, and workspace-aware automation.
 
 ## CLI Usage
 
@@ -10,15 +10,16 @@ Run the interface with `yarn start -- [options]`. Helpful flags:
 
 - Before running, copy `.env.example` to `.env.local`, fill in the required credentials, and place the file either in the repo root or your active workspace (e.g. `{workspace}/.askman/.env.local`).
 - `-h`, `--help`: Show available options and exit.
-- `-p`, `--prompt <text>`: Submit an initial prompt automatically after launch.
+- `-p`, `--prompt <text>`: Submit an initial prompt automatically after launch (no longer auto-exits).
 - `-d`, `--driver <name>`: Open a specific tab/driver (`story`, `agent`, `plan-review-do`, etc.).
-- `--<driver>`: Shorthand for `--driver <driver>` (for example, `--story`).
+- `--<driver>`: Shorthand for `--driver <driver>` (for example, `--blueprint`).
 - `--workspace <path>` or `-w <path>`: Override the workspace directory (defaults to `~/.askman/default_workspace`).
 - `--newsession`: Force creation of a brand-new Claude session before processing input.
+- `--auto-exit`: After first prompt submission & streams finishing (or timeout) exit automatically.
 
 Examples:
 
-- `yarn start -- --story --newsession -p "Outline the onboarding story"`
+- `yarn start -- --blueprint --newsession -p "Outline the onboarding story"`
 - `yarn start -- -d agent -p "Summarize current tasks"`
 
 ## Development

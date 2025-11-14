@@ -1,0 +1,13 @@
+{
+  "name": "@taskagent/tabs",
+  "version": "0.0.1",
+  "type": "module",
+  "exports": {
+    ".": "./index.ts",
+    "./configs/*": "./configs/*.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^24.7.1",
+    "typescript": "^5.9.3"
+  }
+}

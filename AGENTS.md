@@ -1,15 +1,8 @@
-# Agent Execution Notes
+# AGENTS.md
 
-## `yarn start`
+---
 
-The `yarn start` command launches a long-running process that does not exit on its own.
-
-## `yarn start:test`
-
-To facilitate automated testing of the application's initialization and UI rendering, a `start:test` script has been added to `package.json`. This script uses `concurrently` with the `--raw` flag to run `yarn start` and automatically terminates it after 5 seconds. This allows for quick, non-interactive checks of the application's startup and UI rendering.
-
-**Usage:** `yarn start:test`
-
+# Part I: Rules for AI Coding Agent
 
 ## Core Mandate
 
@@ -29,10 +22,57 @@ Your primary role is to act as an interactive CLI agent for software engineering
 - **Memory**: Remember key facts and instructions provided by the user, especially regarding workflow (e.g., how to run and test the application).
 - **Testing Workflow**: Utilize the `yarn start:test` command for quick, automated checks of application initialization and UI rendering, as detailed in `AGENTS.md`.
 
+
+## How to Work with Humans (Rules for AI Coding Agent)
+
+When discussing technical solutions, follow this structure:
+
+1. **Current State**: Objectively describe current behavior/problems without subjective judgment
+2. **Requirements**: Clear goals (not solutions), quantifiable when possible
+3. **Research**: Existing capabilities, technical constraints, available mechanisms
+4. **Solution Directions (L1)**: 2-3 candidate approaches, one sentence each, no implementation details
+5. **Design Proposal (L2)**: Recommended direction + rationale + key decisions + trade-offs
+
+Forbidden:
+- Skipping steps 1-3 and jumping to solutions
+- Including code/API signatures in Level 1/2
+- Proposing more than 3 candidate directions
+
+Request Level 3 (Architecture) or Level 4 (Implementation) explicitly when details are needed.
+
 ## Agent Roles & Capabilities
 
 - **[Memory Systems Analyst](memory/AGENTS.md)**: Use for tasks involving the analysis of conversations or documents to extract and store structured memories (events, facts, skills).
 - **[Source Code Conventions](src/AGENTS.md)**: Implementation-level guidance for TUI streaming, message/state management, error boundaries, performance, and Ink UI.
+
+## Document & Memory Placement
+
+- **Chat Memory Store (`memory/chat/`)**: See [memory/chat/AGENTS.md](memory/chat/AGENTS.md) for details.
+- **Docs Memory Store (`memory/docs/`)**: See [memory/docs/AGENTS.md](memory/docs/AGENTS.md) for details.
+- **Serena MCP Named Memories**: Managed via MCP tools (`write_memory`, `read_memory`, `list_memories`, `delete_memory`). Follow each tool's definition for proper usage.
+- **Feature Specifications (`docs/features/`)**: ⚠️ **READ-ONLY** - Core business logic and feature specifications. AI agents **MUST NOT** modify these files proactively. Changes require:
+  - Explicit human request
+  - Rigorous review process
+  - Comprehensive testing verification
+  - These files define system behavior contracts and acceptance criteria
+
+## Agent Architecture Patterns
+
+### PromptAgent + sub-agents
+A PromptAgent that can be composed with sub-agents defined via .agent.md files, and can also serve as a sub-agent.
+
+**Examples:**
+- `drivers/story/agents/story_builder.agent.md` - File operations for story documents
+- `drivers/glossary/agents/1_searcher.agent.md` - Search for term occurrences
+- `drivers/glossary/agents/2_edits_planner.agent.md` - Plan term replacements
+- `drivers/glossary/agents/3_editor.agent.md` - Execute file edits
+
+### Coordinator (PromptAgent + sub-agents)
+An agent composed of a coordinator and multiple sub-agents. The coordinator defines the workflow and orchestration strategy for calling sub-agents.
+
+**Examples:**
+- `drivers/glossary/` - Coordinator orchestrates searcher → planner → editor workflow
+- `drivers/story/` - Coordinator manages single sub-agent (story_builder) with user dialogue
 
 ## Document & Memory Placement
 
@@ -50,8 +90,8 @@ Your primary role is to act as an interactive CLI agent for software engineering
 
 ## Story & Commit Policy
 
-### Story List 模板
-当用户要求输出 "story list" 时，使用以下简洁格式总结需求：
+### Story List Template
+When user requests a "story list", use this concise format to summarize requirements:
 
 ```markdown
 # [Feature Name]
@@ -65,44 +105,102 @@ Your primary role is to act as an interactive CLI agent for software engineering
 
 ## 🎯 Acceptance Criteria
 
-### Scenario 1: [简洁场景名]
+### Scenario 1: [Concise scenario name]
 
-Given that [前置条件]
-And [额外条件]
+Given that [preconditions]
+And [additional conditions]
 
-When [用户动作]
+When [user action]
 
-Then [期望结果]
-And [额外期望]
+Then [expected result]
+And [additional expectations]
 
 
-### Scenario 2: [另一个场景]
+### Scenario 2: [Another scenario]
 
-Given that [前置条件]
-When [用户动作] 
-Then [期望结果]
+Given that [preconditions]
+When [user action] 
+Then [expected result]
 ```
 
 ### 💡 Problems Solved
-[简洁描述此次修改解决的问题]
+[Concise description of problems solved by this change]
 
-### 适用范围
-- 分析 git diff 生成 story
-- 总结对话历史中的需求
-- 解读 PRD 文档
-- 任何需要结构化需求输出的场景
+### Applicable Scenarios
+- Analyze git diff to generate stories
+- Summarize requirements from conversation history
+- Interpret PRD documents
+- Any scenario requiring structured requirement output
  
-### 关键原则
-- 避免重复（不要 Success Criteria 部分，BDD 场景已经是验收标准）
-- 专注用户价值，不写技术实现
-- **始终从用户视角描述**，不提及代码符号、函数名、技术术语
-- 场景描述简洁明确，使用自然语言描述用户行为和期望
-- Given-When-Then 格式保持一致
+### Key Principles
+- Avoid duplication (no Success Criteria section - BDD scenarios already serve as acceptance criteria)
+- Focus on user value, not technical implementation
+- **Always describe from user perspective** - no code symbols, function names, or technical jargon
+- Keep scenario descriptions concise and clear using natural language for user behavior and expectations
+- Maintain consistent Given-When-Then format
 
-### Commit 要求
-- 使用 Story AC 的格式，总结变更，并加入到 Commit Message 中
+### Commit Requirements
+- Use Story AC format to summarize changes and include in Commit Message
  
  
+
+---
+
+# Part II: Project Information
+
+## Agent Execution Notes
+
+### `yarn start`
+
+The `yarn start` command launches a long-running process that does not exit on its own.
+
+### `yarn start:test`
+
+To facilitate automated testing of the application's initialization and UI rendering, a `start:test` script has been added to `package.json`. This script uses `concurrently` with the `--raw` flag to run `yarn start` and automatically terminates it after 5 seconds. This allows for quick, non-interactive checks of the application's startup and UI rendering.
+
+**Usage:** `yarn start:test`
+
+### Automated & Non-Interactive Testing
+
+For scripting and testing purposes, it is possible to submit a prompt automatically upon application startup. This is achieved by using a combination of a driver flag (e.g., `--blueprint`) and a prompt flag (`-p` or `--prompt`).
+
+**Rule:** The `-p` or `--prompt` flag is **mandatory** to trigger the automatic submission workflow. Any text provided after a driver flag without `-p` will be treated as a positional argument and ignored by the submission logic.
+
+**Correct Usage (Auto-submits):**
+```bash
+yarn start -- --glossary -p "What is a 'user story'?"
+```
+
+**Incorrect Usage (Does NOT auto-submit):**
+```bash
+# This will NOT switch to the Glossary tab and will NOT submit the prompt.
+# The application will start in the default Chat view.
+yarn start -- --glossary "What is a 'user story'?"
+```
+
+## Agent Architecture Patterns
+
+### PromptAgent + sub-agents
+A PromptAgent that can be composed with sub-agents defined via .agent.md files, and can also serve as a sub-agent.
+
+**Examples:**
+- `drivers/story/agents/story_builder.agent.md` - File operations for story documents
+- `drivers/glossary/agents/1_searcher.agent.md` - Search for term occurrences
+- `drivers/glossary/agents/2_edits_planner.agent.md` - Plan term replacements
+- `drivers/glossary/agents/3_editor.agent.md` - Execute file edits
+
+### Coordinator (PromptAgent + sub-agents)
+An agent composed of a coordinator and multiple sub-agents. The coordinator defines the workflow and orchestration strategy for calling sub-agents.
+
+**Examples:**
+- `drivers/glossary/` - Coordinator orchestrates searcher → planner → editor workflow
+- `drivers/story/` - Coordinator manages single sub-agent (story_builder) with user dialogue
+
+## Document & Memory Placement
+
+- **Chat Memory Store (`memory/chat/`)**: See [memory/chat/AGENTS.md](memory/chat/AGENTS.md) for details.
+- **Docs Memory Store (`memory/docs/`)**: See [memory/docs/AGENTS.md](memory/docs/AGENTS.md) for details.
+- **Serena MCP Named Memories**: Managed via MCP tools (`write_memory`, `read_memory`, `list_memories`, `delete_memory`). Follow each tool's definition for proper usage.
 
 ## Development Commands
 
@@ -121,7 +219,6 @@ tsx ui.tsx
 - **Package Manager**: Yarn Berry v4.9.1 with Plug'n'Play (no node_modules)
 - **Runtime**: Node.js with ES Modules
 - **Execution**: Direct TypeScript execution via tsx (no build step)
-- **Logging**: Real-time logging to `debug.log`
 
 ## Architecture Overview
 
@@ -176,7 +273,9 @@ OPENROUTER_BASE_URL='https://openrouter.ai/api/v1'
 - **Performance**: Memoization and throttled rendering for smooth terminal UI
 
 ### Logging and Debugging
-- Comprehensive logging to `debug.log` with timestamps
+- **Avoid `console.log`**: Do not use `console.log` for debugging. Console messages can interfere with Ink's TUI rendering, causing visual glitches and ghosting. Use the file-based logger instead.
+- **Claude Agent SDK**: For issues related to the Claude Agent SDK, refer to the official documentation: https://docs.claude.com/en/api/agent-sdk/typescript.md
+- Real-time debug output streams to `logs/debug.log`, and older sessions remain alongside it under the `logs/` directory for easy discovery.
 - Application lifecycle tracking (start, submissions, API calls, errors)
 - Stream progress monitoring for AI responses
 - Error details captured and displayed in system messages
@@ -198,11 +297,10 @@ OPENROUTER_BASE_URL='https://openrouter.ai/api/v1'
 ### Dependencies
 - **Core**: React, Ink, AI SDK, TypeScript
 - **Utilities**: dotenv for environment, zod for validation
+- **Package manager**: Yarn Berry with Plug'n'Play. Avoid running `npm install` or other npm-driven commands (they create `package-lock.json` and bypass `.pnp.cjs`). After changing dependencies run `yarn install` (or `yarn install --immutable`) so the PnP manifest stays in sync. Use `yarn add`, `yarn remove`, `yarn dlx`, and `yarn run`; never commit a `package-lock.json`.
 - **Development**: tsx for TypeScript execution, type definitions
 
 ## Important Technical Details
-
-### Terminal UI Considerations
 - ASCII-safe rendering with proper newline handling
 - Color-coded messages based on role (white=user, gray=assistant, yellow=system)
 - Box styling for system errors and welcome screen
@@ -219,4 +317,3 @@ OPENROUTER_BASE_URL='https://openrouter.ai/api/v1'
 - Comprehensive logging for debugging
 - Graceful fallbacks for missing configuration
 - User-friendly error messages in terminal interface
-- 你好
