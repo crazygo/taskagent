@@ -1,5 +1,5 @@
 import path from 'path';
-import { promises as fs } from 'fs';
+import { promises as fs, existsSync } from 'fs';
 import { glob } from 'glob';
 import yaml from 'js-yaml';
 import { z } from 'zod';
@@ -87,6 +87,59 @@ interface LoadAgentPipelineConfigOptions {
     disallowedTools?: string[];
 }
 
+const COORDINATOR_SEARCH_CACHE = new Map<string, { dir: string; path: string } | null>();
+
+function findProjectRoot(startDir: string): string | null {
+    let current = path.resolve(startDir);
+    while (true) {
+        if (existsSync(path.join(current, 'package.json'))) {
+            return current;
+        }
+        const parent = path.dirname(current);
+        if (parent === current) {
+            return null;
+        }
+        current = parent;
+    }
+}
+
+async function resolveCoordinatorLocation(driverDir: string, coordinatorFileName: string) {
+    const cacheKey = `${driverDir}::${coordinatorFileName}`;
+    if (COORDINATOR_SEARCH_CACHE.has(cacheKey)) {
+        return COORDINATOR_SEARCH_CACHE.get(cacheKey)!;
+    }
+
+    const searchRoots: string[] = [driverDir];
+    const projectRoot = findProjectRoot(driverDir);
+    if (projectRoot) {
+        searchRoots.push(path.join(projectRoot, 'dist', 'agents'));
+        searchRoots.push(path.join(projectRoot, 'packages', 'agents'));
+    }
+
+    for (const root of searchRoots) {
+        const direct = path.join(root, coordinatorFileName);
+        if (existsSync(direct)) {
+            const result = { dir: root, path: direct };
+            COORDINATOR_SEARCH_CACHE.set(cacheKey, result);
+            return result;
+        }
+        try {
+            const matches = await glob(path.join(root, '**', coordinatorFileName));
+            if (matches.length > 0) {
+                const matchPath = matches[0]!;
+                const result = { dir: path.dirname(matchPath), path: matchPath };
+                COORDINATOR_SEARCH_CACHE.set(cacheKey, result);
+                return result;
+            }
+        } catch {
+            // ignore glob failures for a root, try next
+        }
+    }
+
+    COORDINATOR_SEARCH_CACHE.set(cacheKey, null);
+    return null;
+}
+
 export async function loadAgentPipelineConfig(
     driverDir: string,
     options?: LoadAgentPipelineConfigOptions
@@ -106,11 +159,15 @@ export async function loadAgentPipelineConfig(
     }
 
     if (options?.coordinatorFileName) {
-        const coordinatorPath = path.join(driverDir, options.coordinatorFileName);
-        const coordinatorConfig = await parseAgentMdFile(coordinatorPath);
+        const resolved = await resolveCoordinatorLocation(driverDir, options.coordinatorFileName);
+        if (!resolved) {
+            throw new Error(`Could not locate ${options.coordinatorFileName} relative to ${driverDir}`);
+        }
+
+        const coordinatorConfig = await parseAgentMdFile(resolved.path);
 
         if (!coordinatorConfig) {
-            throw new Error(`Could not load or parse ${options.coordinatorFileName} in ${driverDir}`);
+            throw new Error(`Could not load or parse ${options.coordinatorFileName} in ${resolved.dir}`);
         }
 
         systemPrompt = coordinatorConfig.prompt;
@@ -126,7 +183,7 @@ export async function loadAgentPipelineConfig(
         }
 
         if (coordinatorConfig.sub_agents) {
-            const subAgentGlob = path.join(driverDir, coordinatorConfig.sub_agents);
+            const subAgentGlob = path.join(resolved.dir, coordinatorConfig.sub_agents);
             const subAgentFiles = await glob(subAgentGlob);
 
             agents = {};

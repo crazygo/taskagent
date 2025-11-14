@@ -45,8 +45,7 @@
   "type": "module",
   "scripts": {
     "start": "tsx packages/cli/main.tsx --",
-    "build": "tsup packages/cli/main.tsx --format esm --target node20 --sourcemap --dts --out-dir dist/cli && node scripts/create-aliases.js",
-    "postbuild": "node scripts/create-aliases.js",
+    "build": "tsup packages/cli/main.tsx --format esm --target node20 --sourcemap --dts --out-dir dist/cli && node scripts/copy-assets.js",
     "prepublishOnly": "yarn build",
     "start:test": "concurrently --raw --kill-others --success first \"yarn start\" \"sleep 10\"",
     "test:story": "yarn start -- --blueprint -p \"Hi\" --auto-allow --auto-exit",
@@ -61,14 +60,14 @@
     "test:watch": "vitest watch",
     "publish": "echo \"Use yarn npm publish --access public\""
   },
+  "_note_postbuild": "Yarn 4 hardened mode skips postbuild hooks, so asset copy runs inline in the build script.",
   "files": [
     "dist",
     "package.json",
     "README.md"
   ],
   "bin": {
-    "taskagent": "dist/cli/main.js",
-    "taskagent-monitor": "dist/main-monitor.js"
+    "taskagent": "dist/cli/main.js"
   },
   "main": "dist/cli/main.js",
   "types": "dist/cli/main.d.ts"
