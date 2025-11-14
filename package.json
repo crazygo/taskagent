@@ -45,7 +45,7 @@
   "type": "module",
   "scripts": {
     "start": "tsx packages/cli/main.tsx --",
-    "build": "tsup packages/cli/main.tsx --format esm --target node20 --sourcemap --dts --out-dir dist/cli",
+    "build": "tsup packages/cli/main.tsx --format esm --target node20 --sourcemap --dts --out-dir dist/cli && node scripts/copy-assets.js",
     "prepublishOnly": "yarn build",
     "start:test": "concurrently --raw --kill-others --success first \"yarn start\" \"sleep 10\"",
     "test:story": "yarn start -- --blueprint -p \"Hi\" --auto-allow --auto-exit",
@@ -60,6 +60,7 @@
     "test:watch": "vitest watch",
     "publish": "echo \"Use yarn npm publish --access public\""
   },
+  "_note_postbuild": "Yarn 4 hardened mode skips postbuild hooks, so asset copy runs inline in the build script.",
   "files": [
     "dist",
     "package.json",
