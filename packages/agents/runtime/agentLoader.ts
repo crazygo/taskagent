@@ -112,6 +112,8 @@ async function resolveCoordinatorLocation(driverDir: string, coordinatorFileName
     const searchRoots: string[] = [driverDir];
     const projectRoot = findProjectRoot(driverDir);
     if (projectRoot) {
+        // Support both preserved and non-preserved module layouts after bundling
+        searchRoots.push(path.join(projectRoot, 'dist', 'packages', 'agents'));
         searchRoots.push(path.join(projectRoot, 'dist', 'agents'));
         searchRoots.push(path.join(projectRoot, 'packages', 'agents'));
     }

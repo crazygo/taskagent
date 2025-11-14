@@ -32,22 +32,14 @@ export class JudgeAgent extends PromptAgent implements RunnableAgent {
     private systemPrompt?: string;
 
     async initialize() {
-        // In production (dist/), agent files are in dist/agents/devhub/judge/
-        // In development, they're alongside this file
+        // With --splitting, directory structure is preserved
+        // JudgeAgent.js and judge.agent.md are in the same directory
         const agentDir = path.dirname(fileURLToPath(import.meta.url));
-        let systemPromptPath = path.join(agentDir, 'judge.agent.md');
-        
-        // Check if running from dist/cli (bundled), need to go to dist/agents
-        try {
-            await fs.access(systemPromptPath);
-        } catch {
-            // Fallback: look in dist/agents/devhub/judge/
-            const distRoot = path.resolve(agentDir, '../../');
-            systemPromptPath = path.join(distRoot, 'agents/devhub/judge/judge.agent.md');
-        }
+        const systemPromptPath = path.join(agentDir, 'judge.agent.md');
         
         this.systemPrompt = await fs.readFile(systemPromptPath, 'utf-8');
         
+        addLog(`[JudgeAgent] Loaded from: ${systemPromptPath}`);
         addLog(`[JudgeAgent] Initialized with prompt length: ${this.systemPrompt.length}`);
     }
 
