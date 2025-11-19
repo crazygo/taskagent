@@ -33,6 +33,7 @@ coverage/
 
 # Bundlers and frameworks
 .parcel-cache/
+.vite-cache/
 .next/
 .nuxt/
 .svelte-kit/
