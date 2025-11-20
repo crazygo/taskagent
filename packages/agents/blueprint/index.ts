@@ -1,5 +1,6 @@
 import type { RunnableAgent } from '../runtime/types.js';
-import type { EventBus } from '@taskagent/core/event-bus';
+
+import type { EventBus } from '@core/event-bus';
 import { BlueprintLoop } from './BlueprintLoop.js';
 
 export async function createAgent(options?: {

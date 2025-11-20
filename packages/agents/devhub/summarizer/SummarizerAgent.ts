@@ -11,7 +11,7 @@ import { fileURLToPath } from 'url';
 import { PromptAgent, type AgentContext, type AgentToolContext, type RunnableAgent, type AgentStartContext, type AgentStartSinks, type ExecutionHandle } from '../../runtime/types.js';
 import { buildPromptAgentStart } from '../../runtime/runPromptAgentStart.js';
 import { loadAgentPipelineConfig } from '../../runtime/agentLoader.js';
-import { addLog } from '@taskagent/shared/logger';
+import { addLog } from '@shared/logger';
 
 const SUMMARIZER_AGENT_ID = 'summarizer';
 const SUMMARIZER_DESCRIPTION = 'Generate concise progress summaries from event logs';

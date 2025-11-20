@@ -6,7 +6,7 @@
  * 
  * Usage:
  * ```typescript
- * import { getPreset, PRESETS } from '@taskagent/presets';
+ * import { getPreset, PRESETS } from '@presets';
  * 
  * const preset = getPreset('default');
  * // or

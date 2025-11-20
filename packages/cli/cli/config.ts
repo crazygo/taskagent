@@ -1,8 +1,8 @@
 import { join } from 'node:path';
-import { loadEnv } from '@taskagent/shared/env';
+import { loadEnv } from '@shared/env';
 import { parseCliArgs } from './args.js';
 import { printCliUsage } from './help.js';
-import { addLog } from '@taskagent/shared/logger';
+import { addLog } from '@shared/logger';
 import type { DriverName } from '../drivers/types.js';
 
 export interface CliConfig {

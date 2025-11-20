@@ -1,7 +1,7 @@
 import { Box, Text } from 'ink';
 import React, { useCallback } from 'react';
-import type { Task } from '@taskagent/shared/task-manager';
-import { addLog } from '@taskagent/shared/logger';
+import type { Task } from '@shared/task-manager';
+import { addLog } from '@shared/logger';
 import { useCommand } from '../src/hooks/useCommand.js';
 import { Command } from '../src/config/keyBindings.js';
 import { ACTIVE_TAB_BACKGROUND_COLOR } from './theme.js';

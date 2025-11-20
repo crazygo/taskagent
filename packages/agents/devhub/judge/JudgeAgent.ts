@@ -12,7 +12,7 @@ import { fileURLToPath } from 'url';
 import { PromptAgent, type AgentContext, type AgentToolContext, type RunnableAgent, type AgentStartContext, type AgentStartSinks, type ExecutionHandle } from '../../runtime/types.js';
 import { buildPromptAgentStart } from '../../runtime/runPromptAgentStart.js';
 import { JudgeDecisionSchema, type JudgeDecision } from './schema.js';
-import { addLog } from '@taskagent/shared/logger';
+import { addLog } from '@shared/logger';
 import fs from 'fs/promises';
 
 const JUDGE_AGENT_ID = 'judge';

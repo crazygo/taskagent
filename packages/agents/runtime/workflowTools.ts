@@ -1,7 +1,7 @@
 import { tool } from '@anthropic-ai/claude-agent-sdk';
 import type { TabExecutor } from '../../execution/TabExecutor.js';
 import type { AgentRegistry } from '../registry/AgentRegistry.js';
-import type { EventBus } from '@taskagent/core/event-bus';
+import type { EventBus } from '@core/event-bus';
 import type { ZodTypeAny } from 'zod';
 
 export interface WorkflowSharedDependencies {

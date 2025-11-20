@@ -7,7 +7,7 @@
  * - Determine when to trigger summary (time-based or count-based)
  */
 
-import { addLog } from '@taskagent/shared/logger';
+import { addLog } from '@shared/logger';
 
 export interface TruncatedEvent {
     type: string;

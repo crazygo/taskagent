@@ -21,12 +21,12 @@
  * ```
  */
 
-import type { EventBus } from '@taskagent/core/event-bus';
-import type { AgentRegistry } from '@taskagent/agents/registry/AgentRegistry.js';
+import type { EventBus } from '@core/event-bus';
+import type { AgentRegistry } from '@agents/registry/AgentRegistry.js';
 import { TabExecutionManager } from './TabExecutionManager.js';
 import { MessageAdapter } from './MessageAdapter.js';
 import type { ExecutionContext, ExecutionResult } from './types.js';
-import type { AgentStartSinks } from '@taskagent/agents/runtime/types.js';
+import type { AgentStartSinks } from '@agents/runtime/types.js';
 
 export class TabExecutor {
     constructor(

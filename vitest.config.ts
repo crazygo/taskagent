@@ -1,7 +1,9 @@
 
 import { defineConfig } from 'vitest/config';
+import tsconfigPaths from 'vite-tsconfig-paths';
 
 export default defineConfig({
+  cacheDir: '.vite-cache',
   test: {
     include: ['tests/**/*.test.ts'],
     environment: 'node',
@@ -19,4 +21,5 @@ export default defineConfig({
       },
     },
   },
+  plugins: [tsconfigPaths()],
 });

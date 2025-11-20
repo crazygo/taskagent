@@ -9,7 +9,7 @@ import {
     type DriverPrepareFn 
 } from './types.js';
 import { handlePlanReviewDo } from './plan-review-do/index.js';
-import { buildPromptAgentStart } from '@taskagent/agents/runtime/runPromptAgentStart.js';
+import { buildPromptAgentStart } from '@agents/runtime/runPromptAgentStart.js';
 
 // Import placeholder views
 // import StoryView from '../views/StoryView.js'; // Will be replaced by StackAgentView

@@ -20,7 +20,7 @@ import {
 } from 'react';
 import { useStdin } from 'ink';
 import readline from 'node:readline';
-import { addLog } from '@taskagent/shared/logger';
+import { addLog } from '@shared/logger';
 
 // Bracketed paste protocol markers
 const PASTE_MODE_PREFIX = '\x1B[200~';

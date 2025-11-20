@@ -5,9 +5,9 @@
  * Provides unified interface for agent discovery and instantiation.
  */
 
-import type { EventBus } from '@taskagent/core/event-bus';
+import type { EventBus } from '@core/event-bus';
 import type { AgentStartContext, AgentStartSinks, ExecutionHandle, RunnableAgent } from '../runtime/types.js';
-import { MessageAdapter } from '@taskagent/execution/MessageAdapter.js';
+import { MessageAdapter } from '@execution/MessageAdapter.js';
 
 /**
  * Agent Factory - creates agent instances

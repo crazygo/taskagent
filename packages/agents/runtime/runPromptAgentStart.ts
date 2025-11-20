@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import { inspect } from 'util';
-import { addLog } from '@taskagent/shared/logger';
+import { addLog } from '@shared/logger';
 import { runClaudeStream } from './runClaudeStream.js';
 import { createSdkMcpServer } from '@anthropic-ai/claude-agent-sdk';
 import type { AgentDefinition, McpServerConfig, tool as createSdkTool } from '@anthropic-ai/claude-agent-sdk';
